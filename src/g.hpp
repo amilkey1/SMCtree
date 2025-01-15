@@ -37,6 +37,8 @@ namespace proj {
         static vector<string>           _sim_locus_name;
         static vector<unsigned>         _sim_locus_length;
         static double                   _sim_lambda;
+        static double                   _asrv_shape;
+        static double                   _comphet;
 
         static string   inventName(unsigned k, bool lower_case);
         static double   calcLogSum(const vector<double> & log_values);

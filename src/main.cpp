@@ -95,6 +95,8 @@ unsigned  G::_minor_version = 0;
 unsigned  G::_sim_ntaxa  = 4;
 double    G::_sim_lambda = 1.0;
 string    G::_sim_filename_prefix = "sim";
+double    G::_comphet    = G::_infinity;
+double    G::_asrv_shape = G::_infinity;
 
 vector<string>         G::_taxon_names;
 vector<string>         G::_locus_names;

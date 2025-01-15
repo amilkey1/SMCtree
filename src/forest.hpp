@@ -15,6 +15,7 @@ namespace proj {
         public:
         
             typedef set<Split> treeid_t;
+            typedef shared_ptr<Forest> SharedPtr;
 
             Forest();
             ~Forest();
@@ -25,8 +26,10 @@ namespace proj {
             void        createTrivialForest();
             void        joinRandomLineagePair(Lot::SharedPtr lot);
             unsigned    getNumLineages() const;
+            unsigned    getNumNodes() const;
             void        refreshAllPreorders() const;
             void        renumberInternals();
+            void        simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites);
 
         protected:
         
@@ -41,6 +44,7 @@ namespace proj {
             void        removeTwoAddOne(Node::ptr_vect_t & node_vect, Node * del1, Node * del2, Node * add);
             void        addTwoRemoveOne(Node::ptr_vect_t & node_vect, Node * del1, Node * del2, Node * add);
             void        addTwoRemoveOneAt(Node::ptr_vect_t & node_vect, unsigned pos1, Node * del1, unsigned pos2, Node * del2, Node * add);
+            double calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length);
             
             virtual void operator=(const Forest & other);
 
@@ -105,6 +109,14 @@ namespace proj {
     
     inline unsigned Forest::getNumLineages() const {
         return (unsigned)_lineages.size();
+    }
+    
+    inline unsigned Forest::getNumNodes() const {
+        unsigned n = 0;
+        for (auto & preorder : _preorders) {
+            n += (unsigned)preorder.size();
+        }
+        return n;
     }
     
     inline void Forest::joinRandomLineagePair(Lot::SharedPtr lot) {
@@ -557,5 +569,138 @@ namespace proj {
         assert(_lineages.size() == other._lineages.size());
                 
         refreshAllPreorders();
+    }
+
+    inline double Forest::calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length) {
+        assert(pi.size() == 4);
+        assert(fabs(accumulate(pi.begin(), pi.end(), 0.0) - 1.0) < G::_small_enough);
+        //assert(_relrate > 0.0);
+        double _relrate = 1.0;
+        double transition_prob = 0.0;
+        
+        // F81 transition probabilities
+        double Pi[] = {pi[0] + pi[2], pi[1] + pi[3], pi[0] + pi[2], pi[1] + pi[3]};
+        bool is_transition = (from == 0 && to == 2) || (from == 1 && to == 3) || (from == 2 && to == 0) || (from == 3 && to == 1);
+        bool is_same = (from == 0 && to == 0) || (from == 1 && to == 1) | (from == 2 && to == 2) | (from == 3 && to == 3);
+        bool is_transversion = !(is_same || is_transition);
+
+        // HKY expected number of substitutions per site
+        //  v = betat*(AC + AT + CA + CG + GC + GT + TA + TG) + kappa*betat*(AG + CT + GA + TC)
+        //    = 2*betat*(AC + AT + CG + GT + kappa(AG + CT))
+        //    = 2*betat*((A + G)*(C + T) + kappa(AG + CT))
+        //  betat = v/[2*( (A + G)(C + T) + kappa*(AG + CT) )]
+        double kappa = 1.0;
+        double betat = 0.5*_relrate*edge_length/((pi[0] + pi[2])*(pi[1] + pi[3]) + kappa*(pi[0]*pi[2] + pi[1]*pi[3]));
+        
+        if (is_transition) {
+            double pi_j = pi[to];
+            double Pi_j = Pi[to];
+            transition_prob = pi_j*(1.0 + (1.0 - Pi_j)*exp(-betat)/Pi_j - exp(-betat*(kappa*Pi_j + 1.0 - Pi_j))/Pi_j);
+        }
+        else if (is_transversion) {
+            double pi_j = pi[to];
+            transition_prob = pi_j*(1.0 - exp(-betat));
+        }
+        else {
+            double pi_j = pi[to];
+            double Pi_j = Pi[to];
+            transition_prob = pi_j*(1.0 + (1.0 - Pi_j)*exp(-betat)/Pi_j) + (Pi_j - pi_j)*exp(-betat*(kappa*Pi_j + 1.0 - Pi_j))/Pi_j;
+        }
+        return transition_prob;
+    }
+        
+    inline void Forest::simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites) {
+        
+        // Create vector of states for each node in the tree
+        unsigned nnodes = (unsigned)_nodes.size();
+        vector< vector<unsigned> > sequences(nnodes);
+        for (unsigned i = 0; i < nnodes; i++) {
+            sequences[i].resize(nsites, 4);
+        }
+        
+        // Walk through tree in preorder sequence, simulating all sites as we go
+        //    DNA   state      state
+        //         (binary)  (decimal)
+        //    A      0001        1
+        //    C      0010        2
+        //    G      0100        4
+        //    T      1000        8
+        //    ?      1111       15
+        //    R      0101        5
+        //    Y      1010       10
+        
+        // Draw equilibrium base frequencies from Dirichlet
+        // having parameter G::_comphet
+        vector<double> basefreq = {0.25, 0.25, 0.25, 0.25};
+        if (G::_comphet != G::_infinity) {
+            // Draw 4 Gamma(G::_comphet, 1) variates
+            double A = lot->gamma(G::_comphet, 1.0);
+            double C = lot->gamma(G::_comphet, 1.0);
+            double G = lot->gamma(G::_comphet, 1.0);
+            double T = lot->gamma(G::_comphet, 1.0);
+            double total = A + C + G + T;
+            basefreq[0] = A/total;
+            basefreq[1] = C/total;
+            basefreq[2] = G/total;
+            basefreq[3] = T/total;
+        }
+        
+        // Simulate starting sequence at the root node
+        Node * nd = *(_lineages.begin());
+        unsigned ndnum = nd->_number;
+        assert(ndnum < nnodes);
+        for (unsigned i = 0; i < nsites; i++) {
+            sequences[ndnum][i] = G::multinomialDraw(lot, basefreq);
+        }
+        
+        nd = findNextPreorder(nd);
+        while (nd) {
+            ndnum = nd->_number;
+            assert(ndnum < nnodes);
+
+            // Get reference to parent sequence
+            assert(nd->_parent);
+            unsigned parnum = nd->_parent->_number;
+            assert(parnum < nnodes);
+            
+            // Evolve nd's sequence given parent's sequence and edge length
+            for (unsigned i = 0; i < nsites; i++) {
+                // Choose relative rate for this site
+                double site_relrate = 1.0;
+                if (G::_asrv_shape != G::_infinity)
+                    site_relrate = lot->gamma(G::_asrv_shape, 1.0/G::_asrv_shape);
+                unsigned from_state = sequences[parnum][i];
+                double cum_prob = 0.0;
+                double u = lot->uniform();
+                for (unsigned to_state = 0; to_state < 4; to_state++) {
+                    cum_prob += calcSimTransitionProbability(from_state, to_state, basefreq, site_relrate*nd->_edge_length);
+                    if (u < cum_prob) {
+                        sequences[ndnum][i] = to_state;
+                        break;
+                    }
+                }
+                assert(sequences[ndnum][i] < 4);
+            }
+            
+            // Move to next node in preorder sequence
+            nd = findNextPreorder(nd);
+        }
+
+        assert(data);
+        Data::data_matrix_t & dm = data->getDataMatrixNonConst();
+        
+        // Copy sequences to data object
+        for (unsigned t = 0; t < G::_ntaxa; t++) {
+            // Allocate row t of _data's _data_matrix data member
+            dm[t].resize(starting_site + nsites);
+            
+            // Get reference to nd's sequence
+            unsigned ndnum = _nodes[t]._number;
+            
+            // Translate to state codes and copy
+            for (unsigned i = 0; i < nsites; i++) {
+                dm[t][starting_site + i] = (Data::state_t)1 << sequences[ndnum][i];
+            }
+        }
     }
 }

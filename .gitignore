@@ -1,2 +1,5 @@
 test/sim.tre
 test/sim.nex
+test/mltree.tre
+test/pauplog.txt
+test/sim-paup.nex

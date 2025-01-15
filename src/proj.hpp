@@ -33,14 +33,16 @@ namespace proj {
             
             void simulate();
             void simulateTree();
-            void simulateData(string locus_name, unsigned locus_length);
+            void simulateData(Lot::SharedPtr lot, unsigned startat, unsigned locus_length);
             void simulateSave(string fnprefix);
             
             void smc();
             
             void parseLocusSpec(string s) const;
             
-            Forest _sim_tree;
+            Forest::SharedPtr    _sim_tree;
+            Partition::SharedPtr _partition;
+            Data::SharedPtr      _data;
     };
 
     inline Proj::Proj() {
@@ -51,10 +53,12 @@ namespace proj {
     }
     
     inline void Proj::clear() {
+        _data = nullptr;
+        _partition.reset(new Partition());
     }
 
     inline void Proj::processCommandLineOptions(int argc, const char * argv[]) {
-        vector<string> locus_specs;
+        vector<string> partition_subsets;
         variables_map vm;
         options_description desc("Allowed options");
         desc.add_options()
@@ -66,7 +70,7 @@ namespace proj {
         ("startmode",  value(&G::_start_mode)->default_value("smc"), "smc or sim")
         ("simfnprefix",  value(&G::_sim_filename_prefix), "prefix of files in which to save simulated trees and data if startmode is 'sim' (e.g. specifying 'sim' results in files named 'sim.tre' and 'sim.nex')")
         ("simntaxa",  value(&G::_sim_ntaxa)->default_value(4), "number of taxa to simulate if startmode is 'sim'")
-        ("simlocus",  value(&locus_specs), "string providing the name and number of sites for a locus if startmode is 'sim' (e.g. 'rbcl:1314')")
+        ("subset",  value(&partition_subsets), "a string defining a partition subset, e.g. 'first:1-1234\3' or 'default[codon:standard]:1-3702'")
         ("simlambda",  value(&G::_sim_lambda)->default_value(1.0), "true speciation rate for simulating tree under the Yule model if startmode is 'sim'")
         ;
         
@@ -92,11 +96,12 @@ namespace proj {
             exit(1);
         }
         
-        // If user specified simlocus, break locus specification
-        // into a locus name and number of sites
-        if (vm.count("simlocus") > 0) {
-            for (auto s : locus_specs) {
-                parseLocusSpec(s);
+        // If user specified --subset on command line, break specified partition subset
+        // definition into name and character set string and add to _partition
+        if (vm.count("subset") > 0) {
+            _partition.reset(new Partition());
+            for (auto s : partition_subsets) {
+                _partition->parseSubsetDefinition(s);
             }
         }
         
@@ -135,8 +140,6 @@ namespace proj {
     inline void Proj::simulate() {
         // Sanity checks
         assert(G::_sim_ntaxa > 0);
-        assert(G::_sim_locus_name.size() > 0);
-        assert(G::_sim_locus_name.size() == G::_sim_locus_length.size());
         
         // Show simulation settings to user
         output(format("Simulating data for %d taxa and %d loci\n") % G::_sim_ntaxa % G::_sim_locus_name.size(), 0);
@@ -149,10 +152,31 @@ namespace proj {
         // Simulate the tree
         simulateTree();
         
+        // Interrogate _partition to determine number of genes, gene names, and
+        // number of sites in each gene
+        G::_nloci = _partition->getNumSubsets();
+        G::_nsites_per_locus.resize(G::_nloci);
+        G::_locus_names.resize(G::_nloci);
+        unsigned total_nsites = 0;
+        for (unsigned g = 0; g < G::_nloci; g++) {
+            unsigned locusnsites = _partition->numSitesInSubset(g);
+            total_nsites += locusnsites;
+            string locusname = _partition->getSubsetName(g);
+            G::_nsites_per_locus[g] = locusnsites;
+            G::_locus_names[g] = locusname;
+        }
+
+        // Create data object
+        assert(!_data);
+        _data = Data::SharedPtr(new Data());
+        _data->setTaxonNames(G::_taxon_names);
+        _data->setPartition(_partition);
+        
         // Simulate data for each locus given the tree
-        unsigned nloci = (unsigned)G::_sim_locus_name.size();
-        for (unsigned i = 0; i < nloci; i++) {
-            simulateData(G::_sim_locus_name[i], G::_sim_locus_length[i]);
+        unsigned starting_site = 0;
+        for (unsigned g = 0; g < G::_nloci; ++g) {
+            _sim_tree->simulateData(::rng, _data, starting_site, G::_nsites_per_locus[g]);
+            starting_site += G::_nsites_per_locus[g];
         }
         
         // Save simulated data to file
@@ -170,10 +194,11 @@ namespace proj {
             G::_taxon_names[i] = G::inventName(i, /*lower_case*/false);
         
         unsigned nsteps = nleaves - 1;
-        _sim_tree.createTrivialForest();
+        _sim_tree = Forest::SharedPtr(new Forest);
+        _sim_tree->createTrivialForest();
         for (unsigned i = 0; i < nsteps; i++) {
             // Determine number of lineages remaining
-            unsigned n = _sim_tree.getNumLineages();
+            unsigned n = _sim_tree->getNumLineages();
             assert(n > 1);
             
             // Waiting time to speciation event is Exponential(rate = n*lambda)
@@ -181,28 +206,49 @@ namespace proj {
             double r = G::_sim_lambda*n;
             double u = rng->uniform();
             double t = -log(1.0 - u)/r;
-            _sim_tree.advanceAllLineagesBy(t);
+            _sim_tree->advanceAllLineagesBy(t);
             
             // Join two random lineages
-            _sim_tree.joinRandomLineagePair(rng);
+            _sim_tree->joinRandomLineagePair(rng);
         }
-        assert(_sim_tree.getNumLineages() == 1);
-        _sim_tree.refreshAllPreorders();
-        _sim_tree.renumberInternals();
+        assert(_sim_tree->getNumLineages() == 1);
+        _sim_tree->refreshAllPreorders();
+        _sim_tree->renumberInternals();
     }
-    
-    inline void Proj::simulateData(string locus_name, unsigned locus_length) {
-        output(format("*** not simulating data for locus %s (length %d) ***\n") % locus_name % locus_length, 0);
-    }
-    
+        
     inline void Proj::simulateSave(string fnprefix) {
         string tree_file_name = fnprefix + ".tre";
         ofstream treef(tree_file_name);
         treef << "#nexus\n\n";
         treef << "begin trees;\n";
-        treef << "  tree true = [&R] " << _sim_tree.makeNewick(/*precision*/9, /*use_names*/true) << ";\n";
+        treef << "  tree true = [&R] " << _sim_tree->makeNewick(/*precision*/9, /*use_names*/true) << ";\n";
         treef << "end;\n\n";
         treef.close();
+
+        // Output data to file
+        string data_file_name = fnprefix + ".nex";
+        _data->compressPatterns();
+        _data->writeDataToFile(data_file_name);
+        output(format("  Sequence data saved in file \"%s\"\n") % data_file_name, 0);
+
+        // Output a PAUP* command file for estimating the species tree using
+        // svd quartets and qage
+        string paup_command_file_name = fnprefix + "-paup.nex";
+        output(format("  PAUP* commands saved in file \"%s\"\n") % paup_command_file_name, 1);
+        ofstream paupf(paup_command_file_name);
+        paupf << "#NEXUS\n\n";
+        paupf << "begin paup;\n";
+        paupf << "  log start file=pauplog.txt replace;\n";
+        paupf << "  exe " << data_file_name << ";\n";
+        paupf << "  gettrees file=" << tree_file_name << ";\n";
+        paupf << "  set crit= like;\n";
+        paupf << "  lset nst=1 basefreq=equal rates=equal pinvar=0 clock;\n";
+        paupf << "  hsearch;\n";
+        paupf << "  savetrees file=mltree.tre brlen;\n";
+        paupf << "  log stop;\n";
+        paupf << "  quit;\n";
+        paupf << "end;\n";
+        paupf.close();
     }
 
     inline void Proj::smc() {
