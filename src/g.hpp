@@ -30,6 +30,7 @@ namespace proj {
         static string                   _program_name;
         static unsigned                 _major_version;
         static unsigned                 _minor_version;
+        static string                   _start_mode;
 
         static string   inventName(unsigned k, bool lower_case);
         static double   calcLogSum(const vector<double> & log_values);

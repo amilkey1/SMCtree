@@ -98,6 +98,8 @@ vector<unsigned>       G::_nsites_per_locus;
 map<unsigned,unsigned> G::_nexus_taxon_map;
 map<unsigned, double>  G::_relrate_for_locus;
 
+string                  G::_start_mode = "smc";
+
 static_assert(std::numeric_limits<double>::is_iec559, "IEEE 754 required in order to use infinity()");
 
 GeneticCode::genetic_code_definitions_t GeneticCode::_definitions = { 

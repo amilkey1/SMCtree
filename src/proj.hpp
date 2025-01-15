@@ -25,9 +25,13 @@ namespace proj {
                                             Proj();
                                             ~Proj();
    
-            void                            clear();
             void                            processCommandLineOptions(int argc, const char * argv[]);
             void                            run();
+        
+        private:
+            void                            clear();
+            void                            simulate();
+            void                            smc();
                                     
     };
 
@@ -50,6 +54,7 @@ namespace proj {
         ("lambda",  value(&G::_lambda)->default_value(10.0), "per lineage speciation rate assumed for the Yule model")
         ("rnseed",  value(&G::_rnseed)->default_value(1), "pseudorandom number seed")
         ("nthreads",  value(&G::_nthreads)->default_value(1), "number of threads")
+        ("startmode",  value(&G::_start_mode)->default_value("smc"), "smc or sim")
         ;
         
         store(parse_command_line(argc, argv, desc), vm);
@@ -76,6 +81,20 @@ namespace proj {
     }
 
     inline void Proj::run() {
+        if (G::_start_mode == "sim") {
+            simulate();
+        }
+        else {
+            smc();
+        }
+    }
+
+    inline void Proj::simulate() {
+        
+    }
+
+    inline void Proj::smc() {
+        
     }
         
 }
