@@ -31,6 +31,12 @@ namespace proj {
         static unsigned                 _major_version;
         static unsigned                 _minor_version;
         static string                   _start_mode;
+        
+        static string                   _sim_filename_prefix;
+        static unsigned                 _sim_ntaxa;
+        static vector<string>           _sim_locus_name;
+        static vector<unsigned>         _sim_locus_length;
+        static double                   _sim_lambda;
 
         static string   inventName(unsigned k, bool lower_case);
         static double   calcLogSum(const vector<double> & log_values);

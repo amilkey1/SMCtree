@@ -55,8 +55,8 @@ using boost::format;
 #include "partition.hpp"
 #include "data.hpp"
 //#include "partial_store.hpp"
-//#include "node.hpp"
-//#include "forest.hpp"
+#include "node.hpp"
+#include "forest.hpp"
 #include "proj.hpp"
 
 using namespace proj;
@@ -92,13 +92,21 @@ string    G::_program_name = "smctree";
 unsigned  G::_major_version = 0;
 unsigned  G::_minor_version = 0;
 
+unsigned  G::_sim_ntaxa  = 4;
+double    G::_sim_lambda = 1.0;
+string    G::_sim_filename_prefix = "sim";
+
 vector<string>         G::_taxon_names;
 vector<string>         G::_locus_names;
 vector<unsigned>       G::_nsites_per_locus;
 map<unsigned,unsigned> G::_nexus_taxon_map;
 map<unsigned, double>  G::_relrate_for_locus;
+vector<string>         G::_sim_locus_name;
+vector<unsigned>       G::_sim_locus_length;
 
 string                  G::_start_mode = "smc";
+
+const double Node::_smallest_edge_length = 1e-9;
 
 static_assert(std::numeric_limits<double>::is_iec559, "IEEE 754 required in order to use infinity()");
 
