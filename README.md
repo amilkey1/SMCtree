@@ -1,2 +1,2 @@
 # SMCtree
-SMC for clock tree
+SMC for clock trees
