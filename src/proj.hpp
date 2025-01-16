@@ -38,8 +38,6 @@ namespace proj {
             
             void smc();
             
-            void parseLocusSpec(string s) const;
-            
             Forest::SharedPtr    _sim_tree;
             Partition::SharedPtr _partition;
             Data::SharedPtr      _data;
@@ -64,7 +62,7 @@ namespace proj {
         desc.add_options()
         ("help,h", "produce help message")
         ("version,v", "show program version")
-        ("lambda",  value(&G::_lambda)->default_value(10.0), "per lineage speciation rate assumed for the Yule model")
+        ("verbosity",  value(&G::_verbosity)->default_value(1), "0 (nothing but essential output), 1, 2, ...")
         ("rnseed",  value(&G::_rnseed)->default_value(1), "pseudorandom number seed")
         ("nthreads",  value(&G::_nthreads)->default_value(1), "number of threads")
         ("startmode",  value(&G::_start_mode)->default_value("smc"), "smc or sim")
@@ -107,27 +105,6 @@ namespace proj {
         
     }
     
-    inline void Proj::parseLocusSpec(string s) const {
-        vector<string> v;
-        
-        // Separate part before colon from part after colon
-        split(v, s, boost::is_any_of(":"));
-        if (v.size() != 2) {
-            throw XProj(format("Expecting exactly one colon in locus definition (\"%s\")") % s);
-        }
-
-        string locus_name = v[0];
-        trim(locus_name);
-        
-        if (!all_of(v[1].begin(), v[1].end(), ::isdigit)) {
-            throw XProj(format("Locus length specification (\"%s\") must contain only digits") % v[1]);
-        }
-        
-        unsigned locus_length = (unsigned)stoi(v[1]);
-        G::_sim_locus_name.push_back(locus_name);
-        G::_sim_locus_length.push_back(locus_length);
-    }
-
     inline void Proj::run() {
         if (G::_start_mode == "sim") {
             simulate();
@@ -140,14 +117,6 @@ namespace proj {
     inline void Proj::simulate() {
         // Sanity checks
         assert(G::_sim_ntaxa > 0);
-        
-        // Show simulation settings to user
-        output(format("Simulating data for %d taxa and %d loci\n") % G::_sim_ntaxa % G::_sim_locus_name.size(), 0);
-        output("  Locus names and lengths:\n", 0);
-        for (unsigned i = 0; i < G::_sim_locus_name.size(); ++i) {
-            output(format("    %s (%d sites)\n") % G::_sim_locus_name[i] % G::_sim_locus_length[i], 0);
-        }
-        output(format("  True speciation rate: %g\n") % G::_sim_lambda, 0);
         
         // Simulate the tree
         simulateTree();
@@ -217,6 +186,15 @@ namespace proj {
     }
         
     inline void Proj::simulateSave(string fnprefix) {
+        // Show simulation settings to user
+        string locus_or_loci = (G::_nloci != 1 ? "loci" : "locus");
+        output(format("Simulating data for %d taxa and %d %s\n") % G::_sim_ntaxa % G::_nloci % locus_or_loci, 0);
+        output("  Locus names and lengths:\n", 0);
+        for (unsigned i = 0; i < G::_nloci; ++i) {
+            output(format("    %s (%d sites)\n") % G::_locus_names[i] % G::_nsites_per_locus[i], 0);
+        }
+        output(format("  True speciation rate: %g\n") % G::_sim_lambda, 0);
+
         string tree_file_name = fnprefix + ".tre";
         ofstream treef(tree_file_name);
         treef << "#nexus\n\n";
@@ -240,11 +218,26 @@ namespace proj {
         paupf << "begin paup;\n";
         paupf << "  log start file=pauplog.txt replace;\n";
         paupf << "  exe " << data_file_name << ";\n";
-        paupf << "  gettrees file=" << tree_file_name << ";\n";
         paupf << "  set crit= like;\n";
-        paupf << "  lset nst=1 basefreq=equal rates=equal pinvar=0 clock;\n";
+        paupf << "  lset nst=1 basefreq=equal rates=equal pinvar=0 clock userbrlen;\n";
+        paupf << "  gettrees file=" << tree_file_name << ";\n";
+        paupf << "[!\n";
+        paupf << "*********** true tree ***********]\n";
+        paupf << "  describe 1 / plot=none brlens=sumonly;\n";
+        paupf << "  lset nouserbrlen;\n";
         paupf << "  hsearch;\n";
         paupf << "  savetrees file=mltree.tre brlen;\n";
+        paupf << "[!\n";
+        paupf << "*********** ML tree ***********]\n";
+        paupf << "  describe 1 / plot=none brlens=sumonly;\n";
+        paupf << "[!\n";
+        paupf << "*********** Tree distances ***********]\n";
+        paupf << "  lset userbrlen;\n";
+        paupf << "  gettrees file=sim.tre mode=3;\n";
+        paupf << "  gettrees file=mltree.tre mode=7;\n";
+        paupf << "  [gettrees file=beast/summary.tree mode=7;]\n";
+        paupf << "  treedist reftree=1 measure=pathlength file=pldist.txt replace;\n";
+        paupf << "  treedist reftree=1 measure=rfSymDiff file=rfdist.txt replace;\n";
         paupf << "  log stop;\n";
         paupf << "  quit;\n";
         paupf << "end;\n";
