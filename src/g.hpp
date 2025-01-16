@@ -37,6 +37,7 @@ namespace proj {
         static map<string, string>      _taxon_map;
         static unsigned                 _nspecies;
         static bool                     _save_memory;
+        static string                   _model;
 
         static string   inventName(unsigned k, bool lower_case);
         static double   calcLogSum(const vector<double> & log_values);

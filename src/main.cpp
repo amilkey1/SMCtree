@@ -95,6 +95,7 @@ unsigned  G::_verbosity = 1;
 string    G::_program_name = "smctree";
 unsigned  G::_major_version = 0;
 unsigned  G::_minor_version = 0;
+string    G::_model = "JC";
 
 vector<string>         G::_taxon_names;
 vector<string>         G::_locus_names;

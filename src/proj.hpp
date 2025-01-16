@@ -72,7 +72,8 @@ namespace proj {
         ("verbosity",  value(&G::_verbosity), "level of output")
         ("subset",  value(&partition_subsets), "a string defining a partition subset, e.g. 'first:1-1234\3' or 'default[codon:standard]:1-3702'")
         ("nparticles",  value(&G::_nparticles)->default_value(500), "number of particles)")
-        ("savememory",  value(&G::_save_memory)->default_value(false), "save memory by recalculating partials each round)")
+        ("savememory",  value(&G::_save_memory)->default_value(false), "save memory by recalculating partials each round")
+        ("model",  value(&G::_model)->default_value("JC"), "model to use for likelihood calculations")
         ;
         
         store(parse_command_line(argc, argv, desc), vm);
@@ -179,8 +180,10 @@ namespace proj {
                 double ess = filterParticles(g, particle_vec);
                 output(format("     ESS = %d\n") % ess, 2);
                 
-                for (auto &p:particle_vec) {
-                    p.showParticle();
+                if (g == nsteps - 1) {
+                    for (auto &p:particle_vec) {
+                        p.showParticle();
+                    }
                 }
             }
             
