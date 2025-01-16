@@ -4,13 +4,13 @@ namespace proj {
 
     class Likelihood;
     class Forest;
-    class ForestPOL;
+    class Forest;
     class Particle;
 
     class Node {
         friend class Likelihood;
         friend class Forest;
-        friend class ForestPOL;
+        friend class Forest;
         friend class Particle;
 
         public:

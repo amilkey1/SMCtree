@@ -12,8 +12,14 @@ class Forest {
         Forest();
         ~Forest();
         Forest(const Forest & other);
-    
+        string makeNewick(unsigned precision, bool use_names);
         void operator=(const Forest & other);
+        
+        //POL added
+        void createTrivialForest();
+        void simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites);
+        void buildYuleTree();
+        typedef shared_ptr<Forest> SharedPtr;
     
     private:
         void                        clear();
@@ -25,23 +31,33 @@ class Forest {
         double                      joinTaxa(Lot::SharedPtr lot);
         void                        calcPartialArray(Node* new_nd);
         double                      calcTransitionProbability(Node* child, double s, double s_child);
+        
+        //POL added
+        Node * pullNode();
+        void joinRandomLineagePair(Lot::SharedPtr lot);
+        void advanceAllLineagesBy(double dt);
+        void renumberInternals();
+        unsigned getNumLineages() const;
+        unsigned getNumNodes() const;
+        double calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length);
+
         pair<unsigned, unsigned>    chooseTaxaToJoin(double s, Lot::SharedPtr lot);
-        string                      makeNewick(unsigned precision, bool use_names);
         string                      makePartialNewick(unsigned precision, bool use_names);
         void                        showForest();
         void                        updateNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode);
         void                        updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode);
-    
+        
         Data::SharedPtr             _data;
         vector<Node *>              _lineages;
         list<Node>                  _nodes;
         vector<Node*>               _preorder;
-        unsigned                    _first_pattern = 0;
+        unsigned                    _first_pattern;
         unsigned                    _npatterns;
         vector<double>              _gene_tree_log_likelihoods;
         unsigned                    _ninternals;
         unsigned                    _nleaves;
         
+        vector<unsigned>            _unused_nodes;
 };
 
     inline Forest::Forest() {
@@ -302,7 +318,7 @@ class Forest {
     inline void Forest::refreshPreorder() {
        // Create vector of node pointers in preorder sequence
         Node *nd = &_nodes.back();
-       _preorder.clear();
+       //(unsigned)preorder.size().clear();
        _preorder.reserve(_nodes.size()); // _preorder must include root node
 
         _preorder.push_back(nd);
@@ -731,4 +747,329 @@ class Forest {
         
     }
 
+    inline double Forest::calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length) {
+        assert(pi.size() == 4);
+        assert(fabs(accumulate(pi.begin(), pi.end(), 0.0) - 1.0) < G::_small_enough);
+        //assert(_relrate > 0.0);
+        double _relrate = 1.0;
+        double transition_prob = 0.0;
+        
+        // F81 transition probabilities
+        double Pi[] = {pi[0] + pi[2], pi[1] + pi[3], pi[0] + pi[2], pi[1] + pi[3]};
+        bool is_transition = (from == 0 && to == 2) || (from == 1 && to == 3) || (from == 2 && to == 0) || (from == 3 && to == 1);
+        bool is_same = (from == 0 && to == 0) || (from == 1 && to == 1) | (from == 2 && to == 2) | (from == 3 && to == 3);
+        bool is_transversion = !(is_same || is_transition);
+
+        // HKY expected number of substitutions per site
+        //  v = betat*(AC + AT + CA + CG + GC + GT + TA + TG) + kappa*betat*(AG + CT + GA + TC)
+        //    = 2*betat*(AC + AT + CG + GT + kappa(AG + CT))
+        //    = 2*betat*((A + G)*(C + T) + kappa(AG + CT))
+        //  betat = v/[2*( (A + G)(C + T) + kappa*(AG + CT) )]
+        double kappa = 1.0;
+        double betat = 0.5*_relrate*edge_length/((pi[0] + pi[2])*(pi[1] + pi[3]) + kappa*(pi[0]*pi[2] + pi[1]*pi[3]));
+        
+        if (is_transition) {
+            double pi_j = pi[to];
+            double Pi_j = Pi[to];
+            transition_prob = pi_j*(1.0 + (1.0 - Pi_j)*exp(-betat)/Pi_j - exp(-betat*(kappa*Pi_j + 1.0 - Pi_j))/Pi_j);
+        }
+        else if (is_transversion) {
+            double pi_j = pi[to];
+            transition_prob = pi_j*(1.0 - exp(-betat));
+        }
+        else {
+            double pi_j = pi[to];
+            double Pi_j = Pi[to];
+            transition_prob = pi_j*(1.0 + (1.0 - Pi_j)*exp(-betat)/Pi_j) + (Pi_j - pi_j)*exp(-betat*(kappa*Pi_j + 1.0 - Pi_j))/Pi_j;
+        }
+        return transition_prob;
+    }
+        
+    inline void Forest::simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites) {
+        
+        // Create vector of states for each node in the tree
+        unsigned nnodes = (unsigned)_nodes.size();
+        vector< vector<unsigned> > sequences(nnodes);
+        for (unsigned i = 0; i < nnodes; i++) {
+            sequences[i].resize(nsites, 4);
+        }
+        
+        // Walk through tree in preorder sequence, simulating all sites as we go
+        //    DNA   state      state
+        //         (binary)  (decimal)
+        //    A      0001        1
+        //    C      0010        2
+        //    G      0100        4
+        //    T      1000        8
+        //    ?      1111       15
+        //    R      0101        5
+        //    Y      1010       10
+        
+        // Draw equilibrium base frequencies from Dirichlet
+        // having parameter G::_comphet
+        vector<double> basefreq = {0.25, 0.25, 0.25, 0.25};
+        if (G::_comphet != G::_infinity) {
+            // Draw 4 Gamma(G::_comphet, 1) variates
+            double A = lot->gamma(G::_comphet, 1.0);
+            double C = lot->gamma(G::_comphet, 1.0);
+            double G = lot->gamma(G::_comphet, 1.0);
+            double T = lot->gamma(G::_comphet, 1.0);
+            double total = A + C + G + T;
+            basefreq[0] = A/total;
+            basefreq[1] = C/total;
+            basefreq[2] = G/total;
+            basefreq[3] = T/total;
+        }
+        
+        // Simulate starting sequence at the root node
+        Node * nd = *(_lineages.begin());
+        unsigned ndnum = nd->_number;
+        assert(ndnum < nnodes);
+        for (unsigned i = 0; i < nsites; i++) {
+            sequences[ndnum][i] = G::multinomialDraw(lot, basefreq);
+        }
+        
+        nd = findNextPreorder(nd);
+        while (nd) {
+            ndnum = nd->_number;
+            assert(ndnum < nnodes);
+
+            // Get reference to parent sequence
+            assert(nd->_parent);
+            unsigned parnum = nd->_parent->_number;
+            assert(parnum < nnodes);
+            
+            // Evolve nd's sequence given parent's sequence and edge length
+            for (unsigned i = 0; i < nsites; i++) {
+                // Choose relative rate for this site
+                double site_relrate = 1.0;
+                if (G::_asrv_shape != G::_infinity)
+                    site_relrate = lot->gamma(G::_asrv_shape, 1.0/G::_asrv_shape);
+                unsigned from_state = sequences[parnum][i];
+                double cum_prob = 0.0;
+                double u = lot->uniform();
+                for (unsigned to_state = 0; to_state < 4; to_state++) {
+                    cum_prob += calcSimTransitionProbability(from_state, to_state, basefreq, site_relrate*nd->_edge_length);
+                    if (u < cum_prob) {
+                        sequences[ndnum][i] = to_state;
+                        break;
+                    }
+                }
+                assert(sequences[ndnum][i] < 4);
+            }
+            
+            // Move to next node in preorder sequence
+            nd = findNextPreorder(nd);
+        }
+
+        assert(data);
+        Data::data_matrix_t & dm = data->getDataMatrixNonConst();
+        
+#if 0
+        // Copy sequences to data object
+        for (unsigned t = 0; t < G::_ntaxa; t++) {
+            // Allocate row t of _data's _data_matrix data member
+            dm[t].resize(starting_site + nsites);
+            
+            // Get reference to nd's sequence
+            unsigned ndnum = _nodes[t]._number;
+            
+            // Translate to state codes and copy
+            for (unsigned i = 0; i < nsites; i++) {
+                dm[t][starting_site + i] = (Data::state_t)1 << sequences[ndnum][i];
+            }
+        }
+#else
+        // Copy sequences to data object
+        unsigned t = 0;
+        for (auto & nd : _nodes) {
+            // Allocate row t of _data's _data_matrix data member
+            dm[t].resize(starting_site + nsites);
+            
+            // Get reference to nd's sequence
+            unsigned ndnum = nd._number;
+            
+            // Translate to state codes and copy
+            for (unsigned i = 0; i < nsites; i++) {
+                dm[t][starting_site + i] = (Data::state_t)1 << sequences[ndnum][i];
+            }
+            
+            t++;
+        }
+#endif
+    }
+
+    inline void Forest::createTrivialForest() {
+        assert(G::_ntaxa > 0);
+        assert(G::_ntaxa == G::_taxon_names.size());
+        clear();
+        unsigned nnodes = 2*G::_ntaxa - 1;
+        _nodes.resize(nnodes);
+#if 0
+        for (unsigned i = 0; i < G::_ntaxa; i++) {
+            string taxon_name = G::_taxon_names[i];
+            _nodes[i]._number = (int)i;
+            _nodes[i]._my_index = (int)i;
+            _nodes[i]._name = taxon_name;
+            _nodes[i].setEdgeLength(0.0);
+            _nodes[i]._height = 0.0;
+            _nodes[i]._split.resize(G::_ntaxa);
+            _nodes[i]._split.setBitAt(i);
+            _lineages.push_back(&_nodes[i]);
+        }
+        
+        // Add all remaining nodes to _unused_nodes vector
+        _unused_nodes.clear();
+        for (unsigned i = G::_ntaxa; i < nnodes; i++) {
+            _nodes[i]._my_index = (int)i;
+            _nodes[i]._number = -1;
+            _unused_nodes.push_back(i);
+        }
+#else
+        unsigned i = 0;
+        for (auto & nd : _nodes) {
+            string taxon_name = G::_taxon_names[i];
+            nd._number = (int)i;
+            nd._my_index = (int)i;
+            nd._name = taxon_name;
+            nd.setEdgeLength(0.0);
+            nd._height = 0.0;
+            nd._split.resize(G::_ntaxa);
+            nd._split.setBitAt(i);
+            _lineages.push_back(&nd);
+            i++;
+        }
+        
+        // Add all remaining nodes to _unused_nodes vector
+        _unused_nodes.clear();
+        auto nditer = _nodes.begin();
+        advance(nditer, i);
+        while (nditer != _nodes.end()) {
+            nditer->_my_index = (int)i;
+            nditer->_number = -1;
+            _unused_nodes.push_back(i);
+        }
+#endif
+        
+        refreshPreorder();
+    }
+    
+    inline unsigned Forest::getNumLineages() const {
+        return (unsigned)_lineages.size();
+    }
+    
+    inline unsigned Forest::getNumNodes() const {
+        return (unsigned)_preorder.size();
+    }
+
+    inline Node * Forest::pullNode() {
+        if (_unused_nodes.empty()) {
+            unsigned nleaves = 2*G::_ntaxa - 1;
+            throw XProj(str(format("Forest::pullNode tried to return a node beyond the end of the _nodes list (%d nodes allocated for %d leaves)") % _nodes.size() % nleaves));
+        }
+        double node_index = _unused_nodes.back();
+        _unused_nodes.pop_back();
+        
+        auto nditer = _nodes.begin();
+        advance(nditer, node_index);
+        Node * new_nd = &(*nditer);
+        assert(new_nd->_my_index == node_index);
+        
+        new_nd->clear();
+        new_nd->_number = -2;
+        new_nd->_split.resize(G::_ntaxa);
+        return new_nd;
+    }
+    
+    inline void Forest::joinRandomLineagePair(Lot::SharedPtr lot) {
+        unsigned n = (unsigned)_lineages.size();
+        auto lineage_pair = lot->nchoose2(n);
+        unsigned i = lineage_pair.first;
+        unsigned j = lineage_pair.second;
+        Node * ancnd = pullNode();
+        Node * lchild = _lineages[i];
+        Node * rchild = _lineages[j];
+        
+        ancnd->_left_child = lchild;
+        ancnd->_right_sib = nullptr;
+        ancnd->_parent = nullptr;
+        
+        lchild->_right_sib = rchild;
+        lchild->_parent = ancnd;
+        
+        rchild->_right_sib = nullptr;
+        rchild->_parent = ancnd;
+        
+        updateNodeVector(_lineages, lchild, rchild, ancnd);
+        //removeTwoAddOne(_lineages, lchild, rchild, ancnd);
+    }
+    
+    inline void Forest::renumberInternals() {
+        // First internal node number is the number of leaves
+        int next_node_number = (unsigned)G::_taxon_names.size();
+
+        // Renumber internal nodes in postorder sequence for each lineage in turn
+        for (auto nd : boost::adaptors::reverse(_preorder)) {
+            if (nd->_left_child) {
+                // nd is an internal node
+                assert(nd->_height != G::_infinity);
+                nd->_number = next_node_number++;
+                assert(nd->_left_child->_right_sib);
+                assert(nd->_left_child->_right_sib->_right_sib == nullptr);
+            }
+            else {
+                // nd is a leaf node
+                assert(nd->_number > -1);
+                nd->_height = 0.0;
+            }
+                            
+            if (nd->_parent) {
+                // Set parent's height if nd is right-most child of its parent
+                bool is_rightmost_child = !nd->_right_sib;
+                double parent_height = nd->_height + nd->_edge_length;
+                if (is_rightmost_child) {
+                    nd->_parent->_height = parent_height;
+                }
+                
+                // If nd is not its parent's rightmost child, check ultrametric assumption
+                assert(!is_rightmost_child || fabs(nd->_parent->_height - parent_height) < G::_small_enough);
+            }
+        }
+    }
+
+    inline void Forest::buildYuleTree() {
+        createTrivialForest();
+        unsigned nsteps = G::_ntaxa - 1;
+        for (unsigned i = 0; i < nsteps; i++) {
+            // Determine number of lineages remaining
+            unsigned n = getNumLineages();
+            assert(n > 1);
+            
+            // Waiting time to speciation event is Exponential(rate = n*lambda)
+            // u = 1 - exp(-r*t) ==> t = -log(1-u)/r
+            double r = G::_sim_lambda*n;
+            double u = rng->uniform();
+            double t = -log(1.0 - u)/r;
+            advanceAllLineagesBy(t);
+            joinRandomLineagePair(rng);
+        }
+        assert(getNumLineages() == 1);
+        refreshPreorder();
+        renumberInternals();
+    }
+
+    inline void Forest::advanceAllLineagesBy(double dt) {
+        // Add t to the edge length of all lineage root nodes, unless there
+        // is just one lineage, in which case do nothing
+        unsigned n = (unsigned)_lineages.size();
+        if (n > 1) {
+            for (auto nd : _lineages) {
+                double elen = nd->getEdgeLength() + dt;
+                assert(elen >= 0.0 || fabs(elen) < Node::_smallest_edge_length);
+                nd->setEdgeLength(elen);
+                ++n;
+            }
+        }
+    }
+    
 }

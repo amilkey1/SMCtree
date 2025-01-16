@@ -44,7 +44,7 @@ namespace proj {
             double filterParticles(unsigned step, vector<Particle> & particles);
             double computeEffectiveSampleSize(const vector<double> & probs) const;
         
-            ForestPOL::SharedPtr _sim_tree;
+            Forest::SharedPtr    _sim_tree;
             Partition::SharedPtr _partition;
             Data::SharedPtr      _data;
             double               _log_marginal_likelihood;
@@ -176,27 +176,8 @@ namespace proj {
         for (unsigned i = 0; i < nleaves; i++)
             G::_taxon_names[i] = G::inventName(i, /*lower_case*/false);
         
-        unsigned nsteps = nleaves - 1;
-        _sim_tree = ForestPOL::SharedPtr(new ForestPOL);
-        _sim_tree->createTrivialForest();
-        for (unsigned i = 0; i < nsteps; i++) {
-            // Determine number of lineages remaining
-            unsigned n = _sim_tree->getNumLineages();
-            assert(n > 1);
-            
-            // Waiting time to speciation event is Exponential(rate = n*lambda)
-            // u = 1 - exp(-r*t) ==> t = -log(1-u)/r
-            double r = G::_sim_lambda*n;
-            double u = rng->uniform();
-            double t = -log(1.0 - u)/r;
-            _sim_tree->advanceAllLineagesBy(t);
-            
-            // Join two random lineages
-            _sim_tree->joinRandomLineagePair(rng);
-        }
-        assert(_sim_tree->getNumLineages() == 1);
-        _sim_tree->refreshAllPreorders();
-        _sim_tree->renumberInternals();
+        _sim_tree = Forest::SharedPtr(new Forest);
+        _sim_tree->buildYuleTree();
     }
         
     inline void Proj::simulateSave(string fnprefix) {

@@ -77,36 +77,6 @@ namespace proj {
         _lineages.clear();
     }
         
-    inline void ForestPOL::createTrivialForest() {
-        assert(G::_ntaxa > 0);
-        assert(G::_ntaxa == G::_taxon_names.size());
-        clear();
-        unsigned nnodes = 2*G::_ntaxa - 1;
-        _nodes.resize(nnodes);
-        for (unsigned i = 0; i < G::_ntaxa; i++) {
-            string taxon_name = G::_taxon_names[i];
-            _nodes[i]._number = (int)i;
-            _nodes[i]._my_index = (int)i;
-            _nodes[i]._name = taxon_name;
-            _nodes[i].setEdgeLength(0.0);
-            _nodes[i]._height = 0.0;
-            _nodes[i]._split.resize(G::_ntaxa);
-            _nodes[i]._split.setBitAt(i);
-            _lineages.push_back(&_nodes[i]);
-        }
-        
-        // Add all remaining nodes to _unused_nodes vector
-        _unused_nodes.clear();
-        for (unsigned i = G::_ntaxa; i < nnodes; i++) {
-            _nodes[i]._my_index = (int)i;
-            _nodes[i]._number = -1;
-            _unused_nodes.push_back(i);
-        }
-        
-        refreshAllPreorders();
-        _forest_height = 0.0;
-    }
-    
     inline unsigned ForestPOL::getNumLineages() const {
         return (unsigned)_lineages.size();
     }
