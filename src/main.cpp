@@ -85,6 +85,10 @@ unsigned G::_nstates           = 4;
 unsigned G::_ntaxa             = 0;
 unsigned G::_nloci             = 0;
 double   G::_lambda            = 1.0;
+double   G::_kappa             = 1.0;
+string   G::_string_base_frequencies = "";
+vector<double> G::_base_frequencies;
+
 double   G::_small_enough      = 0.00001;
 double   G::_infinity          = numeric_limits<double>::infinity();
 double   G::_negative_infinity = -numeric_limits<double>::infinity();

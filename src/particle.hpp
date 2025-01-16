@@ -16,6 +16,14 @@ class Particle {
         double                                  getLogWeight() const {return _log_weight;}
         void                                    proposal();
         void                                    showParticle();
+        vector<double>                          getGeneTreeLogLikelihoods();
+        double                                  getTreeHeight();
+        double                                  getTreeLength();
+        double                                  getLogLikelihood();
+        double                                  getYuleModel();
+    vector<pair<double, double>>                getSpeciesTreeIncrementPriors();
+        string                                  saveForestNewick() {
+                                                        return _forest.makeNewick(8, true);}
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
 
     
@@ -65,8 +73,6 @@ class Particle {
     inline void Particle::proposal() {
         _forest.addIncrement(_lot);
         _log_weight = _forest.joinTaxa(_lot);
-        
-        // TODO: need to calculate a likelihood and weight for the particle
     }
 
     inline void Particle::showParticle() {
@@ -82,6 +88,35 @@ class Particle {
     inline void Particle::operator=(const Particle & other) {
         _forest = other._forest;
         _log_weight = other._log_weight;
+    }
+
+    inline vector<double> Particle::getGeneTreeLogLikelihoods() {
+        return _forest._gene_tree_log_likelihoods;
+    }
+
+    inline double Particle::getLogLikelihood() {
+        double log_likelihood = 0.0;
+        for (auto &l:_forest._gene_tree_log_likelihoods) {
+            log_likelihood += l;
+        }
+        
+        return log_likelihood;
+    }
+
+    inline double Particle::getTreeHeight() {
+        return _forest.getTreeHeight();
+    }
+
+    inline double Particle::getTreeLength() {
+        return _forest.getTreeLength();
+    }
+
+    inline double Particle::getYuleModel() {
+        return _forest.getSpeciesTreePrior();
+    }
+
+    inline vector<pair<double, double>> Particle::getSpeciesTreeIncrementPriors() {
+        return _forest._increments_and_priors;
     }
 
 }

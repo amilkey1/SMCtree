@@ -31,6 +31,10 @@ class Forest {
         void                        showForest();
         void                        updateNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode);
         void                        updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode);
+        double                      getTreeHeight();
+        double                      getTreeLength();
+        double                      getSpeciesTreePrior();
+        double                      calcTopologyPrior(unsigned nlineages);
     
         Data::SharedPtr             _data;
         vector<Node *>              _lineages;
@@ -41,6 +45,8 @@ class Forest {
         vector<double>              _gene_tree_log_likelihoods;
         unsigned                    _ninternals;
         unsigned                    _nleaves;
+        double                      _log_joining_prob;
+        vector<pair<double, double>> _increments_and_priors;
         
 };
 
@@ -60,6 +66,8 @@ class Forest {
         _gene_tree_log_likelihoods.clear();
         _ninternals = 0;
         _nleaves = G::_ntaxa;
+        _log_joining_prob = 0.0;
+        _increments_and_priors.clear();
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -125,7 +133,6 @@ class Forest {
     }
 
     inline double Forest::calcSubsetLogLikelihood(unsigned i) {
-        _gene_tree_log_likelihoods[i] = 0.0;
         auto &counts = _data->getPatternCounts();
         _npatterns = _data->getNumPatternsInSubset(i); // TODO: make a vector of patterns by gene?
         Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(i);
@@ -157,6 +164,11 @@ class Forest {
         for (auto &nd:_lineages) {
             nd->_edge_length += increment;
         }
+        
+        // lorad only works if all topologies the same - then don't include the prior on joins because it is fixed
+        double increment_prior = (log(rate)-increment*rate);
+                    
+        _increments_and_priors.push_back(make_pair(increment, increment_prior));
     }
 
     inline double Forest::joinTaxa(Lot::SharedPtr lot) {
@@ -261,6 +273,9 @@ class Forest {
                }
            }
        }
+        
+        calcTopologyPrior((unsigned) _lineages.size()+1);
+        
         return log_weight;
     }
 
@@ -297,6 +312,44 @@ class Forest {
 
         // Add addnode to node_list
         node_list.push_back(addnode);
+    }
+
+    inline double Forest::getTreeHeight() {
+        double sum_height = 0.0;
+
+        // calculate height of lineage
+        Node* base_node = _lineages[0];
+        sum_height += base_node->getEdgeLength();
+        for (Node* child=base_node->_left_child; child; child=child->_left_child) {
+            sum_height += child->getEdgeLength();
+        }
+        return sum_height;
+    }
+
+    inline double Forest::getTreeLength() {
+        // sum of all edge lengths in tree
+        double sum_height = 0.0;
+
+        for (auto &nd:_nodes) {
+            // sum edge lengths from all nodes
+            sum_height += nd._edge_length;
+        }
+        return sum_height;
+    }
+
+    inline double Forest::getSpeciesTreePrior() {
+        double prior = 0.0;
+        for (auto &i:_increments_and_priors) {
+            prior += i.second;
+        }
+        prior += _log_joining_prob;
+        return prior;
+    }
+
+    inline double Forest::calcTopologyPrior(unsigned nlineages) {
+        _log_joining_prob += -log(0.5*nlineages*(nlineages-1));
+        assert (!isinf(_log_joining_prob));
+        return _log_joining_prob;
     }
 
     inline void Forest::refreshPreorder() {
@@ -442,65 +495,65 @@ class Forest {
             return child_transition_prob;
         }
 
-//        if (G::_model == "HKY") { // TODO: add HKY
-//            double pi_A = _base_frequencies[0];
-//            double pi_C = _base_frequencies[1];
-//            double pi_G = _base_frequencies[2];
-//            double pi_T = _base_frequencies[3];
-//
-//            double pi_j = 0.0;
-//            double PI_J = 0.0;
-//
-//            double phi = (pi_A+pi_G)*(pi_C+pi_T)+_kappa*(pi_A*pi_G+pi_C*pi_T);
-//            double beta_t = 0.5*(child->_edge_length * _relative_rate )/phi; // TODO: need to include relative rates
-//
-//
-//            // transition prob depends only on ending state
-//            if (s_child == 0) {
-//                // purine
-//                pi_j = pi_A;
-//                PI_J = pi_A + pi_G;
-//            }
-//            else if (s_child == 1) {
-//                // pyrimidine
-//                pi_j = pi_C;
-//                PI_J = pi_C + pi_T;
-//            }
-//            else if (s_child == 2) {
-//                // purine
-//                pi_j = pi_G;
-//                PI_J = pi_A + pi_G;
-//            }
-//            else if (s_child == 3) {
-//                // pyrimidine
-//                pi_j = pi_T;
-//                PI_J = pi_C + pi_T;
-//            }
-//
-//            while (true) {
-//                if (s == s_child) {
-//                    // no transition or transversion
-//                    double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
-//                    double second_term = (PI_J-pi_j)/PI_J*exp(-beta_t*(PI_J*_kappa+(1-PI_J)));
-//                    child_transition_prob = pi_j*first_term+second_term;
-//                    break;
-//                }
-//
-//                else if ((s == 0 && s_child == 2) || (s == 2 && s_child == 0) || (s == 1 && s_child == 3) || (s == 3 && s_child==1)) {
-//                    // transition
-//                    double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
-//                    double second_term = (1/PI_J)*exp(-beta_t*(PI_J*_kappa+(1-PI_J)));
-//                    child_transition_prob = pi_j*(first_term-second_term);
-//                    break;
-//                }
-//
-//                else {
-//                    // transversion
-//                    child_transition_prob = pi_j*(1-exp(-beta_t));
-//                    break;
-//                }
-//            }
-//        }
+        if (G::_model == "HKY") { // TODO: add HKY
+            double pi_A = G::_base_frequencies[0];
+            double pi_C = G::_base_frequencies[1];
+            double pi_G = G::_base_frequencies[2];
+            double pi_T = G::_base_frequencies[3];
+
+            double pi_j = 0.0;
+            double PI_J = 0.0;
+
+            double phi = (pi_A+pi_G)*(pi_C+pi_T)+G::_kappa*(pi_A*pi_G+pi_C*pi_T);
+            double beta_t = 0.5*(child->_edge_length)/phi; // TODO: need to include relative rates
+
+
+            // transition prob depends only on ending state
+            if (s_child == 0) {
+                // purine
+                pi_j = pi_A;
+                PI_J = pi_A + pi_G;
+            }
+            else if (s_child == 1) {
+                // pyrimidine
+                pi_j = pi_C;
+                PI_J = pi_C + pi_T;
+            }
+            else if (s_child == 2) {
+                // purine
+                pi_j = pi_G;
+                PI_J = pi_A + pi_G;
+            }
+            else if (s_child == 3) {
+                // pyrimidine
+                pi_j = pi_T;
+                PI_J = pi_C + pi_T;
+            }
+
+            while (true) {
+                if (s == s_child) {
+                    // no transition or transversion
+                    double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
+                    double second_term = (PI_J-pi_j)/PI_J*exp(-beta_t*(PI_J*G::_kappa+(1-PI_J)));
+                    child_transition_prob = pi_j*first_term+second_term;
+                    break;
+                }
+
+                else if ((s == 0 && s_child == 2) || (s == 2 && s_child == 0) || (s == 1 && s_child == 3) || (s == 3 && s_child==1)) {
+                    // transition
+                    double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
+                    double second_term = (1/PI_J)*exp(-beta_t*(PI_J*G::_kappa+(1-PI_J)));
+                    child_transition_prob = pi_j*(first_term-second_term);
+                    break;
+                }
+
+                else {
+                    // transversion
+                    child_transition_prob = pi_j*(1-exp(-beta_t));
+                    break;
+                }
+            }
+        }
         assert (child_transition_prob > 0.0);
         return child_transition_prob;
     }
@@ -667,6 +720,8 @@ class Forest {
         _gene_tree_log_likelihoods = other._gene_tree_log_likelihoods;
         _ninternals = other._ninternals;
         _nleaves = other._nleaves;
+        _log_joining_prob = other._log_joining_prob;
+        _increments_and_priors = other._increments_and_priors;
 
         // copy tree itself
 

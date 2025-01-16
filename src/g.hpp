@@ -19,6 +19,8 @@ namespace proj {
         static string                   _filename;
         static unsigned                 _nparticles;
         static string                   _model;
+        static double                   _kappa;
+        static string                   _string_base_frequencies;
         
         // Candidates for setting status
         static double                   _asrv_shape;
@@ -41,6 +43,7 @@ namespace proj {
         static map<unsigned,unsigned>   _nexus_taxon_map;
         static map<unsigned, double>    _relrate_for_locus;
         static double                   _lambda;
+        static vector<double>           _base_frequencies;
 
         // Useful constants
         static double                   _small_enough;

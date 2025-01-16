@@ -43,6 +43,9 @@ namespace proj {
             void proposeParticleRange(unsigned first, unsigned last, vector<Particle> &particles);
             double filterParticles(unsigned step, vector<Particle> & particles);
             double computeEffectiveSampleSize(const vector<double> & probs) const;
+            void writeTreeFile (vector<Particle> &v) const;
+            void writeLogFile(vector<Particle> &v) const;
+            void handleBaseFrequencies();
         
             ForestPOL::SharedPtr _sim_tree;
             Partition::SharedPtr _partition;
@@ -83,6 +86,8 @@ namespace proj {
         ("simfnprefix",  value(&G::_sim_filename_prefix), "prefix of files in which to save simulated trees and data if startmode is 'sim' (e.g. specifying 'sim' results in files named 'sim.tre' and 'sim.nex')")
         ("simntaxa",  value(&G::_sim_ntaxa)->default_value(4), "number of taxa to simulate if startmode is 'sim'")
         ("simlambda",  value(&G::_sim_lambda)->default_value(1.0), "true speciation rate for simulating tree under the Yule model if startmode is 'sim'")
+        ("kappa",  boost::program_options::value(&G::_kappa)->default_value(1.0), "value of kappa")
+        ("base_frequencies", boost::program_options::value(&G::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
         ;
         
         store(parse_command_line(argc, argv, desc), vm);
@@ -115,7 +120,29 @@ namespace proj {
                 _partition->parseSubsetDefinition(s);
             }
         }
+        
+        // If user specified "base_frequencies" in conf file, convert them to a vector<double>
+        if (vm.count("base_frequencies") > 0) {
+            handleBaseFrequencies();
+        }
     }
+
+    inline void Proj::handleBaseFrequencies() {
+        vector <string> temp;
+        split(temp, G::_string_base_frequencies, is_any_of(","));
+        double sum = 0.0;
+        // iterate through temp
+        for (auto &i:temp) {
+            double f = stof(i);
+            G::_base_frequencies.push_back(f);
+            sum +=f;
+        }
+        if (fabs(sum-1)>0.000001) {
+            throw XProj(format("base frequencies (%s) don't add to 1")%G::_string_base_frequencies);
+        }
+        assert (fabs(sum-1) < 0.000001);
+    }
+
     
     inline void Proj::run() {
         rng->setSeed(G::_rnseed);
@@ -314,13 +341,10 @@ namespace proj {
                 proposeParticles(particle_vec);
                 double ess = filterParticles(g, particle_vec);
                 output(format("     ESS = %d\n") % ess, 2);
-                
-                if (g == nsteps - 1) {
-                    for (auto &p:particle_vec) {
-                        p.showParticle();
-                    }
-                }
             }
+            
+            writeTreeFile(particle_vec);
+            writeLogFile(particle_vec);
             
         }
         
@@ -504,5 +528,92 @@ namespace proj {
              partials = false;
          }
     }
+
+    inline void Proj::writeTreeFile(vector<Particle> &particles) const {
+        // save all trees in nexus files
+        ofstream treef("trees.trees");
+        treef << "#nexus\n\n";
+        treef << "begin trees;\n";
         
+        for (auto &p:particles) {
+            treef << "  tree sample = [&R] " << p.saveForestNewick() << ";\n";
+        }
+        
+        treef << "end;\n";
+        treef.close();
+        
+        // save unique trees only
+        ofstream uniquetreef("unique_trees.trees");
+        uniquetreef << "#nexus\n\n";
+        uniquetreef << "begin trees;\n";
+        
+        vector<vector<pair<double, double>>> unique_increments_and_priors;
+        for (auto &p:particles) {
+            vector<pair<double, double>> increments_and_priors = p.getSpeciesTreeIncrementPriors();
+            bool found = false;
+            if(std::find(unique_increments_and_priors.begin(), unique_increments_and_priors.end(), increments_and_priors) != unique_increments_and_priors.end()) {
+                found = true;
+            }
+            if (!found) {
+                unique_increments_and_priors.push_back(increments_and_priors);
+                uniquetreef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
+            }
+        }
+        uniquetreef << "end;\n";
+        uniquetreef.close();
+    }
+
+    inline void Proj::writeLogFile(vector<Particle> &v) const {
+        // this function creates a params file that is comparable to output from beast
+        ofstream logf("params.log");
+        logf << "iter ";
+        logf << "\t" << "posterior ";
+        logf << "\t" << "likelihood ";
+        logf << "\t" << "prior ";
+
+        for (unsigned i=0; i<G::_nloci; i++) {
+            logf << "\t" << "Tree" + to_string(i) + "Likeihood";
+        }
+        
+        logf << "\t" << "Tree.height";
+        logf << "\t" << "Tree.treeLength";
+        logf << "\t" << "YuleModel";
+        logf << "\t" << "birthRate";
+
+
+        logf << endl;
+
+        int iter = 0;
+        for (auto &p:v) {
+            logf << iter;
+            iter++;
+            
+            double log_likelihood = p.getLogLikelihood();
+            double yule = p.getYuleModel();
+            double log_prior = yule;
+            
+            double log_posterior = log_prior + log_likelihood;
+            vector<double> tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
+            double height = p.getTreeHeight();
+            double length = p.getTreeLength();
+            
+
+
+            logf << "\t" << log_posterior;
+            logf << "\t" << log_likelihood;
+            logf << "\t" << log_prior;
+            for (auto &l:tree_log_likelihoods) {
+                logf << "\t" << l;
+            }
+            logf << "\t" << height;
+            logf << "\t" << length;
+            logf << "\t" << yule;
+            logf << "\t" << G::_lambda;
+
+            logf << endl;
+        }
+
+        logf.close();
+    }
+
 }
