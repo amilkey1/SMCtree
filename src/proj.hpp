@@ -38,7 +38,7 @@ namespace proj {
             
             void smc();
             
-            Forest::SharedPtr    _sim_tree;
+            ForestPOL::SharedPtr    _sim_tree;
             Partition::SharedPtr _partition;
             Data::SharedPtr      _data;
     };
@@ -163,7 +163,7 @@ namespace proj {
             G::_taxon_names[i] = G::inventName(i, /*lower_case*/false);
         
         unsigned nsteps = nleaves - 1;
-        _sim_tree = Forest::SharedPtr(new Forest);
+        _sim_tree = ForestPOL::SharedPtr(new ForestPOL);
         _sim_tree->createTrivialForest();
         for (unsigned i = 0; i < nsteps; i++) {
             // Determine number of lineages remaining

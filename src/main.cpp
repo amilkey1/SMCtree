@@ -56,7 +56,7 @@ using boost::format;
 #include "data.hpp"
 //#include "partial_store.hpp"
 #include "node.hpp"
-#include "forest.hpp"
+#include "forestpol.hpp"
 #include "proj.hpp"
 
 using namespace proj;

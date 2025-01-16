@@ -5,7 +5,7 @@ namespace proj {
     class TreeManip;
     class Likelihood;
     class Updater;
-    class Forest;
+    class ForestPOL;
     class GeneForest;
     class SpeciesForest;
     class Particle;
@@ -15,7 +15,7 @@ namespace proj {
         friend class TreeManip;
         friend class Likelihood;
         friend class Updater;
-        friend class Forest;
+        friend class ForestPOL;
         friend class GeneForest;
         friend class SpeciesForest;
         friend class Particle;
