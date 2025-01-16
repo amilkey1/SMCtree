@@ -7,38 +7,53 @@ extern proj::Lot::SharedPtr rng;
 namespace proj {
 
     struct G {
-        static bool                     _simulating;
-        static bool                     _debugging;
+        // Program settings used in processCommandLineOptions
+        static string                   _sim_filename_prefix;
+        static unsigned                 _sim_ntaxa;
+        static double                   _sim_lambda;
+        static unsigned                 _rnseed;
         static unsigned                 _nthreads;
+        static unsigned                 _verbosity;
+        static string                   _start_mode;
+        static bool                     _save_memory;
+        static string                   _filename;
+        static unsigned                 _nparticles;
+        static string                   _model;
+        
+        // Candidates for setting status
+        static double                   _asrv_shape;
+        static double                   _comphet;
+        static double                   _occupancy;
+        
+        // Dimensions
         static unsigned                 _nstates;
         static unsigned                 _ntaxa;
-        static vector<string>           _taxon_names;
-        static map<unsigned,unsigned>   _nexus_taxon_map;
         static unsigned                 _nloci;
-        static vector<string>           _locus_names;
         static vector<unsigned>         _nsites_per_locus;
+        
+        // Names
+        static vector<string>           _taxon_names;
+        static vector<string>           _locus_names;
+
+        // Other globals
+        static bool                     _simulating;
+        static bool                     _debugging;
+        static map<unsigned,unsigned>   _nexus_taxon_map;
         static map<unsigned, double>    _relrate_for_locus;
         static double                   _lambda;
         static double                   _theta;
+
+        // Useful constants
         static double                   _small_enough;
         static double                   _infinity;
         static double                   _negative_infinity;
         
-        static double                   _occupancy;
-        static unsigned                 _verbosity;
-        static unsigned                 _rnseed;
-        
+        // Program info
         static string                   _program_name;
         static unsigned                 _major_version;
         static unsigned                 _minor_version;
-        static string                   _start_mode;
-        static string                   _filename;
-        static unsigned                 _nparticles;
-        static map<string, string>      _taxon_map;
-        static unsigned                 _nspecies;
-        static bool                     _save_memory;
-        static string                   _model;
-
+        
+        // Utility functions
         static string   inventName(unsigned k, bool lower_case);
         static double   calcLogSum(const vector<double> & log_values);
         static string   memoryAddressAsString(const void * ptr);

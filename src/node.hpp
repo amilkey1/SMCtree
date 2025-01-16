@@ -4,16 +4,20 @@ namespace proj {
 
     class Likelihood;
     class Forest;
+    class ForestPOL;
     class Particle;
 
     class Node {
         friend class Likelihood;
         friend class Forest;
+        friend class ForestPOL;
         friend class Particle;
 
         public:
                                         Node();
                                         ~Node();
+
+                    typedef vector<Node *>  ptr_vect_t;
 
                     Node *              getParent()                 {return _parent;}
                     Node *              getLeftChild()              {return _left_child;}
@@ -24,27 +28,18 @@ namespace proj {
 
                     double              getEdgeLength()             {return _edge_length;}
                     void                setEdgeLength(double v);
+                    double              getHeight() const           {return _height;}
+                    void                setHeight(double v);
         
                     unsigned            countChildren() const;
 
                     void                clearPointers()             {_left_child = _right_sib = _parent = 0;}
-            void                resetNode();
-                                        
+                    void                resetNode();
+                                                            
             static const double _smallest_edge_length;
-
-            typedef std::vector<Node>    Vector;
-            typedef std::vector<Node *>  PtrVector;
         
         private:
         
-            enum Flag {
-                Selected   = (1 << 0),
-                SelPartial = (1 << 1),
-                SelTMatrix = (1 << 2),
-                AltPartial = (1 << 3),
-                AltTMatrix = (1 << 4)
-            };
-
             void                clear();
 
             Node *              _left_child;
@@ -54,10 +49,13 @@ namespace proj {
             std::string         _name;
             double              _edge_length;
             Split               _split;
-            int                 _flags;
-//            PartialStore::partial_t _partial;
             PartialStore::partials_t _partials;
             unsigned            _position_in_lineages;
+
+            int                 _my_index;
+            
+            // distance from node to any leaf
+            double          _height;
     };
     
     
@@ -71,12 +69,11 @@ namespace proj {
     }
 
     inline void Node::clear() {
-        _flags = 0;
         clearPointers();
         _number = -1;
         _name = "";
         _edge_length = _smallest_edge_length;
-//        _partials->clear();
+        _height = 0.0;
     }
 
     inline void Node::setEdgeLength(double v) {
