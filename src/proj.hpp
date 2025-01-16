@@ -71,7 +71,6 @@ namespace proj {
         ("help,h", "produce help message")
         ("version,v", "show program version")
         ("lambda",  value(&G::_lambda)->default_value(10.0), "per lineage speciation rate assumed for the Yule model")
-        ("theta",  value(&G::_theta)->default_value(0.1), "theta for entire tree")
         ("rnseed",  value(&G::_rnseed)->default_value(1), "pseudorandom number seed")
         ("nthreads",  value(&G::_nthreads)->default_value(1), "number of threads")
         ("startmode",  value(&G::_start_mode)->default_value("smc"), "smc or sim")

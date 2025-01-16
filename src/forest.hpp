@@ -150,7 +150,8 @@ class Forest {
 
     inline void Forest::addIncrement(Lot::SharedPtr lot) {
         unsigned nlineages = (unsigned) _lineages.size();
-        double rate = (nlineages) * (nlineages - 1) / G::_theta;
+        double rate = nlineages * G::_lambda;
+        
         double increment = -log(1.0 - lot->uniform())/rate;
         
         for (auto &nd:_lineages) {

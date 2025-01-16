@@ -85,7 +85,6 @@ unsigned G::_nstates           = 4;
 unsigned G::_ntaxa             = 0;
 unsigned G::_nloci             = 0;
 double   G::_lambda            = 1.0;
-double   G::_theta             = 0.1;
 double   G::_small_enough      = 0.00001;
 double   G::_infinity          = numeric_limits<double>::infinity();
 double   G::_negative_infinity = -numeric_limits<double>::infinity();

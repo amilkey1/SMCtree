@@ -41,7 +41,6 @@ namespace proj {
         static map<unsigned,unsigned>   _nexus_taxon_map;
         static map<unsigned, double>    _relrate_for_locus;
         static double                   _lambda;
-        static double                   _theta;
 
         // Useful constants
         static double                   _small_enough;
