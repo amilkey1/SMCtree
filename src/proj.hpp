@@ -118,6 +118,8 @@ namespace proj {
     }
     
     inline void Proj::run() {
+        rng->setSeed(G::_rnseed);
+
         if (G::_start_mode == "sim") {
             simulate();
         }
@@ -277,9 +279,7 @@ namespace proj {
             if (G::_verbosity > 0) {
                 summarizeData(_data);
             }
-            
-            rng->setSeed(G::_rnseed);
-            
+                        
             // create vector of particles
             vector<Particle> particle_vec;
             particle_vec.resize(G::_nparticles);
