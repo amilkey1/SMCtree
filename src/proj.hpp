@@ -572,7 +572,7 @@ namespace proj {
         logf << "\t" << "prior ";
 
         for (unsigned i=0; i<G::_nloci; i++) {
-            logf << "\t" << "Tree" + to_string(i) + "Likeihood";
+            logf << "\t" << "Tree" + to_string(i) + "Likelihood";
         }
         
         logf << "\t" << "Tree.height";

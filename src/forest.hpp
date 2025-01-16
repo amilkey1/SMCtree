@@ -133,6 +133,8 @@ class Forest {
     }
 
     inline double Forest::calcSubsetLogLikelihood(unsigned i) {
+        _gene_tree_log_likelihoods[i] = 0.0;
+        
         auto &counts = _data->getPatternCounts();
         _npatterns = _data->getNumPatternsInSubset(i); // TODO: make a vector of patterns by gene?
         Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(i);
