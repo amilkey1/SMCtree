@@ -326,6 +326,13 @@ namespace proj {
                 _log_marginal_likelihood += l;
             }
             
+            // initialize starting log likelihoods for all other particles
+            // necessary for calculating the first weight
+            
+            for (unsigned p=1; p<particle_vec.size(); p++) {
+                particle_vec[p].setStartingLogLikelihoods(starting_log_likelihoods);
+            }
+            
             unsigned nsteps = (G::_ntaxa-1);
             
             for (unsigned g=0; g<nsteps; g++){
@@ -339,8 +346,10 @@ namespace proj {
                 unsigned step_plus_one = g+1;
                 output(format("Step %d of %d steps.\n") % step_plus_one % nsteps, 1);
                 proposeParticles(particle_vec);
+                
                 double ess = filterParticles(g, particle_vec);
                 output(format("     ESS = %d\n") % ess, 2);
+                
             }
             
             writeTreeFile(particle_vec);

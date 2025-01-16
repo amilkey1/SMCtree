@@ -21,7 +21,8 @@ class Particle {
         double                                  getTreeLength();
         double                                  getLogLikelihood();
         double                                  getYuleModel();
-    vector<pair<double, double>>                getSpeciesTreeIncrementPriors();
+        vector<pair<double, double>>            getSpeciesTreeIncrementPriors();
+        void                                    setStartingLogLikelihoods(vector<double> starting_log_likelihoods);
         string                                  saveForestNewick() {
                                                         return _forest.makeNewick(8, true);}
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
@@ -84,12 +85,6 @@ class Particle {
         _forest.showForest();
     }
 
-
-    inline void Particle::operator=(const Particle & other) {
-        _forest = other._forest;
-        _log_weight = other._log_weight;
-    }
-
     inline vector<double> Particle::getGeneTreeLogLikelihoods() {
         return _forest._gene_tree_log_likelihoods;
     }
@@ -115,8 +110,16 @@ class Particle {
         return _forest.getSpeciesTreePrior();
     }
 
+    inline void Particle::setStartingLogLikelihoods(vector<double> starting_log_likelihoods) {
+        _forest._gene_tree_log_likelihoods = starting_log_likelihoods;
+    }
+
     inline vector<pair<double, double>> Particle::getSpeciesTreeIncrementPriors() {
         return _forest._increments_and_priors;
     }
 
+    inline void Particle::operator=(const Particle & other) {
+        _forest = other._forest;
+        _log_weight = other._log_weight;
+    }
 }
