@@ -54,9 +54,12 @@ using boost::format;
 #include "datatype.hpp"
 #include "partition.hpp"
 #include "data.hpp"
-//#include "partial_store.hpp"
-//#include "node.hpp"
-//#include "forest.hpp"
+#include "partial_store.hpp"
+proj::PartialStore ps;
+
+#include "node.hpp"
+#include "forest.hpp"
+#include "particle.hpp"
 #include "proj.hpp"
 
 using namespace proj;
@@ -81,6 +84,7 @@ unsigned G::_nstates           = 4;
 unsigned G::_ntaxa             = 0;
 unsigned G::_nloci             = 0;
 double   G::_lambda            = 1.0;
+double   G::_theta            = 0.1;
 double   G::_small_enough      = 0.00001;
 double   G::_infinity          = numeric_limits<double>::infinity();
 double   G::_negative_infinity = -numeric_limits<double>::infinity();
@@ -97,8 +101,15 @@ vector<string>         G::_locus_names;
 vector<unsigned>       G::_nsites_per_locus;
 map<unsigned,unsigned> G::_nexus_taxon_map;
 map<unsigned, double>  G::_relrate_for_locus;
+map<string, string>    G::_taxon_map;
+unsigned               G::_nspecies;
+bool                   G::_save_memory;
 
 string                  G::_start_mode = "smc";
+string                  G::_filename = "data.nex";
+unsigned                G::_nparticles = 500;
+
+const double Node::_smallest_edge_length=1.0e-12;
 
 static_assert(std::numeric_limits<double>::is_iec559, "IEEE 754 required in order to use infinity()");
 

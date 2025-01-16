@@ -19,6 +19,7 @@ namespace proj {
         static vector<unsigned>         _nsites_per_locus;
         static map<unsigned, double>    _relrate_for_locus;
         static double                   _lambda;
+        static double                   _theta;
         static double                   _small_enough;
         static double                   _infinity;
         static double                   _negative_infinity;
@@ -31,6 +32,11 @@ namespace proj {
         static unsigned                 _major_version;
         static unsigned                 _minor_version;
         static string                   _start_mode;
+        static string                   _filename;
+        static unsigned                 _nparticles;
+        static map<string, string>      _taxon_map;
+        static unsigned                 _nspecies;
+        static bool                     _save_memory;
 
         static string   inventName(unsigned k, bool lower_case);
         static double   calcLogSum(const vector<double> & log_values);
