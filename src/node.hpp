@@ -49,7 +49,8 @@ namespace proj {
             std::string         _name;
             double              _edge_length;
             Split               _split;
-            PartialStore::partials_t _partials;
+//            PartialStore::partials_t _partials;
+            PartialStore::partial_t _partials;
             unsigned            _position_in_lineages;
 
             int                 _my_index;

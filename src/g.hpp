@@ -43,6 +43,7 @@ namespace proj {
         static map<unsigned,unsigned>   _nexus_taxon_map;
         static map<unsigned, double>    _relrate_for_locus;
         static double                   _lambda;
+        static double                   _mu;
         static vector<double>           _base_frequencies;
 
         // Useful constants

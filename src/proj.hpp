@@ -74,6 +74,7 @@ namespace proj {
         ("help,h", "produce help message")
         ("version,v", "show program version")
         ("lambda",  value(&G::_lambda)->default_value(10.0), "per lineage speciation rate assumed for the Yule model")
+        ("mu",  value(&G::_mu)->default_value(1.0), "per lineage extinction rate assumed for the birth death model")
         ("rnseed",  value(&G::_rnseed)->default_value(1), "pseudorandom number seed")
         ("nthreads",  value(&G::_nthreads)->default_value(1), "number of threads")
         ("startmode",  value(&G::_start_mode)->default_value("smc"), "smc or sim")
@@ -331,6 +332,12 @@ namespace proj {
             
             for (unsigned p=1; p<particle_vec.size(); p++) {
                 particle_vec[p].setStartingLogLikelihoods(starting_log_likelihoods);
+            }
+            
+            if (G::_save_memory) {
+                for (auto &p:particle_vec) {
+                    p.clearPartials();
+                }
             }
             
             unsigned nsteps = (G::_ntaxa-1);

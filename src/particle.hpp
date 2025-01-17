@@ -5,7 +5,7 @@ namespace proj {
 class Particle {
     public:
         Particle();
-//        Particle(const Particle & other); // TODO: why does this cause compilation to fail?
+        Particle(const Particle & other);
         ~Particle();
 
         typedef std::shared_ptr<Particle>               SharedPtr;
@@ -23,6 +23,7 @@ class Particle {
         double                                  getYuleModel();
         vector<pair<double, double>>            getSpeciesTreeIncrementPriors();
         void                                    setStartingLogLikelihoods(vector<double> starting_log_likelihoods);
+        void                                    clearPartials();
         string                                  saveForestNewick() {
                                                         return _forest.makeNewick(8, true);}
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
@@ -41,6 +42,10 @@ class Particle {
     inline Particle::Particle() {
         _lot.reset(new Lot());
         clear();
+    }
+
+    inline Particle::Particle(const Particle & other) {
+        *this = other;
     }
 
     inline Particle::~Particle() {
@@ -72,7 +77,7 @@ class Particle {
     }
 
     inline void Particle::proposal() {
-        _forest.addIncrement(_lot);
+       _forest.addIncrement(_lot);
         _log_weight = _forest.joinTaxa(_lot);
     }
 
@@ -80,7 +85,6 @@ class Particle {
         //print out weight of each particle
         output("\nParticle:\n", 1);
         output(format("log weight: %d") % _log_weight, 1);
-//        output(format("log likelihood: %d") % _log_likelihood, 1);
         output("\nForest:\n", 1);
         _forest.showForest();
     }
@@ -116,6 +120,10 @@ class Particle {
 
     inline vector<pair<double, double>> Particle::getSpeciesTreeIncrementPriors() {
         return _forest._increments_and_priors;
+    }
+
+    inline void Particle::clearPartials() {
+        _forest.clearPartials();
     }
 
     inline void Particle::operator=(const Particle & other) {

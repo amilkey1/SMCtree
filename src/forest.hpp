@@ -35,6 +35,7 @@ class Forest {
         double                      getTreeLength();
         double                      getSpeciesTreePrior();
         double                      calcTopologyPrior(unsigned nlineages);
+        void                        clearPartials();
     
         Data::SharedPtr             _data;
         vector<Node *>              _lineages;
@@ -96,7 +97,6 @@ class Forest {
             nd->_edge_length=0.0;
             nd->_position_in_lineages=i;
             _lineages.push_back(nd);
-            nd->_partials.resize(G::_nloci); // _partials contains a vector of partials for each locus
             
             // replace all spaces with underscores so that other programs do not have
               // trouble parsing tree descriptions
@@ -107,25 +107,28 @@ class Forest {
 
         for (unsigned index = 0; index < G::_nloci; index ++) {
             for (auto &nd:_lineages) {
+                if (index == 0) {
+                    double npatterns_total = _data->getNumPatterns();
+                    nd->_partials=ps.getPartial(npatterns_total*G::_nstates);
+                }
+                
                 Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(index);
                 _first_pattern = gene_begin_end.first;
                 _npatterns = _data->getNumPatternsInSubset(index);
                 
+                
                 if (!nd->_left_child) {
 
                     if (!G::_save_memory || (G::_save_memory && partials)) { // if save memory setting, don't set tip partials yet
-//                        for (unsigned i=0; i<G::_nloci; i++) {
-                            nd->_partials[index]=ps.getPartial(_npatterns*4);
-                            for (unsigned p=0; p<_npatterns; p++) {
-                                unsigned pp = _first_pattern+p;
+                            for (unsigned p=_first_pattern; p<_npatterns + _first_pattern; p++) {
+                                unsigned pp = p;
                                 for (unsigned s=0; s<G::_nstates; s++) {
                                     Data::state_t state = (Data::state_t)1 << s;
                                     Data::state_t d = data_matrix[nd->_number][pp];
                                     double result = state & d;
-                                    (*nd->_partials[index])[p*G::_nstates + s] = (result == 0.0 ? 0.0:1.0);
+                                    (*nd->_partials)[p*G::_nstates + s] = (result == 0.0 ? 0.0:1.0);
                                 }
                             }
-//                        }
                     }
                 }
             }
@@ -141,36 +144,37 @@ class Forest {
         _first_pattern = gene_begin_end.first;
 
         for (auto &nd:_lineages) {
+            assert (nd->_partials != nullptr);
             double log_like = 0.0;
-            for (unsigned p=0; p<_npatterns; p++) {
+            for (unsigned p=_first_pattern; p<_npatterns + _first_pattern; p++) {
                 double site_like = 0.0;
                 for (unsigned s=0; s<G::_nstates; s++) {
-                    double partial = (*nd->_partials[i])[p*G::_nstates+s];
+                    double partial = (*nd->_partials)[p*G::_nstates+s];
                     site_like += 0.25*partial;
                 }
                 assert(site_like>0);
-                log_like += log(site_like)*counts[_first_pattern+p];
+                log_like += log(site_like)*counts[p];
             }
             _gene_tree_log_likelihoods[i] += log_like;
-//            debugLogLikelihood(nd, log_like);
         }
+        
         return _gene_tree_log_likelihoods[i];
     }
 
     inline void Forest::addIncrement(Lot::SharedPtr lot) {
-        unsigned nlineages = (unsigned) _lineages.size();
-        double rate = nlineages * G::_lambda;
-        
-        double increment = -log(1.0 - lot->uniform())/rate;
-        
-        for (auto &nd:_lineages) {
-            nd->_edge_length += increment;
-        }
-        
-        // lorad only works if all topologies the same - then don't include the prior on joins because it is fixed
-        double increment_prior = (log(rate)-increment*rate);
-                    
-        _increments_and_priors.push_back(make_pair(increment, increment_prior));
+            unsigned nlineages = (unsigned) _lineages.size();
+            double rate = nlineages * G::_lambda;
+            
+            double increment = -log(1.0 - lot->uniform())/rate;
+            
+            for (auto &nd:_lineages) {
+                nd->_edge_length += increment;
+            }
+            
+            // lorad only works if all topologies the same - then don't include the prior on joins because it is fixed
+            double increment_prior = (log(rate)-increment*rate);
+                        
+            _increments_and_priors.push_back(make_pair(increment, increment_prior));
     }
 
     inline double Forest::joinTaxa(Lot::SharedPtr lot) {
@@ -185,12 +189,11 @@ class Forest {
         Node *subtree2 = nullptr;
         
         if (G::_save_memory) {
-            for (unsigned i=0; i<G::_nloci; i++) {
-                for (auto &nd:_lineages) {
-                    if (nd->_partials[i] == nullptr) {
-                        nd->_partials[i] = ps.getPartial(_npatterns*4);
-                        calcPartialArray(nd);
-                    }
+            double npatterns_total = _data->getNumPatterns();
+            for (auto &nd:_lineages) {
+                if (nd->_partials == nullptr) {
+                    nd->_partials = ps.getPartial(npatterns_total * G::_nstates);
+                    calcPartialArray(nd);
                 }
             }
         }
@@ -221,22 +224,19 @@ class Forest {
         subtree2->_parent=new_nd;
 
         // calculate new partials
-        new_nd->_partials.resize(G::_nloci);
-        for (unsigned index = 0; index < G::_nloci; index++) {
-            assert (new_nd->_partials[index] == nullptr);
-            _npatterns = _data->getNumPatternsInSubset(index);
-            new_nd->_partials[index]=ps.getPartial(_npatterns*4);
-        }
+        assert (new_nd->_partials == nullptr);
+        double npatterns_total = _data->getNumPatterns();
+        new_nd->_partials = ps.getPartial(G::_nstates*npatterns_total);
         assert(new_nd->_left_child->_right_sib);
 
         if (G::_save_memory) {
+            double npatterns_total = _data->getNumPatterns();
+            new_nd->_partials = ps.getPartial(npatterns_total*G::_nstates);
+            
             for (auto &nd:_lineages) {
-                for (unsigned index = 0; index < G::_nloci; index++) {
-                    if (nd->_partials[index] == nullptr) {
-                        _npatterns = _data->getNumPatternsInSubset(index);
-                        nd->_partials[index] = ps.getPartial(_npatterns*4);
-                        calcPartialArray(nd);
-                    }
+                if (nd->_partials == nullptr) {
+                    nd->_partials = ps.getPartial(npatterns_total * G::_nstates);
+                    calcPartialArray(nd);
                 }
             }
         }
@@ -248,8 +248,8 @@ class Forest {
         }
 
         for (unsigned index = 0; index < G::_nloci; index++) {
-            subtree1->_partials[index]=nullptr; // throw away subtree partials now, no longer needed
-            subtree2->_partials[index]=nullptr;
+            subtree1->_partials=nullptr; // throw away subtree partials now, no longer needed
+            subtree2->_partials=nullptr;
         }
 
         //update node lists
@@ -267,12 +267,10 @@ class Forest {
         }
         
         double log_weight = new_log_likelihood - prev_log_likelihood;
-       
+               
        if (G::_save_memory) {
            for (auto &nd:_nodes) {
-               for (unsigned index = 0; index<G::_nloci; index++) {
-                   nd._partials[index]=nullptr;
-               }
+               nd._partials = nullptr;
            }
        }
         
@@ -437,36 +435,40 @@ class Forest {
             if (!new_nd->_left_child) {
                 assert (G::_save_memory || G::_start_mode == "sim");
                 if (!new_nd->_left_child) {
-                    new_nd->_partials[i]=ps.getPartial(_npatterns*4);
-                    for (unsigned p=0; p<_npatterns; p++) {
-                        unsigned pp = _first_pattern+p;
+                    for (unsigned p=_first_pattern; p<_npatterns + _first_pattern; p++) {
+                        unsigned pp = p;
                         for (unsigned s=0; s<G::_nstates; s++) {
                             Data::state_t state = (Data::state_t)1 << s;
                             Data::state_t d = data_matrix[new_nd->_number][pp];
                             double result = state & d;
-                            (*new_nd->_partials[i])[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
+                            (*new_nd->_partials)[p*G::_nstates+s]= (result == 0.0 ? 0.0:1.0);
                         }
                     }
                 }
             }
         }
 
+        
+        double npatterns_total = _data->getNumPatterns();
+//        new_nd->_partials = ps.getPartial(G::_nstates*npatterns_total);
+        
+        auto & parent_partial_array = *(new_nd->_partials);
         for (unsigned i=0; i<G::_nloci; i++) {
             Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(i);
             _first_pattern = gene_begin_end.first;
             _npatterns = _data->getNumPatternsInSubset(i);
-            
-            auto & parent_partial_array = *(new_nd->_partials[i]);
+
             for (Node * child=new_nd->_left_child; child; child=child->_right_sib) {
 
-                if (child->_partials[i] == nullptr) {
-                    child->_partials[i] = ps.getPartial(_npatterns*4);
+                if (child->_partials == nullptr) {
+                    child->_partials = ps.getPartial(npatterns_total*G::_nstates);
                     calcPartialArray(child);
                 }
-                assert (child->_partials[i] != nullptr);
-                auto & child_partial_array = *(child->_partials[i]);
+                
+                assert (child->_partials != nullptr);
+                auto & child_partial_array = *(child->_partials);
 
-                for (unsigned p = 0; p < _npatterns; p++) {
+                for (unsigned p = 0; p < _npatterns + _first_pattern; p++) {
                     for (unsigned s = 0; s <G::_nstates; s++) {
                         double sum_over_child_states = 0.0;
                         for (unsigned s_child = 0; s_child < G::_nstates; s_child++) {
@@ -497,7 +499,7 @@ class Forest {
             return child_transition_prob;
         }
 
-        if (G::_model == "HKY") { // TODO: add HKY
+        if (G::_model == "HKY") {
             double pi_A = G::_base_frequencies[0];
             double pi_C = G::_base_frequencies[1];
             double pi_G = G::_base_frequencies[2];
@@ -710,6 +712,12 @@ class Forest {
             return newick;
         }
 
+    inline void Forest::clearPartials() {
+        for (auto &nd:_lineages) {
+            nd->_partials = nullptr;
+        }
+    }
+
 
     inline void Forest::operator=(const Forest & other) {
         _data               = other._data;
@@ -764,7 +772,7 @@ class Forest {
                 nd->_name = othernd._name;
                 nd->_edge_length = othernd._edge_length;
                 nd->_position_in_lineages = othernd._position_in_lineages;
-                nd->_partials = othernd._partials; // TODO: will this copy the vector correctly?
+                nd->_partials = othernd._partials;
             }
         }
 

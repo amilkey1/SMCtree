@@ -7,7 +7,7 @@ namespace proj {
             ~PartialStore();
             typedef std::shared_ptr < std::vector<double> >   partial_t;
         
-            typedef vector<partial_t>                         partials_t;
+//            typedef vector<partial_t>                         partials_t;
 //            typedef std::shared_ptr <std::vector<std::vector<double> > >     partials_t;
             partial_t getPartial(unsigned nelements);
 //            void setnelements(unsigned nelements) {_nelements = nelements;}

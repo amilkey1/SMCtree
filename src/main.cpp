@@ -85,6 +85,7 @@ unsigned G::_nstates           = 4;
 unsigned G::_ntaxa             = 0;
 unsigned G::_nloci             = 0;
 double   G::_lambda            = 1.0;
+double   G::_mu                = 1.0;
 double   G::_kappa             = 1.0;
 string   G::_string_base_frequencies = "";
 vector<double> G::_base_frequencies;
