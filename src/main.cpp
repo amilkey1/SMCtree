@@ -89,6 +89,8 @@ double   G::_mu                = 1.0;
 double   G::_kappa             = 1.0;
 string   G::_string_base_frequencies = "";
 vector<double> G::_base_frequencies;
+string   G::_string_relative_rates = "";
+vector<double> G::_double_relative_rates;
 
 double   G::_small_enough      = 0.00001;
 double   G::_infinity          = numeric_limits<double>::infinity();

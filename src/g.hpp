@@ -21,6 +21,7 @@ namespace proj {
         static string                   _model;
         static double                   _kappa;
         static string                   _string_base_frequencies;
+        static string                   _string_relative_rates;
         
         // Candidates for setting status
         static double                   _asrv_shape;
@@ -45,6 +46,7 @@ namespace proj {
         static double                   _lambda;
         static double                   _mu;
         static vector<double>           _base_frequencies;
+        static vector<double>           _double_relative_rates;
 
         // Useful constants
         static double                   _small_enough;

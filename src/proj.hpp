@@ -46,6 +46,8 @@ namespace proj {
             void writeTreeFile (vector<Particle> &v) const;
             void writeLogFile(vector<Particle> &v) const;
             void handleBaseFrequencies();
+            void handleRelativeRates();
+
         
             ForestPOL::SharedPtr _sim_tree;
             Partition::SharedPtr _partition;
@@ -89,6 +91,7 @@ namespace proj {
         ("simlambda",  value(&G::_sim_lambda)->default_value(1.0), "true speciation rate for simulating tree under the Yule model if startmode is 'sim'")
         ("kappa",  boost::program_options::value(&G::_kappa)->default_value(1.0), "value of kappa")
         ("base_frequencies", boost::program_options::value(&G::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
+        ("relative_rates", boost::program_options::value(&G::_string_relative_rates)->default_value("null"))
         ;
         
         store(parse_command_line(argc, argv, desc), vm);
@@ -126,6 +129,11 @@ namespace proj {
         if (vm.count("base_frequencies") > 0) {
             handleBaseFrequencies();
         }
+        
+        // If user specified "relative_rates" in conf file, convert them to a vector<double>
+        if (vm.count("relative_rates") > 0) {
+            handleRelativeRates();
+        }
     }
 
     inline void Proj::handleBaseFrequencies() {
@@ -144,7 +152,43 @@ namespace proj {
         assert (fabs(sum-1) < 0.000001);
     }
 
-    
+    inline void Proj::handleRelativeRates() {
+        vector <string> temp;
+        assert (G::_double_relative_rates.size() == 0);
+        unsigned nloci = _partition->getNumSubsets();
+        
+        split(temp, G::_string_relative_rates, is_any_of(","));
+        
+        if (G::_string_relative_rates == "null") {
+            for (unsigned i=0; i<nloci; i++) {
+                G::_double_relative_rates.push_back(1.0); // if no relative rates provided, set them all to 1
+            }
+        }
+        else {
+        // iterate through temp
+            for (auto &i:temp) {
+                double f = stof(i);
+                G::_double_relative_rates.push_back(f);
+            }
+        }
+        
+        if (G::_double_relative_rates.size() != nloci) {
+            throw XProj(format("%d relative rates were provided, but there are %d loci")% G::_double_relative_rates.size() % nloci);
+        }
+        
+        // relative rates must average to 1.0
+        double average = 0.0;
+        for (auto &i:G::_double_relative_rates) {
+            average += i;
+        }
+        average /= G::_double_relative_rates.size();
+        
+        if (fabs(average-1)>0.000001) {
+            throw XProj(format("relative rates (%s) don't average to 1")%G::_string_relative_rates);
+        }
+        assert (fabs(average-1) < 0.000001);
+    }
+
     inline void Proj::run() {
         rng->setSeed(G::_rnseed);
 
@@ -351,7 +395,7 @@ namespace proj {
                 }
                 
                 unsigned step_plus_one = g+1;
-                output(format("Step %d of %d steps.\n") % step_plus_one % nsteps, 1);
+                output(format("Step %d of %d.\n") % step_plus_one % nsteps, 1);
                 proposeParticles(particle_vec);
                 
                 double ess = filterParticles(g, particle_vec);

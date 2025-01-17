@@ -24,7 +24,7 @@ class Forest {
         void                        addIncrement(Lot::SharedPtr lot);
         double                      joinTaxa(Lot::SharedPtr lot);
         void                        calcPartialArray(Node* new_nd);
-        double                      calcTransitionProbability(Node* child, double s, double s_child);
+        double                      calcTransitionProbability(Node* child, double s, double s_child, unsigned locus);
         pair<unsigned, unsigned>    chooseTaxaToJoin(double s, Lot::SharedPtr lot);
         string                      makeNewick(unsigned precision, bool use_names);
         string                      makePartialNewick(unsigned precision, bool use_names);
@@ -472,7 +472,7 @@ class Forest {
                     for (unsigned s = 0; s <G::_nstates; s++) {
                         double sum_over_child_states = 0.0;
                         for (unsigned s_child = 0; s_child < G::_nstates; s_child++) {
-                            double child_transition_prob = calcTransitionProbability(child, s, s_child);
+                            double child_transition_prob = calcTransitionProbability(child, s, s_child, i);
                             double child_partial = child_partial_array[p*G::_nstates + s_child];
                             sum_over_child_states += child_transition_prob * child_partial;
                         }   // child state loop
@@ -486,11 +486,14 @@ class Forest {
         }
     }
 
-    inline double Forest::calcTransitionProbability(Node* child, double s, double s_child) {
+    inline double Forest::calcTransitionProbability(Node* child, double s, double s_child, unsigned locus) {
+        double relative_rate = G::_double_relative_rates[locus];
+        assert (relative_rate > 0.0);
+        
         double child_transition_prob = 0.0;
 
         if (G::_model == "JC" ) {
-            double expterm = exp(-4.0*(child->_edge_length)/3.0); // TODO: need to include relative rates
+            double expterm = exp(-4.0*(child->_edge_length * relative_rate)/3.0); // TODO: need to include relative rates
             double prsame = 0.25+0.75*expterm;
             double prdif = 0.25 - 0.25*expterm;
 
@@ -509,7 +512,7 @@ class Forest {
             double PI_J = 0.0;
 
             double phi = (pi_A+pi_G)*(pi_C+pi_T)+G::_kappa*(pi_A*pi_G+pi_C*pi_T);
-            double beta_t = 0.5*(child->_edge_length)/phi; // TODO: need to include relative rates
+            double beta_t = 0.5*(child->_edge_length * relative_rate)/phi; // TODO: need to include relative rates
 
 
             // transition prob depends only on ending state
