@@ -8,3 +8,5 @@ rm -f sim.nex
 rm -f mltree.tre
 rm -f pauplog.txt
 rm -f sim-paup.nex
+rm -f pldist.txt
+rm -f rfdist.txt

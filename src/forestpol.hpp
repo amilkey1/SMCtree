@@ -1,7 +1,5 @@
 #pragma once
 
-using boost::algorithm::join;
-
 class Particle;
 
 extern proj::Lot::SharedPtr rng;
@@ -179,14 +177,20 @@ namespace proj {
                     }
                     if (use_names) {
                         if (precision > 0)
-                            subtree_newick += str(format(tip_node_name_format) % nd->_name % edge_length);
+                            subtree_newick += str(format(tip_node_name_format)
+                                % nd->_name
+                                % edge_length);
                         else
-                            subtree_newick += str(format("%s") % nd->_name);
+                            subtree_newick += str(format("%s")
+                                % nd->_name);
                     } else {
                         if (precision > 0)
-                            subtree_newick += str(format(tip_node_number_format) % (nd->_number + 1) % edge_length);
+                            subtree_newick += str(format(tip_node_number_format)
+                                % (nd->_number + 1)
+                                % edge_length);
                         else
-                            subtree_newick += str(format("%d") % (nd->_number + 1));
+                            subtree_newick += str(format("%d")
+                                % (nd->_number + 1));
                     }
                     if (nd->_right_sib)
                         subtree_newick += ",";

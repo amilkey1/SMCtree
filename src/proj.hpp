@@ -221,7 +221,7 @@ namespace proj {
         paupf << "  describe 1 / plot=none brlens=sumonly;\n";
         paupf << "  lset nouserbrlen;\n";
         paupf << "  hsearch;\n";
-        paupf << "  savetrees file=mltree.tre brlen;\n";
+        paupf << "  savetrees file=mltree.tre brlen format=altnexus;\n";
         paupf << "[!\n";
         paupf << "*********** ML tree ***********]\n";
         paupf << "  describe 1 / plot=none brlens=sumonly;\n";

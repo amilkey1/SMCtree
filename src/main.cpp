@@ -43,6 +43,8 @@
 
 using namespace std;
 using boost::format;
+using boost::str;
+using boost::algorithm::join;
 
 #include "conditionals.hpp"
 #include "xproj.hpp"
