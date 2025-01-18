@@ -84,7 +84,7 @@ class Forest {
         _npatterns = 0;
         _gene_tree_log_likelihoods.clear();
         _ninternals = 0;
-        _nleaves = G::_ntaxa;
+        _nleaves = 0;
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -99,6 +99,7 @@ class Forest {
 #if NEWWAY == POLWAY  //POL (_nodes is vector fully allocated at start)
         unsigned nnodes = 2*G::_ntaxa - 1;
         _nodes.resize(nnodes);
+        _nleaves = G::_ntaxa;
         for (unsigned i = 0; i < G::_ntaxa; i++) {
             string taxon_name = G::_taxon_names[i];
             _nodes[i]._number = (int)i;
@@ -929,7 +930,7 @@ class Forest {
         
         // Simulate starting sequence at the root node
         Node * nd = *(_lineages.begin());
-        unsigned ndnum = nd->_number;
+        int ndnum = nd->_number;
         assert(ndnum < nnodes);
         for (unsigned i = 0; i < nsites; i++) {
             sequences[ndnum][i] = G::multinomialDraw(lot, basefreq);
@@ -1044,15 +1045,25 @@ class Forest {
         // Sanity checks
         assert(new_nd->_my_index == node_index);
         assert(new_nd->_number == -1);
+        new_nd->clear();
+        new_nd->_number = _nleaves + _ninternals;
+        _ninternals++;
 #else  //AAM (_nodes is not fully allocated at start)
         _nodes.push_back(Node());
         Node* new_nd = &_nodes.back();
         //new_nd->_edge_length = 0.0; // should be Node::_smallest_edge_length?
-#endif
         new_nd->clear();
+        if (_nodes.size() <= G::_ntaxa) {
+            assert(_nleaves == _nodes.size() - 1);
+            new_nd->_number = (int)_nleaves;
+            _nleaves++;
+        }
+        else {
+            new_nd->_number = _nleaves + _ninternals;
+            _ninternals++;
+        }
+#endif
         new_nd->_split.resize(G::_ntaxa);
-        new_nd->_number = _nleaves + _ninternals;
-        _ninternals++;
 
         return new_nd;
     }
