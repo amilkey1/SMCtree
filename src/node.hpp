@@ -77,7 +77,8 @@ namespace proj {
         _name = "";
         _edge_length = _smallest_edge_length;
         _height = 0.0;
-        _partials.clear();
+        //_partials.clear();
+        _partials = nullptr;
     }
     
     inline void Node::clearPointers() {
@@ -109,19 +110,22 @@ namespace proj {
         s += str(format("  _my_index             = %d\n") % _my_index);
         s += str(format("  _position_in_lineages = %d\n") % _position_in_lineages);
         s += str(format("  _split                = %s\n") % _split.createPatternRepresentation());
-        s += str(format("  _partials.size()      = %d\n") % _partials.size());
+        if (_partials)
+            s += str(format("  _partials             = %d\n") % _partials->size());
+        else
+            s += "  _partials             = nullptr\n";
         if (_left_child)
             s += str(format("  _left_child           = Node %d\n") % _left_child->_number);
         else
-            s += "  _left_child           = NULL\n";
+            s += "  _left_child           = nullptr\n";
         if (_right_sib)
             s += str(format("  _right_sib            = Node %d\n") % _right_sib->_number);
         else
-            s += "  _right_sib            = NULL\n";
+            s += "  _right_sib            = nullptr\n";
         if (_parent)
             s += str(format("  _parent               = Node %d\n") % _parent->_number);
         else
-            s += "  _parent               = NULL\n";
+            s += "  _parent               = nullptr\n";
         return s;
     }
 }

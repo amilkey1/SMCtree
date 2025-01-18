@@ -177,7 +177,8 @@ class Forest {
             _nodes[i]._my_index = (int)i;
             _nodes[i]._edge_length=0.0;
             _nodes[i]._position_in_lineages=i;
-            _nodes[i]._partials.resize(G::_nloci);
+            //_nodes[i]._partials.resize(G::_nloci);
+            _nodes[i]._partials = nullptr;
             _nodes[i]._name = G::_taxon_names[i];
             _lineages.push_back(&_nodes[i]);
 #else
@@ -192,7 +193,8 @@ class Forest {
             nd->_edge_length=0.0;
             nd->_position_in_lineages=i;
             _lineages.push_back(nd);
-            nd->_partials.resize(G::_nloci); // _partials contains a vector of partials for each locus
+            //nd->_partials.resize(G::_nloci); // _partials contains a vector of partials for each locus
+            nd->_partials = nullptr; // _partials contains a vector of partials for each locus
             // replace all spaces with underscores so that other programs do not have
               // trouble parsing tree descriptions
             std::string name = G::_taxon_names[i];
@@ -203,11 +205,13 @@ class Forest {
 
 #if NEWWAY == POLWAY
         // Add all remaining nodes to _unused_nodes vector
+        double npatterns_total = _data->getNumPatterns();
         _unused_nodes.clear();
         for (unsigned i = nnodes - 1; i >= G::_ntaxa; --i) {
             _nodes[i]._my_index = (int)i;
             _nodes[i]._number = -1;
-            _nodes[i]._partials.resize(G::_nloci);
+            //_nodes[i]._partials.resize(G::_nloci);
+            _nodes[i]._partials = ps.getPartial(npatterns_total*G::_nstates);
             _unused_nodes.push_back(i);
         }
 #endif
@@ -251,6 +255,12 @@ class Forest {
         _first_pattern = gene_begin_end.first;
 
         for (auto &nd:_lineages) {
+
+            //temporary!
+            if (nd->_partials == nullptr) {
+                cerr << "oops" << endl;
+            }
+            
             assert (nd->_partials != nullptr);
             double log_like = 0.0;
             for (unsigned p=_first_pattern; p<_npatterns + _first_pattern; p++) {
@@ -351,7 +361,7 @@ class Forest {
         }
         
         bool calc_likelihood = true;
-        
+                
         if (calc_likelihood) {
             calcPartialArray(new_nd);
         }
@@ -360,7 +370,7 @@ class Forest {
             subtree1->_partials=nullptr; // throw away subtree partials now, no longer needed
             subtree2->_partials=nullptr;
         }
-
+        
         //update node lists
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
 
