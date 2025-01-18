@@ -1,7 +1,5 @@
 #pragma once
 
-using boost::algorithm::join;
-
 class Particle;
 
 extern proj::Lot::SharedPtr rng;
@@ -77,36 +75,6 @@ namespace proj {
         _lineages.clear();
     }
         
-    inline void ForestPOL::createTrivialForest() {
-        assert(G::_ntaxa > 0);
-        assert(G::_ntaxa == G::_taxon_names.size());
-        clear();
-        unsigned nnodes = 2*G::_ntaxa - 1;
-        _nodes.resize(nnodes);
-        for (unsigned i = 0; i < G::_ntaxa; i++) {
-            string taxon_name = G::_taxon_names[i];
-            _nodes[i]._number = (int)i;
-            _nodes[i]._my_index = (int)i;
-            _nodes[i]._name = taxon_name;
-            _nodes[i].setEdgeLength(0.0);
-            _nodes[i]._height = 0.0;
-            _nodes[i]._split.resize(G::_ntaxa);
-            _nodes[i]._split.setBitAt(i);
-            _lineages.push_back(&_nodes[i]);
-        }
-        
-        // Add all remaining nodes to _unused_nodes vector
-        _unused_nodes.clear();
-        for (unsigned i = G::_ntaxa; i < nnodes; i++) {
-            _nodes[i]._my_index = (int)i;
-            _nodes[i]._number = -1;
-            _unused_nodes.push_back(i);
-        }
-        
-        refreshAllPreorders();
-        _forest_height = 0.0;
-    }
-    
     inline unsigned ForestPOL::getNumLineages() const {
         return (unsigned)_lineages.size();
     }
@@ -209,14 +177,20 @@ namespace proj {
                     }
                     if (use_names) {
                         if (precision > 0)
-                            subtree_newick += str(format(tip_node_name_format) % nd->_name % edge_length);
+                            subtree_newick += str(format(tip_node_name_format)
+                                % nd->_name
+                                % edge_length);
                         else
-                            subtree_newick += str(format("%s") % nd->_name);
+                            subtree_newick += str(format("%s")
+                                % nd->_name);
                     } else {
                         if (precision > 0)
-                            subtree_newick += str(format(tip_node_number_format) % (nd->_number + 1) % edge_length);
+                            subtree_newick += str(format(tip_node_number_format)
+                                % (nd->_number + 1)
+                                % edge_length);
                         else
-                            subtree_newick += str(format("%d") % (nd->_number + 1));
+                            subtree_newick += str(format("%d")
+                                % (nd->_number + 1));
                     }
                     if (nd->_right_sib)
                         subtree_newick += ",";

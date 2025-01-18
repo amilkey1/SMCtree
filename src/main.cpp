@@ -43,6 +43,8 @@
 
 using namespace std;
 using boost::format;
+using boost::str;
+using boost::algorithm::join;
 
 #include "conditionals.hpp"
 #include "xproj.hpp"
@@ -58,7 +60,7 @@ using boost::format;
 #include "node.hpp"
 #include "forest.hpp"
 #include "particle.hpp"
-#include "forestpol.hpp"
+//#include "forestpol.hpp"
 #include "proj.hpp"
 
 proj::PartialStore ps;

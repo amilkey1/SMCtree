@@ -4,13 +4,13 @@ namespace proj {
 
     class Likelihood;
     class Forest;
-    class ForestPOL;
+    class Forest;
     class Particle;
 
     class Node {
         friend class Likelihood;
         friend class Forest;
-        friend class ForestPOL;
+        friend class Forest;
         friend class Particle;
 
         public:
@@ -33,8 +33,10 @@ namespace proj {
         
                     unsigned            countChildren() const;
 
-                    void                clearPointers()             {_left_child = _right_sib = _parent = 0;}
+                    void                clearPointers();
                     void                resetNode();
+                    
+                    string              asString() const;
                                                             
             static const double _smallest_edge_length;
         
@@ -75,6 +77,11 @@ namespace proj {
         _name = "";
         _edge_length = _smallest_edge_length;
         _height = 0.0;
+        _partials.clear();
+    }
+    
+    inline void Node::clearPointers() {
+        _left_child = _right_sib = _parent = nullptr;
     }
 
     inline void Node::setEdgeLength(double v) {
@@ -92,6 +99,30 @@ namespace proj {
     inline void Node::resetNode() {
         _parent=0;
         _right_sib=0;
+    }
+    
+    inline string Node::asString() const {
+        string s = str(format("Node %d:\n") % _number);
+        s += str(format("  _name                 = %s\n") % _name);
+        s += str(format("  _edge_length          = %.9f\n") % _edge_length);
+        s += str(format("  _height               = %.9f\n") % _height);
+        s += str(format("  _my_index             = %d\n") % _my_index);
+        s += str(format("  _position_in_lineages = %d\n") % _position_in_lineages);
+        s += str(format("  _split                = %s\n") % _split.createPatternRepresentation());
+        s += str(format("  _partials.size()      = %d\n") % _partials.size());
+        if (_left_child)
+            s += str(format("  _left_child           = Node %d\n") % _left_child->_number);
+        else
+            s += "  _left_child           = NULL\n";
+        if (_right_sib)
+            s += str(format("  _right_sib            = Node %d\n") % _right_sib->_number);
+        else
+            s += "  _right_sib            = NULL\n";
+        if (_parent)
+            s += str(format("  _parent               = Node %d\n") % _parent->_number);
+        else
+            s += "  _parent               = NULL\n";
+        return s;
     }
 }
 

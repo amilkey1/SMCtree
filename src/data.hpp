@@ -10,7 +10,7 @@ namespace proj {
     class Data {
         
         friend class Proj;
-        friend class ForestPOL;
+        friend class Forest;
         friend class GeneForest;
         friend class Particle;
         
