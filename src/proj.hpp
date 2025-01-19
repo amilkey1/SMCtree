@@ -31,7 +31,9 @@ namespace proj {
         
         private:
             void clear();
-
+            
+            void debugSaveParticleVectorInfo(string fn, unsigned step);
+            
             void simulate();
             void simulateTree();
             void simulateData(Lot::SharedPtr lot, unsigned startat, unsigned locus_length);
@@ -48,6 +50,7 @@ namespace proj {
             void handleBaseFrequencies();
             void handleRelativeRates();
 
+            vector<Particle>     _particle_vec;
         
             Forest::SharedPtr    _sim_tree;
             Partition::SharedPtr _partition;
@@ -310,6 +313,16 @@ namespace proj {
         paupf << "end;\n";
         paupf.close();
     }
+    
+    inline void Proj::debugSaveParticleVectorInfo(string fn, unsigned step) {
+        ofstream outf(fn, ios::out | ios::app);
+        outf << str(format("\n********** particles step %d **********\n\n") % step);
+        unsigned i = 1;
+        for (auto & p : _particle_vec) {
+            outf << p.debugSaveParticleInfo(i++);
+        }
+        outf.close();
+    }
 
     inline void Proj::smc() {
         output("\nStarting....\n",1);
@@ -334,18 +347,19 @@ namespace proj {
             }
                         
             // create vector of particles
-            vector<Particle> particle_vec;
-            particle_vec.resize(G::_nparticles);
+            _particle_vec.resize(G::_nparticles);
 
             for (unsigned i=0; i<G::_nparticles; i++) {
-                particle_vec[i] = Particle();
+                _particle_vec[i] = Particle();
             }
             
-            initializeParticles(particle_vec); // initialize in parallel with multithreading
+            initializeParticles(_particle_vec); // initialize in parallel with multithreading
             
+            //debugSaveParticleVectorInfo("debug-initialized.txt", 0);
+
             // reset marginal likelihood
             _log_marginal_likelihood = 0.0;
-            vector<double> starting_log_likelihoods = particle_vec[0].calcGeneTreeLogLikelihoods();
+            vector<double> starting_log_likelihoods = _particle_vec[0].calcGeneTreeLogLikelihoods();
             
             _log_marginal_likelihood = 0.0;
             for (auto &l:starting_log_likelihoods) {
@@ -355,12 +369,12 @@ namespace proj {
             // initialize starting log likelihoods for all other particles
             // necessary for calculating the first weight
             
-            for (unsigned p=1; p<particle_vec.size(); p++) {
-                particle_vec[p].setStartingLogLikelihoods(starting_log_likelihoods);
+            for (unsigned p=1; p<_particle_vec.size(); p++) {
+                _particle_vec[p].setStartingLogLikelihoods(starting_log_likelihoods);
             }
             
             if (G::_save_memory) {
-                for (auto &p:particle_vec) {
+                for (auto &p:_particle_vec) {
                     p.clearPartials();
                 }
             }
@@ -370,22 +384,25 @@ namespace proj {
             for (unsigned g=0; g<nsteps; g++){
                 // set random number seeds
                 unsigned psuffix = 1;
-                for (auto &p:particle_vec) {
+                for (auto &p:_particle_vec) {
                     p.setSeed(rng->randint(1,9999) + psuffix);
                     psuffix += 2;
                 }
                 
                 unsigned step_plus_one = g+1;
                 output(format("Step %d of %d.\n") % step_plus_one % nsteps, 1);
-                proposeParticles(particle_vec);
+                proposeParticles(_particle_vec);
                 
-                double ess = filterParticles(g, particle_vec);
+                //debugSaveParticleVectorInfo("debug-proposed.txt", g+1);
+                
+                double ess = filterParticles(g, _particle_vec);
                 output(format("     ESS = %d\n") % ess, 2);
                 
+                //debugSaveParticleVectorInfo("debug-filtered.txt", g+1);
             }
             
-            writeTreeFile(particle_vec);
-            writeLogFile(particle_vec);
+            writeTreeFile(_particle_vec);
+            writeLogFile(_particle_vec);
             
         }
         
@@ -396,15 +413,14 @@ namespace proj {
 
     inline double Proj::filterParticles(unsigned step, vector<Particle> & particles) {
         unsigned nparticles = (unsigned) particles.size();
-        // Copy log weights for all bundles to prob vector
+        // Copy log weights for all particles to probs vector
         vector<double> probs(nparticles, 0.0);
-        
         for (unsigned p=0; p < nparticles; p++) {
             probs[p] = particles[p].getLogWeight();
         }
+        
         // Normalize log_weights to create discrete probability distribution
         double log_sum_weights = G::calcLogSum(probs);
-        
         transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
         
         // Compute component of the log marginal likelihood due to this step
@@ -420,7 +436,7 @@ namespace proj {
         partial_sum(probs.begin(), probs.end(), probs.begin());
 
         // Initialize vector of counts storing number of darts hitting each particle
-        vector<unsigned> counts (nparticles, 0);
+        vector<unsigned> counts(nparticles, 0);
 
         // Throw _nparticles darts
         for (unsigned i=0; i<nparticles; i++) {
@@ -433,7 +449,18 @@ namespace proj {
         
         // Copy particles
 
-      bool copying_needed = true;
+#if NEWWAY == POLWAY
+        // This way seems more straightforward to me
+        int donor = -1;
+        for (unsigned i = 0; i < counts.size(); i++) {
+            if (counts[i] > 1) {
+                donor = i;
+                break;
+            }
+        }
+        bool copying_needed = (i >= 0);
+#else
+        bool copying_needed = true;
       
         // Locate first donor
         unsigned donor = 0;
@@ -444,6 +471,7 @@ namespace proj {
                 break;
             }
         }
+#endif
 
       if (copying_needed) {
             // Locate first recipient
@@ -483,8 +511,8 @@ namespace proj {
                 while (recipient < nparticles && counts[recipient] > 0) {
                     recipient++;
                 }
-            }
-      }
+            } // while nzeros > 0
+        } // if copying_needed
         return ess;
     }
 

@@ -36,7 +36,7 @@ namespace proj {
                     void                clearPointers();
                     void                resetNode();
                     
-                    string              asString() const;
+                    string              saveNodeInfo(string prefix = "") const;
                                                             
             static const double _smallest_edge_length;
         
@@ -102,30 +102,31 @@ namespace proj {
         _right_sib=0;
     }
     
-    inline string Node::asString() const {
-        string s = str(format("Node %d:\n") % _number);
-        s += str(format("  _name                 = %s\n") % _name);
-        s += str(format("  _edge_length          = %.9f\n") % _edge_length);
-        s += str(format("  _height               = %.9f\n") % _height);
-        s += str(format("  _my_index             = %d\n") % _my_index);
-        s += str(format("  _position_in_lineages = %d\n") % _position_in_lineages);
-        s += str(format("  _split                = %s\n") % _split.createPatternRepresentation());
+    inline string Node::saveNodeInfo(string prefix) const {
+        string s = str(format("%sNode %d:\n") % prefix % _number);
+        s += str(format("%s  _number               = %d\n") % prefix % _number);
+        s += str(format("%s  _my_index             = %d\n") % prefix % _my_index);
+        s += str(format("%s  _name                 = %s\n") % prefix % _name);
+        s += str(format("%s  _edge_length          = %.9f\n") % prefix % _edge_length);
+        s += str(format("%s  _height               = %.9f\n") % prefix % _height);
+        s += str(format("%s  _position_in_lineages = %d\n") % prefix % _position_in_lineages);
+        s += str(format("%s  _split                = %s\n") % prefix %  _split.createPatternRepresentation());
         if (_partials)
-            s += str(format("  _partials             = %d\n") % _partials->size());
+            s += str(format("%s  _partials             = %d\n") % prefix % _partials->size());
         else
-            s += "  _partials             = nullptr\n";
+            s += str(format("%s  _partials             = nullptr\n") % prefix);
         if (_left_child)
-            s += str(format("  _left_child           = Node %d\n") % _left_child->_number);
+            s += str(format("%s  _left_child           = Node %d\n") % prefix % _left_child->_number);
         else
-            s += "  _left_child           = nullptr\n";
+            s += str(format("%s  _left_child           = nullptr\n") % prefix);
         if (_right_sib)
-            s += str(format("  _right_sib            = Node %d\n") % _right_sib->_number);
+            s += str(format("%s  _right_sib            = Node %d\n") % prefix % _right_sib->_number);
         else
-            s += "  _right_sib            = nullptr\n";
+            s += str(format("%s  _right_sib            = nullptr\n") % prefix);
         if (_parent)
-            s += str(format("  _parent               = Node %d\n") % _parent->_number);
+            s += str(format("%s  _parent               = Node %d\n") % prefix % _parent->_number);
         else
-            s += "  _parent               = nullptr\n";
+            s += str(format("%s  _parent               = nullptr\n") % prefix);
         return s;
     }
 }

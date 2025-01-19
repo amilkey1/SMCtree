@@ -28,6 +28,7 @@ class Particle {
                                                         return _forest.makeNewick(8, true);}
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
 
+        string debugSaveParticleInfo(unsigned i) const;
     
     private:
         mutable                                 Lot::SharedPtr _lot;
@@ -35,9 +36,16 @@ class Particle {
     
         Forest                                  _forest;
         double                                  _log_weight;
-
-    
 };
+
+    inline string Particle::debugSaveParticleInfo(unsigned i) const {
+        string s;
+        s += str(format("Particle %d:\n") % i);
+        s += str(format("  _log_weight = %.9f:\n") % _log_weight);
+        s += _forest.debugSaveForestInfo();
+        s += "\n";
+        return s;
+    }
 
     inline Particle::Particle() {
         _lot.reset(new Lot());
@@ -130,4 +138,5 @@ class Particle {
         _forest = other._forest;
         _log_weight = other._log_weight;
     }
+    
 }

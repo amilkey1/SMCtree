@@ -20,6 +20,7 @@ class Forest {
         void simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites);
         void buildYuleTree();
         typedef shared_ptr<Forest> SharedPtr;
+        string debugSaveForestInfo() const;
         //POL added above
     
     private:
@@ -76,6 +77,37 @@ class Forest {
         vector<unsigned>            _unused_nodes;
 #endif
 };
+
+    inline string Forest::debugSaveForestInfo() const {
+        string s = "  Forest:\n";
+
+        s += str(format("    _nleaves    = %d\n") % _nleaves);
+        s += str(format("    _ninternals = %d\n") % _ninternals);
+            
+#if NEWWAY == POLWAY
+        s += "    _unused_nodes = ";
+        for (auto x : _unused_nodes)
+            s += str(format(" %d") % x);
+        s += "\n";
+#endif
+
+        s += "    _lineages = ";
+        for (auto nd : _lineages)
+            s += str(format(" %d") % nd->_number);
+        s += "\n";
+
+        s += "    _preorder = ";
+        for (auto nd : _preorder)
+            s += str(format(" %d") % nd->_number);
+        s += "\n";
+
+        s += "    _nodes:\n";
+        for (auto nd : _nodes) {
+            s += nd.saveNodeInfo("      ");
+            s += "\n";
+        }
+        return s;
+    }
 
     inline Forest::Forest() {
         clear();
@@ -202,6 +234,8 @@ class Forest {
             nd->_name = name;
 #endif
         }
+        
+        _nleaves = G::_ntaxa;
 
 #if NEWWAY == POLWAY
         // Add all remaining nodes to _unused_nodes vector
@@ -843,6 +877,89 @@ class Forest {
         }
     }
 
+#if NEWWAY == POLWAY
+    inline void Forest::operator=(const Forest & other) {
+        _nodes.clear();
+        _nodes.resize(other._nodes.size());
+        _lineages.resize(other._lineages.size());
+        _preorder.resize(other._preorder.size());
+
+        _data                      = other._data;
+        _first_pattern             = other._first_pattern;
+        _npatterns                 = other._npatterns;
+        _gene_tree_log_likelihoods = other._gene_tree_log_likelihoods;
+        _ninternals                = other._ninternals;
+        _nleaves                   = other._nleaves;
+        _log_joining_prob          = other._log_joining_prob;
+        _increments_and_priors     = other._increments_and_priors;
+        _unused_nodes              = other._unused_nodes;
+
+        // copy tree itself
+
+        for (Node & othernd : other._nodes) {
+            int k = othernd._number;
+
+            if (k > -1) {
+                Node * nd = &*next(_nodes.begin(), k);
+
+                // copy parent
+                if (othernd._parent) {
+                    unsigned parent_number = othernd._parent->_number;
+                    Node * parent = &*next(_nodes.begin(), parent_number);
+                    nd->_parent = parent;
+                }
+
+                // copy left child
+                if (othernd._left_child) {
+                    unsigned left_child_number = othernd._left_child->_number;
+                    Node* left_child = &*next(_nodes.begin(), left_child_number);
+                    nd->_left_child = left_child;
+                }
+                else {
+                    nd->_left_child = 0;
+                }
+
+                // copy right sibling
+                if (othernd._right_sib) {
+                    unsigned right_sib_number = othernd._right_sib->_number;
+                    Node* right_sib = &*next(_nodes.begin(), right_sib_number);
+                    nd->_right_sib = right_sib;
+                }
+                else
+                    nd->_right_sib = 0;
+
+                nd->_number = othernd._number;
+                nd->_name = othernd._name;
+                nd->_edge_length = othernd._edge_length;
+                nd->_position_in_lineages = othernd._position_in_lineages;
+                nd->_partials = othernd._partials;
+                nd->_split = othernd._split;
+                nd->_my_index = othernd._my_index;
+                nd->_height = othernd._height;
+            } // if k > -1
+        }
+
+        unsigned j = 0;
+        for (auto othernd : other._lineages) {
+            unsigned k = othernd->_number;
+            Node * nd = &*next(_nodes.begin(), k);
+            _lineages[j] = nd;
+            j++;
+        }
+        
+        if (other._preorder.size() > 0) {
+            unsigned m = 0;
+            for (auto othernd : other._preorder) {
+                unsigned n = othernd->_number;
+                Node * nd = &*next(_nodes.begin(), n);
+                _preorder[m] = nd;
+                m++;
+            }
+        }
+    }
+#endif
+
+#if NEWWAY == AAMWAY
     inline void Forest::operator=(const Forest & other) {
         _data               = other._data;
         _nodes.clear();
@@ -857,13 +974,10 @@ class Forest {
         _log_joining_prob = other._log_joining_prob;
         _increments_and_priors = other._increments_and_priors;
 
-#if NEWWAY == POLWAY   //POL (_nodes is vector fully allocated at start)
-        _unused_nodes = other._unused_nodes;
-#endif
-
         // copy tree itself
 
         for (auto othernd : other._nodes) {
+            //POL _nodes is not in preorder sequence, so comment below is confusing
             // get number of next node in preorder sequence (serves as index of node in _nodes vector)
             int k = othernd._number;
 
@@ -921,8 +1035,8 @@ class Forest {
                 m++;
             }
         }
-        
     }
+#endif
 
     inline double Forest::calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length) {
         assert(pi.size() == 4);
@@ -1123,6 +1237,7 @@ class Forest {
         Node* new_nd = &_nodes.back();
         //new_nd->_edge_length = 0.0; // should be Node::_smallest_edge_length?
         new_nd->clear();
+        new_nd->_my_index = (unsigned)_nodes.size() - 1;
         if (_nodes.size() <= G::_ntaxa) {
             assert(_nleaves == _nodes.size() - 1);
             new_nd->_number = (int)_nleaves;
