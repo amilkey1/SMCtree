@@ -896,7 +896,7 @@ class Forest {
 
         // copy tree itself
 
-        for (Node & othernd : other._nodes) {
+        for (const Node & othernd : other._nodes) {
             int k = othernd._number;
 
             if (k > -1) {

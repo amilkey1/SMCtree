@@ -458,7 +458,7 @@ namespace proj {
                 break;
             }
         }
-        bool copying_needed = (i >= 0);
+        bool copying_needed = (donor >= 0);
 #else
         bool copying_needed = true;
       

@@ -10,3 +10,6 @@ rm -f pauplog.txt
 rm -f sim-paup.nex
 rm -f pldist.txt
 rm -f rfdist.txt
+rm -f trees.trees
+rm -f params.log
+rm -f unique_trees.trees
