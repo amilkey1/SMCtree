@@ -55,7 +55,7 @@ namespace proj {
             PartialStore::partial_t _partials;
             unsigned            _position_in_lineages;
 
-            int                 _my_index;
+            //int                 _my_index;
             
             // distance from node to any leaf
             double          _height;
@@ -105,7 +105,7 @@ namespace proj {
     inline string Node::saveNodeInfo(string prefix) const {
         string s = str(format("%sNode %d:\n") % prefix % _number);
         s += str(format("%s  _number               = %d\n") % prefix % _number);
-        s += str(format("%s  _my_index             = %d\n") % prefix % _my_index);
+        //s += str(format("%s  _my_index             = %d\n") % prefix % _my_index);
         s += str(format("%s  _name                 = %s\n") % prefix % _name);
         s += str(format("%s  _edge_length          = %.9f\n") % prefix % _edge_length);
         s += str(format("%s  _height               = %.9f\n") % prefix % _height);
