@@ -72,10 +72,6 @@ class Forest {
         unsigned                    _nleaves;
         double                      _log_joining_prob;
         vector<pair<double, double>> _increments_and_priors;
-        
-#if 0
-        vector<unsigned>            _unused_nodes;
-#endif
 };
 
     inline string Forest::debugSaveForestInfo() const {
@@ -84,13 +80,6 @@ class Forest {
         s += str(format("    _nleaves    = %d\n") % _nleaves);
         s += str(format("    _ninternals = %d\n") % _ninternals);
             
-#if 0
-        s += "    _unused_nodes = ";
-        for (auto x : _unused_nodes)
-            s += str(format(" %d") % x);
-        s += "\n";
-#endif
-
         s += "    _lineages = ";
         for (auto nd : _lineages)
             s += str(format(" %d") % nd->_number);
@@ -146,7 +135,6 @@ class Forest {
         for (unsigned i = 0; i < G::_ntaxa; i++) {
             string taxon_name = G::_taxon_names[i];
             _nodes[i]._number = (int)i;
-            //_nodes[i]._my_index = (int)i;
             _nodes[i]._name = taxon_name;
             _nodes[i].setEdgeLength(0.0);
             _nodes[i]._height = 0.0;
@@ -154,16 +142,6 @@ class Forest {
             _nodes[i]._split.setBitAt(i);
             _lineages.push_back(&_nodes[i]);
         }
-
-#   if 0
-        // Add all remaining nodes to _unused_nodes vector
-        _unused_nodes.clear();
-        for (unsigned i = G::_ntaxa; i < nnodes; i++) {
-            //_nodes[i]._my_index = (int)i;
-            _nodes[i]._number = -1;
-            _unused_nodes.push_back(i);
-        }
-#   endif
 #else  //AAM (_nodes is list not fully allocated at start)
         unsigned i = 0;
         unsigned nnodes = 2*G::_ntaxa - 1;
@@ -172,7 +150,6 @@ class Forest {
             Node * nd = pullNode();
             string taxon_name = G::_taxon_names[i];
             nd->_number = (int)i;
-            //nd->_my_index = (int)i;
             nd->_name = taxon_name;
             nd->setEdgeLength(0.0);
             nd->_height = 0.0;
@@ -210,7 +187,6 @@ class Forest {
             _nodes[i]._right_sib=0;
             _nodes[i]._parent=0;
             _nodes[i]._number=i;
-            //_nodes[i]._my_index = (int)i;
             _nodes[i]._edge_length=0.0;
             _nodes[i]._position_in_lineages=i;
             //_nodes[i]._partials.resize(G::_nloci);
@@ -225,7 +201,6 @@ class Forest {
             nd->_right_sib=0;
             nd->_parent=0;
             nd->_number=i;
-            //nd->_my_index = (int)i;
             nd->_edge_length=0.0;
             nd->_position_in_lineages=i;
             _lineages.push_back(nd);
@@ -240,19 +215,6 @@ class Forest {
         }
         
         _nleaves = G::_ntaxa;
-
-#if 0
-        // Add all remaining nodes to _unused_nodes vector
-        double npatterns_total = _data->getNumPatterns();
-        _unused_nodes.clear();
-        for (unsigned i = nnodes - 1; i >= G::_ntaxa; --i) {
-            //_nodes[i]._my_index = (int)i;
-            _nodes[i]._number = -1;
-            //_nodes[i]._partials.resize(G::_nloci);
-            _nodes[i]._partials = ps.getPartial(npatterns_total*G::_nstates);
-            _unused_nodes.push_back(i);
-        }
-#endif
 
         for (unsigned index = 0; index < G::_nloci; index ++) {
             for (auto &nd:_lineages) {
@@ -896,9 +858,7 @@ class Forest {
         _nleaves                   = other._nleaves;
         _log_joining_prob          = other._log_joining_prob;
         _increments_and_priors     = other._increments_and_priors;
-#   if 0
-        _unused_nodes              = other._unused_nodes;
-#   endif
+
         // copy tree itself
 
         for (const Node & othernd : other._nodes) {
@@ -939,7 +899,6 @@ class Forest {
                 nd->_position_in_lineages = othernd._position_in_lineages;
                 nd->_partials = othernd._partials;
                 nd->_split = othernd._split;
-                //nd->_my_index = othernd._my_index;
                 nd->_height = othernd._height;
             } // if k > -1
         }
@@ -1204,33 +1163,12 @@ class Forest {
     }
 
     inline Node * Forest::pullNode() {
-#if 0
-        if (_unused_nodes.empty()) {
-            throw XProj(str(format("Forest::pullNode tried to return a node beyond the end of the _nodes list (%d nodes allocated for %d leaves)") % _nodes.size() % G::_ntaxa));
-        }
-                
-        // Pop a node index off the back of _unused_nodes
-        double node_index = _unused_nodes.back();
-        _unused_nodes.pop_back();
-                
-        // Get pointer to node with index node_index
-        auto nditer = _nodes.begin();
-        advance(nditer, node_index);
-        Node * new_nd = &(*nditer);
-        
-        // Sanity checks
-        //assert(new_nd->_my_index == node_index);
-        assert(new_nd->_number == -1);
-        new_nd->clear();
-        new_nd->_number = _nleaves + _ninternals;
-        _ninternals++;
-#elseif NEWWAY == POLWAY
+#if NEWWAY == POLWAY
         unsigned nnodes = (unsigned)_nodes.size();
         _nodes.resize(nnodes + 1);
         auto nditer = next(_nodes.begin(), nnodes);
         Node * new_nd = &(*nditer);
         assert(new_nd->_number == -1);
-        //new_nd->_my_index = nnodes;
         new_nd->clear();
         new_nd->_number = _nleaves + _ninternals;
         _ninternals++;
@@ -1239,7 +1177,6 @@ class Forest {
         Node* new_nd = &_nodes.back();
         //new_nd->_edge_length = 0.0; // should be Node::_smallest_edge_length?
         new_nd->clear();
-        //new_nd->_my_index = (unsigned)_nodes.size() - 1;
         if (_nodes.size() <= G::_ntaxa) {
             assert(_nleaves == _nodes.size() - 1);
             new_nd->_number = (int)_nleaves;
