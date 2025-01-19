@@ -18,7 +18,8 @@ class Forest {
         //POL added below
         void createTrivialForest();
         void simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites);
-        void buildYuleTree();
+        //void buildYuleTree();
+        void buildBirthDeathTree();
         typedef shared_ptr<Forest> SharedPtr;
         string debugSaveForestInfo() const;
         //POL added above
@@ -39,6 +40,7 @@ class Forest {
         Node * pullNode();
         void joinRandomLineagePair(Lot::SharedPtr lot);
         void advanceAllLineagesBy(double dt);
+        void scaleAllEdgeLengthsBy(double scaling_factor);
         void renumberInternals();
         unsigned getNumLineages() const;
         unsigned getNumNodes() const;
@@ -1247,28 +1249,137 @@ class Forest {
             }
         }
     }
-
-    inline void Forest::buildYuleTree() {
+    
+    inline void Forest::buildBirthDeathTree() {
+        // Algorithm from Yang and Rannala. 1997. MBE 14(7):717-724.
         createTrivialForest();
+#if 0
         unsigned nsteps = G::_ntaxa - 1;
+        double cum_height = 0.0;
         for (unsigned i = 0; i < nsteps; i++) {
             // Determine number of lineages remaining
             unsigned n = getNumLineages();
             assert(n > 1);
             
-            // Waiting time to speciation event is Exponential(rate = n*lambda)
-            // u = 1 - exp(-r*t) ==> t = -log(1-u)/r
-            double r = G::_sim_lambda*n;
-            double u = rng->uniform();
-            double t = -log(1.0 - u)/r;
+            // Draw n-1 internal node heights and store in vector heights
+            vector<double> heights(n - 1, 0.0);
+            
+            double rho = G::_sim_rho;
+            double birth_rate = G::_sim_lambda;
+            double death_rate = G::_sim_mu;
+            double exp_death_minus_birth = exp(death_rate - birth_rate);
+            double phi = 0.0;
+            phi += rho*birth_rate*(exp_death_minus_birth - 1.0);
+            phi += (death_rate - birth_rate)*exp_death_minus_birth;
+            phi /= (exp_death_minus_birth - 1.0);
+            for (unsigned i = 0; i < n - 2; i++) {
+                double u = rng->uniform();
+                double y = u/(1.0 + birth_rate*rho*(1.0 - u));
+                if (birth_rate > death_rate) {
+                    y = log(phi - u*rho*birth_rate);
+                    y -= log(phi - u*rho*birth_rate + u*(birth_rate - death_rate));
+                    y /= (death_rate - birth_rate);
+                }
+                heights[i] = y;
+            }
+            heights[n-2] = 1.0;
+            sort(heights.begin(), heights.end());
+            
+            // Waiting time to next speciation event is first height
+            // scaled so that max height is 1 - cum_height
+            double t = heights[0]*(1.0 - cum_height);
+            cum_height += t;
             advanceAllLineagesBy(t);
             joinRandomLineagePair(rng);
         }
+#else
+        // Draw n-1 internal node heights and store in vector heights
+        unsigned n = getNumLineages();
+        vector<double> heights(n - 1, 0.0);
+        
+        double rho = G::_sim_rho;
+        double birth_rate = G::_sim_lambda;
+        double death_rate = G::_sim_mu;
+        double exp_death_minus_birth = exp(death_rate - birth_rate);
+        double phi = 0.0;
+        phi += rho*birth_rate*(exp_death_minus_birth - 1.0);
+        phi += (death_rate - birth_rate)*exp_death_minus_birth;
+        phi /= (exp_death_minus_birth - 1.0);
+        for (unsigned i = 0; i < n - 2; i++) {
+            double u = rng->uniform();
+            double y = u/(1.0 + birth_rate*rho*(1.0 - u));
+            if (birth_rate > death_rate) {
+                y = log(phi - u*rho*birth_rate);
+                y -= log(phi - u*rho*birth_rate + u*(birth_rate - death_rate));
+                y /= (death_rate - birth_rate);
+            }
+            heights[i] = y;
+        }
+        heights[n-2] = 1.0;
+        sort(heights.begin(), heights.end());
+        
+        // Now that we have the increments, perform the joins
+        //
+        // 1   2   3  4  5 n = 5, n - 1 = 4
+        // |   |   |  |  |
+        // +-+-+   |  |  | i = 0
+        //   |     |  |  |
+        //   +--+--+  |  | i = 1
+        //      |     |  |
+        //      +--+--+  | i = 2
+        //         |     |
+        //         +--+--+ i = 3
+        
+        double t0 = 0.0;
+        for (unsigned i = 0; i < n - 1; i++) {
+            double t = heights[i];
+            double dt = t - t0;
+            advanceAllLineagesBy(dt);
+            joinRandomLineagePair(rng);
+            t0 = t;
+        }
+#endif
         assert(getNumLineages() == 1);
+
+        // Scale all edge lengths by G::_sim_root_age
+        scaleAllEdgeLengthsBy(G::_sim_root_age);
+        
         refreshPreorder();
-        //renumberInternals();
     }
 
+    //inline void Forest::buildYuleTree() {
+    //    createTrivialForest();
+    //    unsigned nsteps = G::_ntaxa - 1;
+    //    for (unsigned i = 0; i < nsteps; i++) {
+    //        // Determine number of lineages remaining
+    //        unsigned n = getNumLineages();
+    //        assert(n > 1);
+    //
+    //        // Waiting time to speciation event is Exponential(rate = n*lambda)
+    //        // u = 1 - exp(-r*t) ==> t = -log(1-u)/r
+    //        double r = G::_sim_lambda*n;
+    //        double u = rng->uniform();
+    //        double t = -log(1.0 - u)/r;
+    //        advanceAllLineagesBy(t);
+    //        joinRandomLineagePair(rng);
+    //    }
+    //    assert(getNumLineages() == 1);
+    //    refreshPreorder();
+    //}
+
+    inline void Forest::scaleAllEdgeLengthsBy(double scaling_factor) {
+        // This function should only be called for complete trees
+        assert(_lineages.size() == 1);
+        
+        // Supplied scaling_factor should be strictly positive
+        assert(scaling_factor > 0.0);
+        
+        for (auto & nd : _nodes) {
+            double elen = nd.getEdgeLength();
+            nd.setEdgeLength(scaling_factor*elen);
+        }
+    }
+    
     inline void Forest::advanceAllLineagesBy(double dt) {
         // Add t to the edge length of all lineage root nodes, unless there
         // is just one lineage, in which case do nothing

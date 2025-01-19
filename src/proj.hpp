@@ -92,6 +92,9 @@ namespace proj {
         ("simfnprefix",  value(&G::_sim_filename_prefix), "prefix of files in which to save simulated trees and data if startmode is 'sim' (e.g. specifying 'sim' results in files named 'sim.tre' and 'sim.nex')")
         ("simntaxa",  value(&G::_sim_ntaxa)->default_value(4), "number of taxa to simulate if startmode is 'sim'")
         ("simlambda",  value(&G::_sim_lambda)->default_value(1.0), "true speciation rate for simulating tree under the Yule model if startmode is 'sim'")
+        ("simmu",  value(&G::_sim_mu)->default_value(0.0), "true extinction rate for simulating tree under the constant-rates Birth-Death model if startmode is 'sim'")
+        ("simrho",  value(&G::_sim_rho)->default_value(1.0), "true extant taxon sampling rate for simulating tree under the constant-rates Birth-Death model if startmode is 'sim'")
+        ("simrootage",  value(&G::_sim_root_age)->default_value(1.0), "true root age for simulating tree under the constant-rates Birth-Death model if startmode is 'sim'")
         ("kappa",  boost::program_options::value(&G::_kappa)->default_value(1.0), "value of kappa")
         ("base_frequencies", boost::program_options::value(&G::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
         ("relative_rates", boost::program_options::value(&G::_string_relative_rates)->default_value("null"))
@@ -252,7 +255,7 @@ namespace proj {
             G::_taxon_names[i] = G::inventName(i, /*lower_case*/false);
         
         _sim_tree = Forest::SharedPtr(new Forest);
-        _sim_tree->buildYuleTree();
+        _sim_tree->buildBirthDeathTree();
     }
         
     inline void Proj::simulateSave(string fnprefix) {
@@ -264,6 +267,9 @@ namespace proj {
             output(format("    %s (%d sites)\n") % G::_locus_names[i] % G::_nsites_per_locus[i], 0);
         }
         output(format("  True speciation rate: %g\n") % G::_sim_lambda, 0);
+        output(format("  True extinction rate: %g\n") % G::_sim_mu, 0);
+        output(format("  True sampling rate: %g\n") % G::_sim_rho, 0);
+        output(format("  True root age: %g\n") % G::_sim_root_age, 0);
 
         string tree_file_name = fnprefix + ".tre";
         ofstream treef(tree_file_name);
