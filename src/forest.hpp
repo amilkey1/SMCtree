@@ -26,15 +26,18 @@ class Forest {
     
     private:
 
-        void                        clear();
-        void                        setForestData(Data::SharedPtr d, bool partials);
-        Node *                      findNextPreorder(Node * nd);
-        void                        refreshPreorder();
-        double                      calcSubsetLogLikelihood(unsigned i);
-        void                        addIncrement(Lot::SharedPtr lot);
-        double                      joinTaxa(Lot::SharedPtr lot);
-        void                        calcPartialArray(Node* new_nd);
-        double                      calcTransitionProbability(Node* child, double s, double s_child, unsigned locus);
+        void clear();
+        void setForestData(Data::SharedPtr d, bool partials);
+        Node * findNextPreorder(Node * nd);
+        void refreshPreorder();
+        double calcSubsetLogLikelihood(unsigned i);
+        void addIncrement(Lot::SharedPtr lot);
+        double joinTaxa(Lot::SharedPtr lot);
+        double joinPriorPrior(Lot::SharedPtr lot);
+        double joinPriorPost(Lot::SharedPtr lot);
+        pair<pair<Node*, Node*>, double> chooseAllPairs(Lot::SharedPtr lot);
+        void calcPartialArray(Node* new_nd);
+        double calcTransitionProbability(Node* child, double s, double s_child, unsigned locus);
         
         //POL added below
         Node * pullNode();
@@ -47,29 +50,37 @@ class Forest {
         double calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length);
         //POL added above
 
-        pair<unsigned, unsigned>    chooseTaxaToJoin(double s, Lot::SharedPtr lot);
-        string                      makePartialNewick(unsigned precision, bool use_names);
-        void                        showForest();
-        void                        updateNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode);
-        void                        updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode);
+        pair<unsigned, unsigned> chooseTaxaToJoin(double s, Lot::SharedPtr lot);
+        string makePartialNewick(unsigned precision, bool use_names);
+        void showForest();
+        void updateNodeList(list<Node *> & node_list, Node * delnode1, Node * delnode2, Node * addnode);
+        void updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode);
+        void revertNodeVector(vector<Node *> & node_vector, Node * addnode1, Node * addnode2, Node * delnode1);
+        tuple<Node*, Node*, Node*> createNewSubtree(pair<unsigned, unsigned> t);
+        double getRunningSumChoices(vector<double> &log_weight_choices);
+        vector<double> reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood);
+        int selectPair(vector<double> weight_vec, Lot::SharedPtr lot);
 
-        double                      getTreeHeight();
-        double                      getTreeLength();
-        double                      getSpeciesTreePrior();
-        double                      calcTopologyPrior(unsigned nlineages);
-        void                        clearPartials();
+
+
+        double getTreeHeight();
+        double getTreeLength();
+        double getSpeciesTreePrior();
+        double calcTopologyPrior(unsigned nlineages);
+        void clearPartials();
     
-        Data::SharedPtr             _data;
-        vector<Node *>              _lineages;
-        vector<Node>                _nodes;
-        vector<Node*>               _preorder;
-        unsigned                    _first_pattern;
-        unsigned                    _npatterns;
-        vector<double>              _gene_tree_log_likelihoods;
-        unsigned                    _ninternals;
-        unsigned                    _nleaves;
-        double                      _log_joining_prob;
+        Data::SharedPtr _data;
+        vector<Node *> _lineages;
+        vector<Node> _nodes;
+        vector<Node*> _preorder;
+        unsigned _first_pattern;
+        unsigned _npatterns;
+        vector<double> _gene_tree_log_likelihoods;
+        unsigned _ninternals;
+        unsigned _nleaves;
+        double _log_joining_prob;
         vector<pair<double, double>> _increments_and_priors;
+        vector<pair<Node*, Node*>> _node_choices;
 };
 
     inline string Forest::debugSaveForestInfo() const {
@@ -114,6 +125,7 @@ class Forest {
         _log_joining_prob = 0.0;
         _increments_and_priors.clear();
         _nleaves = 0;
+        _node_choices.clear();
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -244,16 +256,19 @@ class Forest {
     }
 
     inline double Forest::joinTaxa(Lot::SharedPtr lot) {
-        double prev_log_likelihood = 0.0;
-        
-        for (auto &g:_gene_tree_log_likelihoods) {
-            prev_log_likelihood += g;
+        double log_weight = 0.0;
+        if (G::_proposal == "prior-prior") {
+            log_weight = joinPriorPrior(lot);
         }
-        
-        unsigned nlineages = (unsigned) _lineages.size();
-        Node *subtree1 = nullptr;
-        Node *subtree2 = nullptr;
-        
+        else {
+            log_weight = joinPriorPost(lot);
+        }
+
+        assert (log_weight != 0.0);
+        return log_weight;
+    }
+
+    inline double Forest::joinPriorPost(Lot::SharedPtr lot) {
         if (G::_save_memory) {
             double npatterns_total = _data->getNumPatterns();
             for (auto &nd:_lineages) {
@@ -264,23 +279,14 @@ class Forest {
             }
         }
         
-        pair <unsigned, unsigned> t = make_pair (0, 1); // if there is only choice, 0 and 1 will be chosen
-        t = chooseTaxaToJoin(nlineages, lot);
+        pair<pair<Node*, Node*>, double> node_pair = chooseAllPairs(lot);
         
-        subtree1 = _lineages[t.first];
-        subtree2 = _lineages[t.second];
+        Node* subtree1 = node_pair.first.first;
+        Node* subtree2 = node_pair.first.second;
+        
+        double log_weight = node_pair.second;
 
         assert (subtree1 != subtree2);
-        
-        // The commented lines below now done by pullNode()
-        //Node nd;
-        //_nodes.push_back(nd);
-        //Node* new_nd = &_nodes.back();
-        //new_nd->_parent=0;
-        //new_nd->_number=_nleaves+_ninternals;
-        //new_nd->_edge_length=0.0;
-        //_ninternals++;
-        //new_nd->_right_sib=0;
 
         //new node is always needed
         Node* new_nd = pullNode();
@@ -308,12 +314,8 @@ class Forest {
                 }
             }
         }
-        
-        bool calc_likelihood = true;
                 
-        if (calc_likelihood) {
-            calcPartialArray(new_nd);
-        }
+        calcPartialArray(new_nd);
 
         for (unsigned index = 0; index < G::_nloci; index++) {
             subtree1->_partials=nullptr; // throw away subtree partials now, no longer needed
@@ -323,10 +325,190 @@ class Forest {
         //update node lists
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
 
-        if (calc_likelihood) {
-            for (unsigned index = 0; index<G::_nloci; index++) {
-                calcSubsetLogLikelihood(index);
+        for (unsigned index = 0; index<G::_nloci; index++) {
+            calcSubsetLogLikelihood(index);
+        }
+        
+       if (G::_save_memory) {
+           for (auto &nd:_nodes) {
+               nd._partials = nullptr;
+           }
+       }
+        
+        calcTopologyPrior((unsigned) _lineages.size()+1);
+
+        return log_weight;
+    }
+
+    inline pair<pair<Node*, Node*>, double> Forest::chooseAllPairs(Lot::SharedPtr lot) {
+        // this function tries all possible node pairs for "prior-post" proposal
+        double prev_log_likelihood = 0.0;
+        double log_weight = 0.0;
+        assert (_node_choices.size() == 0);
+        
+        for (auto &g:_gene_tree_log_likelihoods) {
+            prev_log_likelihood += g;
+        }
+                
+        vector<double> log_likelihood_choices;
+             
+          // choose pair of nodes to try
+        for (unsigned i = 0; i < _lineages.size()-1; i++) {
+            for (unsigned j = i+1; j < _lineages.size(); j++) {
+
+                // createNewSubtree returns subtree1, subtree2, new_nd
+              
+                tuple<Node*, Node*, Node*> t = createNewSubtree(make_pair(i,j));
+              
+                double log_likelihood_of_pair = 0.0;
+              
+                  for (unsigned index = 0; index<G::_nloci; index++) {
+                      log_likelihood_of_pair += calcSubsetLogLikelihood(index);
+                  }
+              
+                log_likelihood_choices.push_back(log_likelihood_of_pair);
+              
+                // revert _lineages if > 1 choice
+                revertNodeVector(_lineages, get<0>(t), get<1>(t), get<2>(t));
+
+                //reset siblings and parents of original nodes back to 0
+                get<0>(t)->resetNode(); //subtree1
+                get<1>(t)->resetNode(); //subtree2
+
+                // delete new node -- TODO: just reset it and keep using it?
+                _nodes.pop_back();
+                // clear new node from _nodes
+                //clear new node that was just created
+//                get<2>(t)->clear(); //new_nd
+                _ninternals--;
             }
+        }
+              
+        assert (_node_choices.size() == log_likelihood_choices.size());
+        // reweight each choice of pairs
+        vector<double> log_weight_choices = reweightChoices(log_likelihood_choices, prev_log_likelihood);
+
+        // sum unnormalized weights before choosing the pair
+        // must include the likelihoods of all pairs in the final particle weight
+        double log_weight_choices_sum = getRunningSumChoices(log_weight_choices);
+        log_weight = log_weight_choices_sum;
+        for (unsigned b=0; b < log_weight_choices.size(); b++) {
+            log_weight_choices[b] -= log_weight_choices_sum;
+        }
+             
+        // randomly select a pair
+        unsigned index_of_choice = selectPair(log_weight_choices, lot);
+
+        // find nodes to join in node_list
+        Node* subtree1 = _node_choices[index_of_choice].first;
+        Node* subtree2 = _node_choices[index_of_choice].second;
+//
+//        // erase extra nodes created from node list
+//        for (unsigned i = 0; i < _node_choices.size(); i++) {
+//            _nodes.pop_back();
+//        }
+        
+        _node_choices.clear();
+             
+        return make_pair(make_pair(subtree1, subtree2), log_weight);
+      }
+
+    inline tuple<Node*, Node*, Node*> Forest::createNewSubtree(pair<unsigned, unsigned> t) {
+        Node* subtree1 = _lineages[t.first];
+        Node* subtree2 = _lineages[t.second];
+
+        Node* new_nd = pullNode();
+
+        new_nd->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
+
+        subtree1->_parent=new_nd;
+        subtree2->_parent=new_nd;
+
+        // calculate partials for new node
+        double npatterns_total = _data->getNumPatterns();
+        new_nd->_partials = ps.getPartial(npatterns_total * G::_nstates);
+        calcPartialArray(new_nd);
+        
+         assert(new_nd->_left_child->_right_sib);
+         calcPartialArray(new_nd);
+
+         // don't update the species list
+         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+        
+        _node_choices.push_back(make_pair(subtree1, subtree2));
+                  
+         return make_tuple(subtree1, subtree2, new_nd);
+     }
+
+    inline double Forest::joinPriorPrior(Lot::SharedPtr lot) {
+        double prev_log_likelihood = 0.0;
+        
+        for (auto &g:_gene_tree_log_likelihoods) {
+            prev_log_likelihood += g;
+        }
+        
+        unsigned nlineages = (unsigned) _lineages.size();
+        Node *subtree1 = nullptr;
+        Node *subtree2 = nullptr;
+        
+        if (G::_save_memory) {
+            double npatterns_total = _data->getNumPatterns();
+            for (auto &nd:_lineages) {
+                if (nd->_partials == nullptr) {
+                    nd->_partials = ps.getPartial(npatterns_total * G::_nstates);
+                    calcPartialArray(nd);
+                }
+            }
+        }
+        
+        pair <unsigned, unsigned> t = make_pair (0, 1); // if there is only choice, 0 and 1 will be chosen
+        t = chooseTaxaToJoin(nlineages, lot);
+        
+        subtree1 = _lineages[t.first];
+        subtree2 = _lineages[t.second];
+
+        assert (subtree1 != subtree2);
+
+        //new node is always needed
+        Node* new_nd = pullNode();
+
+        new_nd->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
+
+        subtree1->_parent=new_nd;
+        subtree2->_parent=new_nd;
+
+        // calculate new partials
+        assert (new_nd->_partials == nullptr);
+        double npatterns_total = _data->getNumPatterns();
+        new_nd->_partials = ps.getPartial(G::_nstates*npatterns_total);
+        assert(new_nd->_left_child->_right_sib);
+
+        if (G::_save_memory) {
+            double npatterns_total = _data->getNumPatterns();
+            new_nd->_partials = ps.getPartial(npatterns_total*G::_nstates);
+            
+            for (auto &nd:_lineages) {
+                if (nd->_partials == nullptr) {
+                    nd->_partials = ps.getPartial(npatterns_total * G::_nstates);
+                    calcPartialArray(nd);
+                }
+            }
+        }
+                
+        calcPartialArray(new_nd);
+
+        for (unsigned index = 0; index < G::_nloci; index++) {
+            subtree1->_partials=nullptr; // throw away subtree partials now, no longer needed
+            subtree2->_partials=nullptr;
+        }
+        
+        //update node lists
+        updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+
+        for (unsigned index = 0; index<G::_nloci; index++) {
+            calcSubsetLogLikelihood(index);
         }
         
         double new_log_likelihood = 0.0;
@@ -360,6 +542,75 @@ class Forest {
 
         // Add addnode to node_vector
         node_vector.push_back(addnode);
+
+        // reset _position_in_lineages
+        for (int i=0; i < (int) _lineages.size(); i++) {
+            _lineages[i] -> _position_in_lineages=i;
+        }
+    }
+
+    inline vector<double> Forest::reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood) {
+        vector<double> weight_vec;
+        for (int a = 0; a < (int) likelihood_vec.size(); a++) {
+            weight_vec.push_back(likelihood_vec[a]-prev_log_likelihood);
+        }
+        return weight_vec;
+    }
+
+    inline int Forest::selectPair(vector<double> weight_vec, Lot::SharedPtr lot) {
+         // choose a random number [0,1]
+         assert (lot != nullptr);
+         double u = lot->uniform();
+         
+         double cum_prob = 0.0;
+         int index = 0.0;
+         for (int i=0; i < (int) weight_vec.size(); i++) {
+             cum_prob += exp(weight_vec[i]);
+             if (u <= cum_prob) {
+                 index = i;
+                 break;
+             }
+         }
+         // return index of choice
+         return index;
+     }
+
+    inline double Forest::getRunningSumChoices(vector<double> &log_weight_choices) {
+        double running_sum = 0.0;
+        double log_weight_choices_sum = 0.0;
+        double log_max_weight = *max_element(log_weight_choices.begin(), log_weight_choices.end());
+        for (auto & i:log_weight_choices) {
+            running_sum += exp(i - log_max_weight);
+        }
+        log_weight_choices_sum = log(running_sum) + log_max_weight;
+        return log_weight_choices_sum;
+    }
+
+    inline void Forest::revertNodeVector(vector<Node *> &node_vector, Node *addnode1, Node *addnode2, Node *delnode1) {
+        // Delete delnode1 from node_vector
+        auto it = find(node_vector.begin(), node_vector.end(), delnode1);
+        assert (it != node_vector.end());
+        node_vector.erase(it);
+
+        // find positions of nodes to insert
+        auto position1 = addnode1->_position_in_lineages;
+        auto iter1 = addnode1;
+
+        auto position2 = addnode2->_position_in_lineages;
+        auto iter2 = addnode2;
+
+        // lower position must be inserted first
+        if (position1 < position2) {
+            node_vector.insert(node_vector.begin()+position1, iter1);
+            node_vector.insert(node_vector.begin()+position2, iter2);
+        }
+        else {
+            node_vector.insert(node_vector.begin()+position2, iter2);
+            node_vector.insert(node_vector.begin()+position1, iter1);
+        }
+
+        assert(_lineages[addnode1->_position_in_lineages] == addnode1);
+        assert(_lineages[addnode2->_position_in_lineages] == addnode2);
 
         // reset _position_in_lineages
         for (int i=0; i < (int) _lineages.size(); i++) {
@@ -801,6 +1052,7 @@ class Forest {
         _nleaves                   = other._nleaves;
         _log_joining_prob          = other._log_joining_prob;
         _increments_and_priors     = other._increments_and_priors;
+        _node_choices              = other._node_choices;
 
         // Copy _nodes
         _nodes.clear();

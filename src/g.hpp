@@ -25,6 +25,7 @@ namespace proj {
         static double                   _kappa;
         static string                   _string_base_frequencies;
         static string                   _string_relative_rates;
+        static string                   _proposal;
         
         // Candidates for setting status
         static double                   _asrv_shape;

@@ -98,6 +98,7 @@ namespace proj {
         ("kappa",  boost::program_options::value(&G::_kappa)->default_value(1.0), "value of kappa")
         ("base_frequencies", boost::program_options::value(&G::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
         ("relative_rates", boost::program_options::value(&G::_string_relative_rates)->default_value("null"))
+        ("proposal", boost::program_options::value(&G::_proposal)->default_value("prior-prior"))
         ;
         
         store(parse_command_line(argc, argv, desc), vm);
@@ -139,6 +140,11 @@ namespace proj {
         // If user specified "relative_rates" in conf file, convert them to a vector<double>
         if (vm.count("relative_rates") > 0) {
             handleRelativeRates();
+        }
+        
+        // If user specified a start mode other than "prior-prior" or "prior-post", throw an exception
+        if (G::_proposal != "prior-prior" && G::_proposal != "prior-post") {
+            throw XProj(format("must specify a proposal of either prior-prior or prior-post but %s was specified")%G::_proposal);
         }
     }
 
