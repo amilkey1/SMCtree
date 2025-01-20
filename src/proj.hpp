@@ -455,8 +455,6 @@ namespace proj {
         
         // Copy particles
 
-#if NEWWAY == POLWAY
-        // This way seems more straightforward to me
         int donor = -1;
         for (unsigned i = 0; i < counts.size(); i++) {
             if (counts[i] > 1) {
@@ -465,7 +463,8 @@ namespace proj {
             }
         }
         bool copying_needed = (donor >= 0);
-#else
+
+#if 0 // saving until we're sure the method above works for e.g. 2 particles
         bool copying_needed = true;
       
         // Locate first donor

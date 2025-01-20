@@ -61,15 +61,7 @@ class Forest {
     
         Data::SharedPtr             _data;
         vector<Node *>              _lineages;
-#if NEWWAY == POLWAY
-        //POL: always better to use vector than list if you don't
-        // need to insert or delete in the middle (saves having to
-        // allocate memory for forward and reverse pointers for every
-        // element
         vector<Node>                _nodes;
-#else
-        list<Node>                  _nodes;
-#endif
         vector<Node*>               _preorder;
         unsigned                    _first_pattern;
         unsigned                    _npatterns;
@@ -133,7 +125,6 @@ class Forest {
         assert(G::_ntaxa > 0);
         assert(G::_ntaxa == G::_taxon_names.size());
         clear();
-#if NEWWAY == POLWAY
         unsigned nnodes = 2*G::_ntaxa - 1;
         _nodes.reserve(nnodes);
         _nodes.resize(G::_ntaxa);
@@ -148,23 +139,6 @@ class Forest {
             _nodes[i]._split.setBitAt(i);
             _lineages.push_back(&_nodes[i]);
         }
-#else  //AAM (_nodes is list not fully allocated at start)
-        unsigned i = 0;
-        unsigned nnodes = 2*G::_ntaxa - 1;
-        _lineages.reserve(nnodes);
-        for (unsigned i = 0; i < G::_ntaxa; i++) {
-            Node * nd = pullNode();
-            string taxon_name = G::_taxon_names[i];
-            nd->_number = (int)i;
-            nd->_name = taxon_name;
-            nd->setEdgeLength(0.0);
-            nd->_height = 0.0;
-            nd->_split.resize(G::_ntaxa);
-            nd->_split.setBitAt(i);
-            _lineages.push_back(nd);
-        }
-#endif
-        
         refreshPreorder();
     }
     
@@ -175,21 +149,13 @@ class Forest {
         
         auto &data_matrix=_data->getDataMatrix();
 
-#if NEWWAY == POLWAY
-        //POL: I like being able to reserve contiguous memory for
-        // all nodes we will need, even if we don't create them
-        // at this point
         unsigned nnodes = 2*G::_ntaxa - 1;
         _nodes.reserve(nnodes);
         _nodes.resize(G::_ntaxa);
-#else
-        _nodes.resize(G::_ntaxa);
-#endif
 
         _lineages.reserve(_nodes.size());
         //create taxa
         for (unsigned i = 0; i < G::_ntaxa; i++) {
-#if NEWWAY == POLWAY
             _nodes[i]._right_sib=0;
             _nodes[i]._name=" ";
             _nodes[i]._left_child=0;
@@ -201,25 +167,6 @@ class Forest {
             _nodes[i]._partials = nullptr;
             _nodes[i]._name = G::_taxon_names[i];
             _lineages.push_back(&_nodes[i]);
-#else
-            Node* nd = &*next(_nodes.begin(), i);
-            nd->_right_sib=0;
-            nd->_name=" ";
-            nd->_left_child=0;
-            nd->_right_sib=0;
-            nd->_parent=0;
-            nd->_number=i;
-            nd->_edge_length=0.0;
-            nd->_position_in_lineages=i;
-            _lineages.push_back(nd);
-            nd->_partials = nullptr; // _partials contains a vector of partials for each locus
-            // replace all spaces with underscores so that other programs do not have
-            // trouble parsing tree descriptions
-            //POL: seems this would be best done when creating G::_taxon_names?
-            std::string name = G::_taxon_names[i];
-            boost::replace_all(name, " ", "_");
-            nd->_name = name;
-#endif
         }
         
         _nleaves = G::_ntaxa;
@@ -263,12 +210,6 @@ class Forest {
         _first_pattern = gene_begin_end.first;
 
         for (auto &nd:_lineages) {
-
-            //temporary!
-            if (nd->_partials == nullptr) {
-                cerr << "oops" << endl;
-            }
-            
             assert (nd->_partials != nullptr);
             double log_like = 0.0;
             for (unsigned p=_first_pattern; p<_npatterns + _first_pattern; p++) {
@@ -851,7 +792,6 @@ class Forest {
         }
     }
 
-#if NEWWAY == POLWAY
     inline void Forest::operator=(const Forest & other) {
         _data                      = other._data;
         _first_pattern             = other._first_pattern;
@@ -904,7 +844,8 @@ class Forest {
             nd._height               = othernd._height;
             
             // Sanity check
-            assert(nd._number >= 0 && nd._number < _nodes.size());
+            assert(nd._number >= 0);
+            assert(nd._number < _nodes.size());
         }
 
         // Copy _lineages
@@ -927,88 +868,6 @@ class Forest {
             m++;
         }
     }
-#endif
-
-#if NEWWAY == AAMWAY
-    inline void Forest::operator=(const Forest & other) {
-        _nodes.clear();
-        _nodes.resize(other._nodes.size());
-        _lineages.resize(other._lineages.size());
-        _preorder.resize(other._preorder.size());
-
-        _data                      = other._data;
-        _first_pattern             = other._first_pattern;
-        _npatterns                 = other._npatterns;
-        _gene_tree_log_likelihoods = other._gene_tree_log_likelihoods;
-        _ninternals                = other._ninternals;
-        _nleaves                   = other._nleaves;
-        _log_joining_prob          = other._log_joining_prob;
-        _increments_and_priors     = other._increments_and_priors;
-
-        // copy tree itself
-
-        //POL: better to use a reference here to avoid copying every node in other
-        for (auto othernd : other._nodes) {
-            //POL: _nodes is not in preorder sequence, so comment below is confusing
-            // get number of next node in preorder sequence (serves as index of node in _nodes vector)
-            int k = othernd._number;
-
-            if (k>-1) {
-                Node* nd = &*next(_nodes.begin(), k);
-
-            // copy parent
-                if (othernd._parent) {
-                    unsigned parent_number = othernd._parent->_number;
-                    Node* parent = &*next(_nodes.begin(), parent_number);
-                    nd->_parent = parent;
-                }
-
-            // copy left child
-                if (othernd._left_child) {
-                unsigned left_child_number = othernd._left_child->_number;
-                    Node* left_child = &*next(_nodes.begin(), left_child_number);
-                    nd->_left_child = left_child;
-            }
-                else {
-                    nd->_left_child = 0;
-                }
-
-            // copy right sibling
-            if (othernd._right_sib) {
-                unsigned right_sib_number = othernd._right_sib->_number;
-                Node* right_sib = &*next(_nodes.begin(), right_sib_number);
-                nd->_right_sib = right_sib;
-            }
-            else
-                nd->_right_sib = 0;
-
-                nd->_number = othernd._number;
-                nd->_name = othernd._name;
-                nd->_edge_length = othernd._edge_length;
-                nd->_position_in_lineages = othernd._position_in_lineages;
-                nd->_partials = othernd._partials;
-            }
-        }
-
-        unsigned j = 0;
-        for (auto othernd : other._lineages) {
-            unsigned k = othernd->_number;
-            Node* nd = &*next(_nodes.begin(), k);
-            _lineages[j] = nd;
-            j++;
-        }
-        
-        if (other._preorder.size() > 0) {
-            unsigned m = 0;
-            for (auto othernd : other._preorder) {
-                unsigned n = othernd->_number;
-                Node* nd = &*next(_nodes.begin(), n);
-                _preorder[m] = nd;
-                m++;
-            }
-        }
-    }
-#endif
 
     inline double Forest::calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length) {
         assert(pi.size() == 4);
@@ -1128,7 +987,6 @@ class Forest {
         assert(data);
         Data::data_matrix_t & dm = data->getDataMatrixNonConst();
         
-#if NEWWAY == POLWAY
         // Copy sequences to data object
         for (unsigned t = 0; t < G::_ntaxa; t++) {
             // Allocate row t of _data's _data_matrix data member
@@ -1142,24 +1000,6 @@ class Forest {
                 dm[t][starting_site + i] = (Data::state_t)1 << sequences[ndnum][i];
             }
         }
-#else   //AAMWAY
-        // Copy sequences to data object
-        for (auto & nd : _nodes) {
-            if (!nd._left_child) {
-                unsigned t = nd._number;
-                assert(t < G::_ntaxa);
-                
-                // Allocate row t of _data's _data_matrix data member
-                assert(dm[t].size() == starting_site);
-                dm[t].resize(starting_site + nsites);
-                            
-                // Translate to state codes and copy
-                for (unsigned i = 0; i < nsites; i++) {
-                    dm[t][starting_site + i] = (Data::state_t)1 << sequences[t][i];
-                }
-            }
-        }
-#endif
     }
 
     inline unsigned Forest::getNumLineages() const {
@@ -1171,7 +1011,6 @@ class Forest {
     }
 
     inline Node * Forest::pullNode() {
-#if NEWWAY == POLWAY
         // Add one node to the end of _nodes vector
         _nodes.resize(_nodes.size() + 1);
         
@@ -1181,23 +1020,10 @@ class Forest {
         // Set up the new node
         new_nd->clear();
         new_nd->_number = _nleaves + _ninternals;
-        _ninternals++;
-#else  //AAM
-        _nodes.push_back(Node());
-        Node* new_nd = &_nodes.back();
-        //new_nd->_edge_length = 0.0; // should be Node::_smallest_edge_length?
-        new_nd->clear();
-        if (_nodes.size() <= G::_ntaxa) {
-            assert(_nleaves == _nodes.size() - 1);
-            new_nd->_number = (int)_nleaves;
-            _nleaves++;
-        }
-        else {
-            new_nd->_number = _nleaves + _ninternals;
-            _ninternals++;
-        }
-#endif
         new_nd->_split.resize(G::_ntaxa);
+
+        // Increment number of internals
+        _ninternals++;
 
         return new_nd;
     }
