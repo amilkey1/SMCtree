@@ -99,6 +99,7 @@ namespace proj {
         ("base_frequencies", boost::program_options::value(&G::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
         ("relative_rates", boost::program_options::value(&G::_string_relative_rates)->default_value("null"))
         ("proposal", boost::program_options::value(&G::_proposal)->default_value("prior-prior"))
+        ("est_lambda", boost::program_options::value(&G::_est_lambda)->default_value("false"))
         ;
         
         store(parse_command_line(argc, argv, desc), vm);
@@ -601,11 +602,20 @@ namespace proj {
         // set partials for first particle under save_memory setting for initial marginal likelihood calculation
          assert (G::_nthreads > 0);
 
+        unsigned psuffix = 1;
+        
          bool partials = true;
 
          for (auto & p:particles ) {
              p.setParticleData(_data, partials);
              partials = false;
+             
+             if (G::_est_lambda) {
+                 // must seed seed before drawing lambdas
+                 p.setSeed(rng->randint(1,9999) + psuffix);
+                 psuffix += 2;
+                 p.drawLambda();
+             }
          }
         
 #if defined (UPGMA_COMPLETION)
@@ -692,8 +702,6 @@ namespace proj {
             double height = p.getTreeHeight();
             double length = p.getTreeLength();
             
-
-
             logf << "\t" << log_posterior;
             logf << "\t" << log_likelihood;
             logf << "\t" << log_prior;
@@ -703,7 +711,13 @@ namespace proj {
             logf << "\t" << height;
             logf << "\t" << length;
             logf << "\t" << yule;
-            logf << "\t" << G::_lambda;
+            
+            if (G::_lambda) {
+                logf << "\t" << p.getEstLambda();
+            }
+            else {
+                logf << "\t" << G::_lambda;
+            }
 
             logf << endl;
         }

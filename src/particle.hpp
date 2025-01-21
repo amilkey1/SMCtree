@@ -19,6 +19,7 @@ class Particle {
         vector<double>                          getGeneTreeLogLikelihoods();
         double                                  getTreeHeight();
         double                                  getTreeLength();
+        double                                  getEstLambda() {return _forest._estimated_lambda;}
         double                                  getLogLikelihood();
         double                                  getYuleModel();
         vector<pair<double, double>>            getSpeciesTreeIncrementPriors();
@@ -29,6 +30,7 @@ class Particle {
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
 
         string debugSaveParticleInfo(unsigned i) const;
+        void drawLambda();
     
 #if defined (UPGMA_COMPLETION)
         void calcStartingUPGMAMatrix();
@@ -185,6 +187,11 @@ class Particle {
         _forest.buildStartingRow();
     }
 #endif
+
+    inline void Particle::drawLambda() {
+        assert (G::_est_lambda);
+        _forest.drawLambda(_lot);
+    }
 
     inline void Particle::operator=(const Particle & other) {
         _forest = other._forest;

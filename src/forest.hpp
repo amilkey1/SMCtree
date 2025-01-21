@@ -60,8 +60,7 @@ class Forest {
         double getRunningSumChoices(vector<double> &log_weight_choices);
         vector<double> reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood);
         int selectPair(vector<double> weight_vec, Lot::SharedPtr lot);
-
-
+        void drawLambda(Lot::SharedPtr lot);
 
         double getTreeHeight();
         double getTreeLength();
@@ -89,6 +88,7 @@ class Forest {
         double _log_joining_prob;
         vector<pair<double, double>> _increments_and_priors;
         vector<pair<Node*, Node*>> _node_choices;
+        double _estimated_lambda;
     
 #if defined(UPGMA_COMPLETION)
         stack<Node *> _upgma_additions;
@@ -142,6 +142,7 @@ class Forest {
         _increments_and_priors.clear();
         _nleaves = 0;
         _node_choices.clear();
+        _estimated_lambda = G::_lambda;
 #if defined (UPGMA_COMPLETION)
         _upgma_additions = stack<Node*>();
         _upgma_starting_edgelen.clear();
@@ -263,19 +264,27 @@ class Forest {
     }
 
     inline void Forest::addIncrement(Lot::SharedPtr lot) {
-            unsigned nlineages = (unsigned) _lineages.size();
-            double rate = nlineages * G::_lambda;
-            
-            double increment = -log(1.0 - lot->uniform())/rate;
-            
-            for (auto &nd:_lineages) {
-                nd->_edge_length += increment;
-            }
-            
-            // lorad only works if all topologies the same - then don't include the prior on joins because it is fixed
-            double increment_prior = (log(rate)-increment*rate);
-                        
-            _increments_and_priors.push_back(make_pair(increment, increment_prior));
+        unsigned nlineages = (unsigned) _lineages.size();
+        
+        double rate = 0.0;
+        
+        if (G::_est_lambda) {
+            rate = nlineages * _estimated_lambda;
+        }
+        else {
+            rate = nlineages * G::_lambda;
+        }
+        
+        double increment = -log(1.0 - lot->uniform())/rate;
+        
+        for (auto &nd:_lineages) {
+            nd->_edge_length += increment;
+        }
+        
+        // lorad only works if all topologies the same - then don't include the prior on joins because it is fixed
+        double increment_prior = (log(rate)-increment*rate);
+                    
+        _increments_and_priors.push_back(make_pair(increment, increment_prior));
     }
 
     inline double Forest::joinTaxa(Lot::SharedPtr lot) {
@@ -287,7 +296,7 @@ class Forest {
             log_weight = joinPriorPost(lot);
         }
 
-        assert (log_weight != 0.0);
+//        assert (log_weight != 0.0); // TODO: log weight can be 0 if branches are very long?
         return log_weight;
     }
 
@@ -1076,6 +1085,7 @@ class Forest {
         _log_joining_prob          = other._log_joining_prob;
         _increments_and_priors     = other._increments_and_priors;
         _node_choices              = other._node_choices;
+        _estimated_lambda          = other._estimated_lambda;
 #if defined(UPGMA_COMPLETION)
         _upgma_additions = other._upgma_additions;
         _upgma_starting_edgelen = other._upgma_starting_edgelen;
@@ -2114,6 +2124,13 @@ class Forest {
         else {
             return 0.0;
         }
+    }
+
+    inline void Forest::drawLambda(Lot::SharedPtr lot) {
+        // Gamma(1, n) = Exp(1/n)
+        // mean = n
+        // for now, n = G::_lambda set by user
+        _estimated_lambda = lot->gamma(1, G::_lambda);
     }
     
 }

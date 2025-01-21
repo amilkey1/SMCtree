@@ -26,6 +26,7 @@ namespace proj {
         static string                   _string_base_frequencies;
         static string                   _string_relative_rates;
         static string                   _proposal;
+        static bool                     _est_lambda;
         
         // Candidates for setting status
         static double                   _asrv_shape;
