@@ -30,6 +30,15 @@ class Particle {
 
         string debugSaveParticleInfo(unsigned i) const;
     
+#if defined (UPGMA_COMPLETION)
+        void calcStartingUPGMAMatrix();
+        vector<vector<double>> getStartingUPGMAMatrix();
+        void setStartingUPGMAMatrix(vector<vector<double>> starting_upgma_matrices_by_gene);
+        vector<map<Node*,  unsigned>> getStartingRowCount();
+        void setStartingRowCount(vector<map<Node*,  unsigned>> starting_row_count_by_gene);
+        void calcStartingRowCount();
+#endif
+    
     private:
         mutable                                 Lot::SharedPtr _lot;
         void                                    clear();
@@ -87,6 +96,9 @@ class Particle {
     inline void Particle::proposal() {
        _forest.addIncrement(_lot);
         _log_weight = _forest.joinTaxa(_lot);
+#if defined (UPGMA_COMPLETION)
+        _log_weight = _forest.buildRestOfTreeUPGMA();
+#endif
     }
 
     inline void Particle::showParticle() {
@@ -133,6 +145,46 @@ class Particle {
     inline void Particle::clearPartials() {
         _forest.clearPartials();
     }
+
+#if defined (UPGMA_COMPLETION)
+    inline void Particle::calcStartingUPGMAMatrix() {
+            _forest.buildStartingUPGMAMatrix();
+    }
+#endif
+
+#if defined (UPGMA_COMPLETION)
+    inline vector<vector<double>> Particle::getStartingUPGMAMatrix() {
+        vector<vector<double>> starting_upgma_matrices_by_gene;
+        starting_upgma_matrices_by_gene.push_back(_forest._starting_dij);
+        return starting_upgma_matrices_by_gene;
+    }
+#endif
+
+#if defined (UPGMA_COMPLETION)
+    inline void Particle::setStartingUPGMAMatrix(vector<vector<double>> starting_upgma_matrices_by_gene) {
+        _forest._starting_dij = starting_upgma_matrices_by_gene[0];
+    }
+#endif
+
+#if defined (UPGMA_COMPLETION)
+    inline vector<map<Node*,  unsigned>> Particle::getStartingRowCount() {
+        vector<map<Node*,  unsigned>> starting_row_count_by_gene;
+        starting_row_count_by_gene.push_back(_forest._starting_row);
+        return starting_row_count_by_gene;
+    }
+#endif
+
+#if defined (UPGMA_COMPLETION)
+    inline void Particle::setStartingRowCount(vector<map<Node*,  unsigned>> starting_row_count_by_gene) {
+        _forest._starting_row = starting_row_count_by_gene[0];
+    }
+#endif
+
+#if defined (UPGMA_COMPLETION)
+    inline void Particle::calcStartingRowCount() {
+        _forest.buildStartingRow();
+    }
+#endif
 
     inline void Particle::operator=(const Particle & other) {
         _forest = other._forest;

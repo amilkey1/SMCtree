@@ -607,6 +607,21 @@ namespace proj {
              p.setParticleData(_data, partials);
              partials = false;
          }
+        
+#if defined (UPGMA_COMPLETION)
+        unsigned particle_num = 0;
+        
+        for (auto &p:particles) {
+            if (particle_num == 0) {
+                p.calcStartingUPGMAMatrix();
+            }
+            else {
+                p.setStartingUPGMAMatrix(particles[0].getStartingUPGMAMatrix());
+            }
+            p.calcStartingRowCount();
+            particle_num++;
+        }
+#endif
     }
 
     inline void Proj::writeTreeFile(vector<Particle> &particles) const {
