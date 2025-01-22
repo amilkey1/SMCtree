@@ -20,8 +20,10 @@ class Particle {
         double                                  getTreeHeight();
         double                                  getTreeLength();
         double                                  getEstLambda() {return _forest._estimated_lambda;}
+        double                                  getEstMu() {return _forest._estimated_mu;}
         double                                  getLogLikelihood();
         double                                  getYuleModel();
+        double                                  getBirthDeathModel();
         vector<pair<double, double>>            getSpeciesTreeIncrementPriors();
         void                                    setStartingLogLikelihoods(vector<double> starting_log_likelihoods);
         void                                    clearPartials();
@@ -31,6 +33,8 @@ class Particle {
 
         string debugSaveParticleInfo(unsigned i) const;
         void drawLambda();
+        void drawMu();
+        void drawRootAge();
     
 #if defined (UPGMA_COMPLETION)
         void calcStartingUPGMAMatrix();
@@ -136,6 +140,11 @@ class Particle {
         return _forest.getSpeciesTreePrior();
     }
 
+    inline double Particle::getBirthDeathModel() {
+        // TODO: fix this for birth death model
+        return _forest.getSpeciesTreePrior();
+    }
+
     inline void Particle::setStartingLogLikelihoods(vector<double> starting_log_likelihoods) {
         _forest._gene_tree_log_likelihoods = starting_log_likelihoods;
     }
@@ -191,6 +200,16 @@ class Particle {
     inline void Particle::drawLambda() {
         assert (G::_est_lambda);
         _forest.drawLambda(_lot);
+    }
+
+    inline void Particle::drawMu() {
+        assert (G::_est_mu);
+        _forest.drawMu(_lot);
+    }
+
+    inline void Particle::drawRootAge() {
+        assert (G::_est_root_age > 0.0);
+        _forest.drawRootAge(_lot);
     }
 
     inline void Particle::operator=(const Particle & other) {

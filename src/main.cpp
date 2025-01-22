@@ -89,12 +89,15 @@ unsigned G::_nloci             = 0;
 double   G::_lambda            = 1.0;
 double   G::_mu                = 1.0;
 double   G::_kappa             = 1.0;
+double   G::_root_age          = 1.0;
 string   G::_string_base_frequencies = "";
 vector<double> G::_base_frequencies;
 string   G::_string_relative_rates = "";
 vector<double> G::_double_relative_rates;
 string G::_proposal = "prior-prior";
 bool G::_est_lambda = "false";
+bool G::_est_mu = "false";
+bool G::_est_root_age = "false";
 
 double   G::_small_enough      = 0.00001;
 double   G::_infinity          = numeric_limits<double>::infinity();

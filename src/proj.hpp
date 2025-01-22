@@ -79,6 +79,7 @@ namespace proj {
         ("help,h", "produce help message")
         ("version,v", "show program version")
         ("lambda",  value(&G::_lambda)->default_value(10.0), "per lineage speciation rate assumed for the Yule model")
+        ("root_age",  value(&G::_root_age)->default_value(1.0), "root age for birth death model")
         ("mu",  value(&G::_mu)->default_value(1.0), "per lineage extinction rate assumed for the birth death model")
         ("rnseed",  value(&G::_rnseed)->default_value(1), "pseudorandom number seed")
         ("nthreads",  value(&G::_nthreads)->default_value(1), "number of threads")
@@ -97,9 +98,10 @@ namespace proj {
         ("simrootage",  value(&G::_sim_root_age)->default_value(1.0), "true root age for simulating tree under the constant-rates Birth-Death model if startmode is 'sim'")
         ("kappa",  boost::program_options::value(&G::_kappa)->default_value(1.0), "value of kappa")
         ("base_frequencies", boost::program_options::value(&G::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
-        ("relative_rates", boost::program_options::value(&G::_string_relative_rates)->default_value("null"))
-        ("proposal", boost::program_options::value(&G::_proposal)->default_value("prior-prior"))
-        ("est_lambda", boost::program_options::value(&G::_est_lambda)->default_value("false"))
+        ("relative_rates", boost::program_options::value(&G::_string_relative_rates)->default_value("null"), "relative rates by locus")
+        ("proposal", boost::program_options::value(&G::_proposal)->default_value("prior-prior"), "prior-prior or prior-post")
+        ("estimate_lambda", boost::program_options::value(&G::_est_lambda)->default_value("false"), "estimate birth rate")
+        ("estimate_mu", boost::program_options::value(&G::_est_mu)->default_value("false"), "estimate death rate")
         ;
         
         store(parse_command_line(argc, argv, desc), vm);
@@ -616,6 +618,14 @@ namespace proj {
                  psuffix += 2;
                  p.drawLambda();
              }
+             
+             if (G::_est_mu) {
+                 p.drawMu();
+             }
+             
+             if (G::_est_root_age) {
+                 p.drawRootAge();
+             }
          }
         
 #if defined (UPGMA_COMPLETION)
@@ -682,9 +692,16 @@ namespace proj {
         
         logf << "\t" << "Tree.height";
         logf << "\t" << "Tree.treeLength";
-        logf << "\t" << "YuleModel";
-        logf << "\t" << "birthRate";
-
+        
+        if (G::_mu > 0.0) {
+            logf << "\t" << "BirthDeath";
+            logf << "\t" << "BDBirthRate";
+            logf << "\t" << "BDDeathRate";
+        }
+        else {
+            logf << "\t" << "YuleModel";
+            logf << "\t" << "birthRate";
+        }
 
         logf << endl;
 
@@ -694,13 +711,21 @@ namespace proj {
             iter++;
             
             double log_likelihood = p.getLogLikelihood();
-            double yule = p.getYuleModel();
+            double yule = 0.0;
+            if (G::_mu > 0.0) {
+                yule = p.getYuleModel();
+            }
             double log_prior = yule;
             
             double log_posterior = log_prior + log_likelihood;
             vector<double> tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
             double height = p.getTreeHeight();
             double length = p.getTreeLength();
+            
+            double birth_death = 0.0;
+            if (G::_mu > 0.0) {
+                birth_death = p.getBirthDeathModel();
+            }
             
             logf << "\t" << log_posterior;
             logf << "\t" << log_likelihood;
@@ -710,13 +735,28 @@ namespace proj {
             }
             logf << "\t" << height;
             logf << "\t" << length;
-            logf << "\t" << yule;
+            
+            if (G::_mu > 0.0) {
+                logf << "\t" << birth_death;
+            }
+            else {
+                logf << "\t" << yule;
+            }
             
             if (G::_lambda) {
                 logf << "\t" << p.getEstLambda();
             }
             else {
                 logf << "\t" << G::_lambda;
+            }
+            
+            if (G::_mu > 0.0) {
+                if (G::_mu) {
+                    logf << "\t" << p.getEstMu();
+                }
+                else {
+                    logf << "\t" << G::_mu;
+                }
             }
 
             logf << endl;

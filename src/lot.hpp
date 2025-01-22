@@ -1,5 +1,7 @@
 #pragma once
 
+#include <boost/random.hpp>
+
 namespace proj {
 
     class Lot {
@@ -14,6 +16,7 @@ namespace proj {
             double                          normal();
             double                          gamma(double shape, double scale);
             double                          logUniform();
+            double                          logNormal(double mu, double sigma);
             
             typedef shared_ptr<Lot>    SharedPtr;
 
@@ -23,6 +26,7 @@ namespace proj {
             typedef boost::variate_generator<boost::mt19937 &, boost::random::normal_distribution<> >       normal_variate_generator_t;
             typedef boost::variate_generator<boost::mt19937 &, boost::random::gamma_distribution<> >        gamma_variate_generator_t;
             typedef boost::variate_generator<boost::mt19937 &, boost::random::uniform_int_distribution<> >  uniform_int_generator_t;
+            typedef boost::variate_generator<boost::mt19937 &, boost::random::lognormal_distribution<> >    lognormal_variate_generator_t;
 
             unsigned                                   _seed;
             boost::mt19937                             _generator;
@@ -30,10 +34,13 @@ namespace proj {
             shared_ptr<normal_variate_generator_t>     _normal_variate_generator;
             shared_ptr<gamma_variate_generator_t>      _gamma_variate_generator;
             shared_ptr<uniform_int_generator_t>        _uniform_int_generator;
+            shared_ptr<lognormal_variate_generator_t>  _lognormal_variate_generator;
 
             double                                          _gamma_shape;
             int                                             _low;
             int                                             _high;
+            double                                          _mu;
+            double                                          _sigma;
     };
     
     // member function bodies go here
@@ -44,6 +51,7 @@ namespace proj {
         _normal_variate_generator = shared_ptr<normal_variate_generator_t>(new normal_variate_generator_t(_generator, boost::random::normal_distribution<>()));
         _gamma_variate_generator = shared_ptr<gamma_variate_generator_t>(new gamma_variate_generator_t(_generator, boost::random::gamma_distribution<>(_gamma_shape)));
         _uniform_int_generator = shared_ptr<uniform_int_generator_t>(new uniform_int_generator_t(_generator, boost::random::uniform_int_distribution<>(_low, _high)));
+        _lognormal_variate_generator = shared_ptr<lognormal_variate_generator_t>(new lognormal_variate_generator_t(_generator, boost::random::lognormal_distribution<>()));
     }
         
     inline Lot::~Lot() {
@@ -51,6 +59,7 @@ namespace proj {
         _normal_variate_generator.reset();
         _gamma_variate_generator.reset();
         _uniform_int_generator.reset();
+        _lognormal_variate_generator.reset();
     }
         
     inline void Lot::setSeed(unsigned seed) {
@@ -109,6 +118,12 @@ namespace proj {
         }
         
         return make_pair(i, j);
+    }
+
+    inline double Lot::logNormal(double mu, double sigma) {
+        _lognormal_variate_generator.reset(new lognormal_variate_generator_t(_generator, boost::random::lognormal_distribution<>(mu,sigma)));
+        
+        return (*_lognormal_variate_generator)();
     }
         
 }

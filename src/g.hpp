@@ -27,6 +27,8 @@ namespace proj {
         static string                   _string_relative_rates;
         static string                   _proposal;
         static bool                     _est_lambda;
+        static bool                     _est_mu;
+        static bool                     _est_root_age;
         
         // Candidates for setting status
         static double                   _asrv_shape;
@@ -50,6 +52,7 @@ namespace proj {
         static map<unsigned, double>    _relrate_for_locus;
         static double                   _lambda;
         static double                   _mu;
+        static double                   _root_age;
         static vector<double>           _base_frequencies;
         static vector<double>           _double_relative_rates;
 

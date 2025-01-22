@@ -61,6 +61,8 @@ class Forest {
         vector<double> reweightChoices(vector<double> & likelihood_vec, double prev_log_likelihood);
         int selectPair(vector<double> weight_vec, Lot::SharedPtr lot);
         void drawLambda(Lot::SharedPtr lot);
+        void drawMu(Lot::SharedPtr lot);
+        void drawRootAge(Lot::SharedPtr lot);
 
         double getTreeHeight();
         double getTreeLength();
@@ -68,6 +70,8 @@ class Forest {
         double calcTopologyPrior(unsigned nlineages);
         void clearPartials();
         double getLineageHeight(Node* nd);
+        void addYuleTreeIncrement(Lot::SharedPtr lot);
+        void addBirthDeathTreeIncrement(Lot::SharedPtr lot);
     
 #if defined (UPGMA_COMPLETION)
         void buildStartingUPGMAMatrix();
@@ -89,6 +93,8 @@ class Forest {
         vector<pair<double, double>> _increments_and_priors;
         vector<pair<Node*, Node*>> _node_choices;
         double _estimated_lambda;
+        double _estimated_mu;
+        double _estimated_root_age;
     
 #if defined(UPGMA_COMPLETION)
         stack<Node *> _upgma_additions;
@@ -143,6 +149,8 @@ class Forest {
         _nleaves = 0;
         _node_choices.clear();
         _estimated_lambda = G::_lambda;
+        _estimated_mu = G::_mu;
+        _estimated_root_age = G::_root_age;
 #if defined (UPGMA_COMPLETION)
         _upgma_additions = stack<Node*>();
         _upgma_starting_edgelen.clear();
@@ -263,7 +271,8 @@ class Forest {
         return _gene_tree_log_likelihoods[i];
     }
 
-    inline void Forest::addIncrement(Lot::SharedPtr lot) {
+    inline void Forest::addYuleTreeIncrement(Lot::SharedPtr lot) {
+        // Yule tree
         unsigned nlineages = (unsigned) _lineages.size();
         
         double rate = 0.0;
@@ -285,6 +294,73 @@ class Forest {
         double increment_prior = (log(rate)-increment*rate);
                     
         _increments_and_priors.push_back(make_pair(increment, increment_prior));
+    }
+
+    inline void Forest::addBirthDeathTreeIncrement(Lot::SharedPtr lot) {
+        // birth death
+        double cum_height = getLineageHeight(_lineages.back());
+        // Determine number of lineages remaining
+        unsigned n = getNumLineages();
+        assert(n > 1);
+        
+        // Draw n-1 internal node heights and store in vector heights
+        vector<double> heights(n - 1, 0.0);
+        
+        double rho = 1.0; // TODO: for now, assume rho = 1.0
+        
+        double birth_rate = G::_lambda;
+        if (_estimated_lambda > 0.0) {
+            birth_rate = _estimated_lambda;
+        }
+        
+        double death_rate = G::_mu;
+        if (_estimated_mu > 0.0) {
+            death_rate = _estimated_mu;
+        }
+        double exp_death_minus_birth = exp(death_rate - birth_rate);
+        double phi = 0.0;
+        phi += rho*birth_rate*(exp_death_minus_birth - 1.0);
+        phi += (death_rate - birth_rate)*exp_death_minus_birth;
+        phi /= (exp_death_minus_birth - 1.0);
+        for (unsigned i = 0; i < n - 2; i++) {
+            double u = rng->uniform();
+            double y = u/(1.0 + birth_rate*rho*(1.0 - u));
+            if (birth_rate > death_rate) {
+                y = log(phi - u*rho*birth_rate);
+                y -= log(phi - u*rho*birth_rate + u*(birth_rate - death_rate));
+                y /= (death_rate - birth_rate);
+            }
+            heights[i] = y;
+        }
+        heights[n-2] = 1.0;
+        sort(heights.begin(), heights.end());
+        
+        // Waiting time to next speciation event is first height
+        // scaled so that max height is mu - cum_height
+        double t = heights[0]*(_estimated_root_age - cum_height); // TODO: not sure this is right
+        
+        assert (t > 0.0);
+        
+        for (auto &nd:_lineages) {
+            nd->_edge_length += t;
+        }
+        
+        // lorad only works if all topologies the same - then don't include the prior on joins because it is fixed
+        double rate = 0.0; // TODO: what is rate here?
+        rate = _lineages.size() * birth_rate;
+        double increment_prior = (log(rate)-t*rate);
+        
+        _increments_and_priors.push_back(make_pair(t, increment_prior));
+    }
+
+    inline void Forest::addIncrement(Lot::SharedPtr lot) {
+        if (G::_mu == 0.0) {
+            addYuleTreeIncrement(lot);
+        }
+        
+        else {
+            addBirthDeathTreeIncrement(lot);
+        }
     }
 
     inline double Forest::joinTaxa(Lot::SharedPtr lot) {
@@ -1086,6 +1162,8 @@ class Forest {
         _increments_and_priors     = other._increments_and_priors;
         _node_choices              = other._node_choices;
         _estimated_lambda          = other._estimated_lambda;
+        _estimated_mu              = other._estimated_mu;
+        _estimated_root_age        = other._estimated_root_age;
 #if defined(UPGMA_COMPLETION)
         _upgma_additions = other._upgma_additions;
         _upgma_starting_edgelen = other._upgma_starting_edgelen;
@@ -1386,7 +1464,7 @@ class Forest {
     inline void Forest::buildBirthDeathTree() {
         // Algorithm from Yang and Rannala. 1997. MBE 14(7):717-724.
         createTrivialForest();
-#if 0
+#if 1
         unsigned nsteps = G::_ntaxa - 1;
         double cum_height = 0.0;
         for (unsigned i = 0; i < nsteps; i++) {
@@ -1641,13 +1719,6 @@ class Forest {
                 // Get the number of patterns
                 unsigned npatterns = _data->getNumPatterns();
 
-                // Get the first and last pattern index for this gene's data
-//                Data::begin_end_pair_t be = _data->getSubsetBeginEnd(index);
-//                unsigned first_pattern = be.first;
-                
-                // Get the name of the gene (data subset)
-                //string gene_name = _data->getSubsetName(_gene_index);
-
                 // Get pattern counts
                 auto counts = _data->getPatternCounts();
                 
@@ -1838,8 +1909,6 @@ class Forest {
             _upgma_starting_edgelen[nd] = nd->_edge_length;
             row[nd] = i;
         }
-            
-//        double upgma_height = 0.0;
         
 //            debugShowDistanceMatrix(_starting_dij);
             
@@ -2131,6 +2200,36 @@ class Forest {
         // mean = n
         // for now, n = G::_lambda set by user
         _estimated_lambda = lot->gamma(1, G::_lambda);
+        
+//        double mu = 0.0;
+//        double mean = G::_lambda;
+//        double sigma = sqrt(2*log(mean));
+//        _estimated_lambda = lot->logNormal(mu, sigma);
+    }
+
+    inline void Forest::drawMu(Lot::SharedPtr lot) {
+        // Gamma(1, n) = Exp(1/n)
+        // mean = n
+//        // for now, n = G::_lambda set by user
+        _estimated_mu = lot->gamma(1, G::_mu);
+        
+//        double mu = 0.5;
+//        double mean = G::_mu;
+//        double sigma = sqrt(2*(log(mean)-mu));
+//        assert (sigma == sigma); // assert not NaN
+//        _estimated_mu = lot->logNormal(mu, sigma);
+    }
+
+    inline void Forest::drawRootAge(Lot::SharedPtr lot) {
+        // Gamma(1, n) = Exp(1/n)
+        // mean = n
+        // for now, n = G::_lambda set by user
+        _estimated_root_age = lot->gamma(1, G::_root_age);
+        
+    //        double mu = 0.0;
+    //        double mean = G::_root_age;
+    //        double sigma = sqrt(2*log(mean));
+    //        _estimated_root_age = lot->logNormal(mu, sigma);
     }
     
 }
