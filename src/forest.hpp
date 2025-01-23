@@ -66,7 +66,7 @@ class Forest {
 
         double getTreeHeight();
         double getTreeLength();
-        double getSpeciesTreePrior();
+        double getTreePrior();
         double calcTopologyPrior(unsigned nlineages);
         void clearPartials();
         double getLineageHeight(Node* nd);
@@ -764,7 +764,7 @@ class Forest {
         return sum_height;
     }
 
-    inline double Forest::getSpeciesTreePrior() {
+    inline double Forest::getTreePrior() {
         double prior = 0.0;
         for (auto &i:_increments_and_priors) {
             prior += i.second;

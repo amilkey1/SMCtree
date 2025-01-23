@@ -664,7 +664,7 @@ namespace proj {
         
         vector<vector<pair<double, double>>> unique_increments_and_priors;
         for (auto &p:particles) {
-            vector<pair<double, double>> increments_and_priors = p.getSpeciesTreeIncrementPriors();
+            vector<pair<double, double>> increments_and_priors = p.getTreeIncrementPriors();
             bool found = false;
             if(std::find(unique_increments_and_priors.begin(), unique_increments_and_priors.end(), increments_and_priors) != unique_increments_and_priors.end()) {
                 found = true;
@@ -712,12 +712,12 @@ namespace proj {
             
             double log_likelihood = p.getLogLikelihood();
             double yule = 0.0;
-            if (G::_mu > 0.0) {
-                yule = p.getYuleModel();
-            }
-            double log_prior = yule;
+//            if (G::_mu > 0.0) {
+//                yule = p.getYuleModel();
+//            }
+            double total_log_prior = p.getAllPriors();
             
-            double log_posterior = log_prior + log_likelihood;
+            double log_posterior = total_log_prior + log_likelihood;
             vector<double> tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
             double height = p.getTreeHeight();
             double length = p.getTreeLength();
@@ -729,7 +729,7 @@ namespace proj {
             
             logf << "\t" << log_posterior;
             logf << "\t" << log_likelihood;
-            logf << "\t" << log_prior;
+            logf << "\t" << total_log_prior;
             for (auto &l:tree_log_likelihoods) {
                 logf << "\t" << l;
             }
@@ -744,31 +744,36 @@ namespace proj {
             }
             
             double lambda = 0.0;
+            double mu = 0.0;
+            
             if (G::_lambda) {
                 lambda = p.getEstLambda();
-                logf << "\t" << lambda;
             }
             else {
                 lambda = G::_lambda;
-                logf << "\t" << lambda;
             }
             
             if (G::_mu > 0.0) {
                 if (G::_mu) {
-                    double bddeathrate = 0.0; // to be consistent with beast output, death rate is relative to birth rate (u / lambda)
-                    // https://groups.google.com/g/beast-users/c/HtpPKHGYNYg/m/pC1rIS5iCgAJ
-                    // https://beast2-dev.github.io/hmc/hmc//Priors/DeathRatePrior/
-                    bddeathrate = p.getEstMu() / lambda;
-                    logf << "\t" << bddeathrate;
+                    mu = p.getEstMu();
                 }
                 else {
-                    double bddeathrate = 0.0; // to be consistent with beast output, death rate is relative to birth rate (u / lambda)
-                    // https://groups.google.com/g/beast-users/c/HtpPKHGYNYg/m/pC1rIS5iCgAJ
-                    // https://beast2-dev.github.io/hmc/hmc//Priors/DeathRatePrior/
-                    bddeathrate = G::_mu / lambda;
-                    logf << "\t" << bddeathrate;
+                    mu = G::_mu;
                 }
             }
+            
+//            to be consistent with beast output, birth rate is "effective birth rate": lambda - mu
+//            death rate is relative to birth rate (mu / lambda)
+//            https://groups.google.com/g/beast-users/c/HtpPKHGYNYg/m/pC1rIS5iCgAJ
+//            https://beast2-dev.github.io/hmc/hmc//Priors/DeathRatePrior/
+//            https://beast2-dev.github.io/hmc/hmc//Priors/BirthRatePrior/
+            
+            double effective_birth_rate = lambda - mu;
+            double bddeathrate = mu / lambda;
+            
+            logf << "\t" << effective_birth_rate;
+            logf << "\t" << bddeathrate;
+            
 
             logf << endl;
         }

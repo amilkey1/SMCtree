@@ -23,8 +23,9 @@ class Particle {
         double                                  getEstMu() {return _forest._estimated_mu;}
         double                                  getLogLikelihood();
         double                                  getYuleModel();
+        double                                  getAllPriors();
         double                                  getBirthDeathModel();
-        vector<pair<double, double>>            getSpeciesTreeIncrementPriors();
+        vector<pair<double, double>>            getTreeIncrementPriors();
         void                                    setStartingLogLikelihoods(vector<double> starting_log_likelihoods);
         void                                    clearPartials();
         string                                  saveForestNewick() {
@@ -137,19 +138,43 @@ class Particle {
     }
 
     inline double Particle::getYuleModel() {
-        return _forest.getSpeciesTreePrior();
+        return _forest.getTreePrior();
+    }
+
+    inline double Particle::getAllPriors() {
+        double tree_prior = _forest.getTreePrior();
+        double param_prior = 0.0;
+        
+        // TODO: for now, these params are all drawn from exponential distributions - need to change priors if distribution is changed
+        // TODO: this also assumes the mean of the exponential distribution is the user-specified param
+        if (G::_est_mu) {
+            param_prior += log(G::_mu) - (_forest._estimated_mu * G::_mu);
+        }
+        
+        if (G::_est_lambda) {
+            param_prior += log(G::_lambda) - (_forest._estimated_lambda * G::_lambda);
+        }
+        
+        if (G::_est_root_age) {
+            param_prior += log(G::_root_age) - (_forest._estimated_root_age * G::_root_age);
+        }
+        
+//        total_prior += log(Forest::_theta_prior_mean) - (_forests[1]._theta * Forest::_theta_prior_mean);
+        
+        double total_prior = tree_prior + param_prior;
+        return total_prior;
     }
 
     inline double Particle::getBirthDeathModel() {
         // TODO: fix this for birth death model
-        return _forest.getSpeciesTreePrior();
+        return _forest.getTreePrior();
     }
 
     inline void Particle::setStartingLogLikelihoods(vector<double> starting_log_likelihoods) {
         _forest._gene_tree_log_likelihoods = starting_log_likelihoods;
     }
 
-    inline vector<pair<double, double>> Particle::getSpeciesTreeIncrementPriors() {
+    inline vector<pair<double, double>> Particle::getTreeIncrementPriors() {
         return _forest._increments_and_priors;
     }
 
