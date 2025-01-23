@@ -743,19 +743,30 @@ namespace proj {
                 logf << "\t" << yule;
             }
             
+            double lambda = 0.0;
             if (G::_lambda) {
-                logf << "\t" << p.getEstLambda();
+                lambda = p.getEstLambda();
+                logf << "\t" << lambda;
             }
             else {
-                logf << "\t" << G::_lambda;
+                lambda = G::_lambda;
+                logf << "\t" << lambda;
             }
             
             if (G::_mu > 0.0) {
                 if (G::_mu) {
-                    logf << "\t" << p.getEstMu();
+                    double bddeathrate = 0.0; // to be consistent with beast output, death rate is relative to birth rate (u / lambda)
+                    // https://groups.google.com/g/beast-users/c/HtpPKHGYNYg/m/pC1rIS5iCgAJ
+                    // https://beast2-dev.github.io/hmc/hmc//Priors/DeathRatePrior/
+                    bddeathrate = p.getEstMu() / lambda;
+                    logf << "\t" << bddeathrate;
                 }
                 else {
-                    logf << "\t" << G::_mu;
+                    double bddeathrate = 0.0; // to be consistent with beast output, death rate is relative to birth rate (u / lambda)
+                    // https://groups.google.com/g/beast-users/c/HtpPKHGYNYg/m/pC1rIS5iCgAJ
+                    // https://beast2-dev.github.io/hmc/hmc//Priors/DeathRatePrior/
+                    bddeathrate = G::_mu / lambda;
+                    logf << "\t" << bddeathrate;
                 }
             }
 
