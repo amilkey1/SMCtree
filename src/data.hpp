@@ -90,9 +90,7 @@ namespace proj {
             pattern_origsite_map_t                      _orig_site_map;
             orig_site_lookup_t                          _orig_site_lookup;
             unsigned                                    _cum_nchar;
-#if defined (UPGMA_COMPLETION)
             data_matrix_t                               _original_data_matrix;
-#endif
     };
 
     inline Data::Data() {
@@ -166,10 +164,8 @@ namespace proj {
         _taxon_names.clear();
         _data_matrix.clear();
         _subset_end.clear();
-#if defined (UPGMA_COMPLETION)
         _original_data_matrix.clear();
-#endif
-    }    
+    }
 
     inline unsigned Data::getNumPatterns() const {    
         if (_data_matrix.size() > 0)
@@ -218,9 +214,7 @@ namespace proj {
     inline unsigned Data::buildSubsetSpecificMaps(unsigned ntaxa, unsigned seqlen, unsigned nsubsets) {    
         pattern_vect_t pattern(ntaxa);
 
-#if defined (UPGMA_COMPLETION)
         _original_data_matrix = _data_matrix;
-#endif
         
         _orig_site_map.clear();
         _pattern_map_vect.clear();

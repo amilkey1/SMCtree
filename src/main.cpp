@@ -128,6 +128,7 @@ vector<unsigned>       G::_nsites_per_locus;
 map<unsigned,unsigned> G::_nexus_taxon_map;
 map<unsigned, double>  G::_relrate_for_locus;
 bool                   G::_save_memory;
+bool                   G::_upgma_completion;
 
 string                  G::_start_mode = "smc";
 string                  G::_filename = "data.nex";

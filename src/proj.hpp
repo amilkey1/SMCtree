@@ -47,6 +47,7 @@ namespace proj {
             double computeEffectiveSampleSize(const vector<double> & probs) const;
             void writeTreeFile (vector<Particle> &v) const;
             void writeLogFile(vector<Particle> &v) const;
+            void writeLogMarginalLikelihoodFile() const;
             void handleBaseFrequencies();
             void handleRelativeRates();
 
@@ -102,6 +103,7 @@ namespace proj {
         ("proposal", boost::program_options::value(&G::_proposal)->default_value("prior-prior"), "prior-prior or prior-post")
         ("estimate_lambda", boost::program_options::value(&G::_est_lambda)->default_value("false"), "estimate birth rate")
         ("estimate_mu", boost::program_options::value(&G::_est_mu)->default_value("false"), "estimate death rate")
+        ("upgma_completion",  value(&G::_upgma_completion)->default_value(true), "complete SMC tree using UPGMA at each step")
         ;
         
         store(parse_command_line(argc, argv, desc), vm);
@@ -148,6 +150,11 @@ namespace proj {
         // If user specified a start mode other than "prior-prior" or "prior-post", throw an exception
         if (G::_proposal != "prior-prior" && G::_proposal != "prior-post") {
             throw XProj(format("must specify a proposal of either prior-prior or prior-post but %s was specified")%G::_proposal);
+        }
+        
+        // If user specified both "prior-post" and "upgma_completion", throw an exception
+        if (G::_proposal == "prior-post" && G::_upgma_completion) {
+            throw XProj("cannot specify both UPGMA completion and prior-post");
         }
     }
 
@@ -345,6 +352,10 @@ namespace proj {
         output(format("Random seed: %d\n") % G::_rnseed, 1);
         output(format("Number of threads: %d\n") % G::_nthreads, 1);
         
+        if (G::_upgma_completion) {
+            output("Using UPGMA completion\n", 1);
+        }
+        
         try {
             _data = Data::SharedPtr(new Data());
             _data->setPartition(_partition);
@@ -397,6 +408,8 @@ namespace proj {
             unsigned nsteps = (G::_ntaxa-1);
             
             for (unsigned g=0; g<nsteps; g++){
+                
+                
                 // set random number seeds
                 unsigned psuffix = 1;
                 for (auto &p:_particle_vec) {
@@ -408,17 +421,18 @@ namespace proj {
                 output(format("Step %d of %d.\n") % step_plus_one % nsteps, 1);
                 proposeParticles(_particle_vec);
                 
-                //debugSaveParticleVectorInfo("debug-proposed.txt", g+1);
+//                debugSaveParticleVectorInfo("debug-proposed.txt", g+1);
                 
                 double ess = filterParticles(g, _particle_vec);
                 output(format("     ESS = %d\n") % ess, 2);
                 
                 //debugSaveParticleVectorInfo("debug-filtered.txt", g+1);
             }
+            output(format("     log marginal likelihood = %d\n") % _log_marginal_likelihood, 2);
             
             writeTreeFile(_particle_vec);
             writeLogFile(_particle_vec);
-            
+            writeLogMarginalLikelihoodFile();
         }
         
         catch (XProj & x) {
@@ -612,10 +626,11 @@ namespace proj {
              p.setParticleData(_data, partials);
              partials = false;
              
+             // set particle seed for drawing new values
+             p.setSeed(rng->randint(1,9999) + psuffix);
+             psuffix += 2;
+             
              if (G::_est_lambda) {
-                 // must seed seed before drawing lambdas
-                 p.setSeed(rng->randint(1,9999) + psuffix);
-                 psuffix += 2;
                  p.drawLambda();
              }
              
@@ -628,20 +643,20 @@ namespace proj {
              }
          }
         
-#if defined (UPGMA_COMPLETION)
-        unsigned particle_num = 0;
+        if (G::_upgma_completion) {
+            unsigned particle_num = 0;
         
-        for (auto &p:particles) {
-            if (particle_num == 0) {
-                p.calcStartingUPGMAMatrix();
+            for (auto &p:particles) {
+                if (particle_num == 0) {
+                    p.calcStartingUPGMAMatrix();
+                }
+                else {
+                    p.setStartingUPGMAMatrix(particles[0].getStartingUPGMAMatrix());
+                }
+                p.calcStartingRowCount();
+                particle_num++;
             }
-            else {
-                p.setStartingUPGMAMatrix(particles[0].getStartingUPGMAMatrix());
-            }
-            p.calcStartingRowCount();
-            particle_num++;
         }
-#endif
     }
 
     inline void Proj::writeTreeFile(vector<Particle> &particles) const {
@@ -712,9 +727,7 @@ namespace proj {
             
             double log_likelihood = p.getLogLikelihood();
             double yule = 0.0;
-//            if (G::_mu > 0.0) {
-//                yule = p.getYuleModel();
-//            }
+            
             double total_log_prior = p.getAllPriors();
             
             double log_posterior = total_log_prior + log_likelihood;
@@ -779,6 +792,12 @@ namespace proj {
         }
 
         logf.close();
+    }
+
+    inline void Proj::writeLogMarginalLikelihoodFile() const {
+        // this function writes the log marginal likelihood to a file
+        ofstream logf ("marginal_likelihood.txt");
+        logf << "log marginal likelihood: " << _log_marginal_likelihood << "\n";
     }
 
 }
