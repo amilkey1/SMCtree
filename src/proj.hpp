@@ -156,6 +156,26 @@ namespace proj {
         if (G::_proposal == "prior-post" && G::_upgma_completion) {
             throw XProj("cannot specify both UPGMA completion and prior-post");
         }
+        
+        // If user specified lambda <= 0, throw an exception
+        if (G::_lambda <= 0.0) {
+            throw XProj(format("must specify a value of lambda > 0 but %d was specified")%G::_lambda);
+        }
+        
+        // If user specified mu < 0, throw an exception
+        if (G::_mu < 0.0) {
+            throw XProj(format("must specify a value of mu >= 0 but %d was specified")%G::_mu);
+        }
+        
+        // If user specified root age <= 0, throw an exception
+        if (G::_root_age <= 0.0) {
+            throw XProj(format("must specify a value of root age >= 0 but %d was specified")%G::_root_age);
+        }
+        
+        // If user specified mu = 0 and estimate_mu, print a warning that Yule model will be chosen and mu will not be estimated
+        if (G::_mu == 0.0 && G::_est_mu) {
+            output(format("warning: extinction rate specified to be estimated but mean rate set to %d; extinction rate will be set to 0 and Yule model will be used\n")%G::_mu, 1);
+        }
     }
 
     inline void Proj::handleBaseFrequencies() {
@@ -271,7 +291,14 @@ namespace proj {
             G::_taxon_names[i] = G::inventName(i, /*lower_case*/false);
         
         _sim_tree = Forest::SharedPtr(new Forest);
-        _sim_tree->buildBirthDeathTree();
+        
+        if (G::_mu > 0.0) {
+            _sim_tree->buildBirthDeathTree();
+        }
+        else {
+            // using birth death function will condition on root age
+            _sim_tree->buildYuleTree();
+        }
     }
         
     inline void Proj::simulateSave(string fnprefix) {
@@ -419,6 +446,7 @@ namespace proj {
                 
                 unsigned step_plus_one = g+1;
                 output(format("Step %d of %d.\n") % step_plus_one % nsteps, 1);
+                
                 proposeParticles(_particle_vec);
                 
 //                debugSaveParticleVectorInfo("debug-proposed.txt", g+1);
@@ -634,7 +662,7 @@ namespace proj {
                  p.drawLambda();
              }
              
-             if (G::_est_mu) {
+             if (G::_est_mu && G::_mu > 0.0) {
                  p.drawMu();
              }
              
@@ -739,6 +767,9 @@ namespace proj {
             if (G::_mu > 0.0) {
                 birth_death = p.getBirthDeathModel();
             }
+            else {
+                yule = p.getYuleModel();
+            }
             
             logf << "\t" << log_posterior;
             logf << "\t" << log_likelihood;
@@ -785,7 +816,10 @@ namespace proj {
             double bddeathrate = mu / lambda;
             
             logf << "\t" << effective_birth_rate;
-            logf << "\t" << bddeathrate;
+            
+            if (G::_mu > 0.0) {
+                logf << "\t" << bddeathrate;
+            }
             
 
             logf << endl;

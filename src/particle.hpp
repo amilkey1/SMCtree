@@ -145,7 +145,7 @@ class Particle {
         
         // TODO: for now, these params are all drawn from exponential distributions - need to change priors if distribution is changed
         // TODO: this also assumes the mean of the exponential distribution is the user-specified param
-        if (G::_est_mu) {
+        if (G::_est_mu && G::_mu > 0.0) {
             param_prior += log(G::_mu) - (_forest._estimated_mu * G::_mu);
         }
         
@@ -156,9 +156,7 @@ class Particle {
         if (G::_est_root_age) {
             param_prior += log(G::_root_age) - (_forest._estimated_root_age * G::_root_age);
         }
-        
-//        total_prior += log(Forest::_theta_prior_mean) - (_forests[1]._theta * Forest::_theta_prior_mean);
-        
+                
         double total_prior = tree_prior + param_prior;
         return total_prior;
     }
@@ -181,7 +179,7 @@ class Particle {
     }
 
     inline void Particle::calcStartingUPGMAMatrix() {
-            _forest.buildStartingUPGMAMatrix();
+        _forest.buildStartingUPGMAMatrix();
     }
 
     inline vector<vector<double>> Particle::getStartingUPGMAMatrix() {
@@ -215,6 +213,7 @@ class Particle {
 
     inline void Particle::drawMu() {
         assert (G::_est_mu);
+        assert (G::_mu > 0.0);
         _forest.drawMu(_lot);
     }
 

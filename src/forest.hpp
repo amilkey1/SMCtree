@@ -18,7 +18,7 @@ class Forest {
         //POL added below
         void createTrivialForest();
         void simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites);
-        //void buildYuleTree();
+        void buildYuleTree();
         void buildBirthDeathTree();
         typedef shared_ptr<Forest> SharedPtr;
         string debugSaveForestInfo() const;
@@ -538,6 +538,9 @@ class Forest {
      }
 
     inline double Forest::joinPriorPrior(Lot::SharedPtr lot) {
+//        if (_lineages.size() == 2) {
+//            showForest();
+//        }
         double prev_log_likelihood = 0.0;
         
         for (auto &g:_gene_tree_log_likelihoods) {
@@ -614,6 +617,9 @@ class Forest {
             new_log_likelihood += g;
         }
         
+//        if (_lineages.size() == 1) {
+//            showForest();
+//        }
         double log_weight = new_log_likelihood - prev_log_likelihood;
                
        if (G::_save_memory) {
@@ -1546,25 +1552,25 @@ class Forest {
         refreshPreorder();
     }
 
-    //inline void Forest::buildYuleTree() {
-    //    createTrivialForest();
-    //    unsigned nsteps = G::_ntaxa - 1;
-    //    for (unsigned i = 0; i < nsteps; i++) {
-    //        // Determine number of lineages remaining
-    //        unsigned n = getNumLineages();
-    //        assert(n > 1);
-    //
-    //        // Waiting time to speciation event is Exponential(rate = n*lambda)
-    //        // u = 1 - exp(-r*t) ==> t = -log(1-u)/r
-    //        double r = G::_sim_lambda*n;
-    //        double u = rng->uniform();
-    //        double t = -log(1.0 - u)/r;
-    //        advanceAllLineagesBy(t);
-    //        joinRandomLineagePair(rng);
-    //    }
-    //    assert(getNumLineages() == 1);
-    //    refreshPreorder();
-    //}
+    inline void Forest::buildYuleTree() {
+        createTrivialForest();
+        unsigned nsteps = G::_ntaxa - 1;
+        for (unsigned i = 0; i < nsteps; i++) {
+            // Determine number of lineages remaining
+            unsigned n = getNumLineages();
+            assert(n > 1);
+    
+            // Waiting time to speciation event is Exponential(rate = n*lambda)
+            // u = 1 - exp(-r*t) ==> t = -log(1-u)/r
+            double r = G::_sim_lambda*n;
+            double u = rng->uniform();
+            double t = -log(1.0 - u)/r;
+            advanceAllLineagesBy(t);
+            joinRandomLineagePair(rng);
+        }
+        assert(getNumLineages() == 1);
+        refreshPreorder();
+    }
 
     inline void Forest::scaleAllEdgeLengthsBy(double scaling_factor) {
         // This function should only be called for complete trees
@@ -2027,7 +2033,7 @@ class Forest {
             gene_tree_log_likelihood += calcSubsetLogLikelihood(g);
         }
         double log_weight = gene_tree_log_likelihood - _previous_upgma_log_likelihood; // previous likelihood is the entire tree
-        
+                
         _previous_upgma_log_likelihood = gene_tree_log_likelihood;
                         
         if (G::_save_memory) {
