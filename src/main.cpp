@@ -50,6 +50,8 @@ using boost::algorithm::join;
 #include "xproj.hpp"
 #include "lot.hpp"
 #include "split.hpp"
+#include "fossil.hpp"
+#include "taxset.hpp"
 #include "g.hpp"
 #include "stopwatch.hpp"
 #include "genetic-code.hpp"
@@ -60,7 +62,6 @@ using boost::algorithm::join;
 #include "node.hpp"
 #include "forest.hpp"
 #include "particle.hpp"
-//#include "forestpol.hpp"
 #include "proj.hpp"
 
 proj::PartialStore ps;
@@ -98,6 +99,10 @@ string G::_proposal = "prior-prior";
 bool G::_est_lambda = "false";
 bool G::_est_mu = "false";
 bool G::_est_root_age = "false";
+#if defined (FOSSILS)
+vector<Fossil> G::_fossils;
+vector<TaxSet> G::_taxsets;
+#endif
 
 double   G::_small_enough      = 0.00001;
 double   G::_infinity          = numeric_limits<double>::infinity();

@@ -51,9 +51,12 @@ namespace proj {
             std::string         _name;
             double              _edge_length;
             Split               _split;
-//            PartialStore::partials_t _partials;
             PartialStore::partial_t _partials;
             unsigned            _position_in_lineages;
+            bool                _set_partials; // true if node is included in likelihood calculation
+            double              _accumulated_height; // only add to this if a parent node is being skipped
+            bool                _use_in_likelihood;
+            int                 _next_real_node; // if the node is not real, set the number of the next node that is real for use in likelihood calculations
 
             // distance from node to any leaf
             double          _height;
@@ -77,6 +80,10 @@ namespace proj {
         _height = 0.0;
         //_partials.clear();
         _partials = nullptr;
+        _set_partials = true;
+        _accumulated_height = 0.0;
+        _use_in_likelihood = true;
+        _next_real_node = -1;
     }
     
     inline void Node::clearPointers() {

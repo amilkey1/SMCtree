@@ -14,7 +14,7 @@ class Particle {
         void                                    operator=(const Particle & other);
         vector<double>                          calcGeneTreeLogLikelihoods();
         double                                  getLogWeight() const {return _log_weight;}
-        void                                    proposal();
+        void                                    proposal(unsigned step_number);
         void                                    showParticle();
         vector<double>                          getGeneTreeLogLikelihoods();
         double                                  getTreeHeight();
@@ -33,9 +33,11 @@ class Particle {
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
 
         string debugSaveParticleInfo(unsigned i) const;
-        void drawLambda();
-        void drawMu();
+        void drawBirthDiff();
+        void drawTurnover();
         void drawRootAge();
+        void calculateLambdaAndMu();
+        void drawLambda();
     
         void calcStartingUPGMAMatrix();
         vector<vector<double>> getStartingUPGMAMatrix();
@@ -50,6 +52,9 @@ class Particle {
     
         Forest                                  _forest;
         double                                  _log_weight;
+#if defined (FOSSILS)
+        unsigned                                _fossil_number;
+#endif
 };
 
     inline string Particle::debugSaveParticleInfo(unsigned i) const {
@@ -76,6 +81,9 @@ class Particle {
 
     inline void Particle::clear() {
         _log_weight = 0.0;
+#if defined (FOSSILS)
+        _fossil_number = 0;
+#endif
       }
 
     inline void Particle::setParticleData(Data::SharedPtr d, bool partials) {
@@ -98,11 +106,43 @@ class Particle {
         return gene_forest_likelihoods;
     }
 
-    inline void Particle::proposal() {
-       _forest.addIncrement(_lot);
-        _log_weight = _forest.joinTaxa(_lot);
-        if (G::_upgma_completion) {
-            _log_weight = _forest.buildRestOfTreeUPGMA();
+    inline void Particle::proposal(unsigned step_number) {
+        double prev_log_likelihood = _forest.getLogLikelihood();
+        
+        bool done = false;
+        
+        while (!done) {
+            // TODO: need to draw an age for each fossil and sort the fossils by age
+            // TODO: for now, just use existing ages
+#if defined (FOSSILS)
+                bool fossil_added = false;
+            if ((_fossil_number < G::_fossils.size()) || (_fossil_number == 0 && G::_fossils.size() == 1)) {
+                fossil_added = _forest.addIncrementFossil(_lot, G::_fossils[_fossil_number]._age, G::_fossils[_fossil_number]._name);
+            }
+            else {
+                fossil_added = _forest.addIncrementFossil(_lot, -1, "placeholder");
+                assert (!fossil_added);
+            }
+            if (fossil_added) {
+                _fossil_number++;
+            }
+#else
+            _forest.addIncrement(_lot);
+#endif
+            _log_weight = _forest.joinTaxa(prev_log_likelihood, _lot);
+            // step is done when log weight is not 0 or when all the lineages are joined and all the fossils have been added
+            if (_log_weight != 0.0 || (_forest._lineages.size() == 1 && _fossil_number == (unsigned) (G::_fossils.size()))) {
+                done = true;
+            }
+            
+            // if you are on the last step and still have fossils to join, keep going
+            if (step_number == (G::_ntaxa-2) && _forest._lineages.size() > 1) {
+                done = false;
+            }
+            
+            if (G::_upgma_completion) {
+                _log_weight = _forest.buildRestOfTreeUPGMA();
+            }
         }
     }
 
@@ -206,25 +246,37 @@ class Particle {
         _forest.buildStartingRow();
     }
 
-    inline void Particle::drawLambda() {
+    inline void Particle::drawBirthDiff() {
         assert (G::_est_lambda);
-        _forest.drawLambda(_lot);
+        assert (G::_est_mu);
+        _forest.drawBirthDiff(_lot);
     }
 
-    inline void Particle::drawMu() {
+    inline void Particle::drawTurnover() {
         assert (G::_est_mu);
-        assert (G::_mu > 0.0);
-        _forest.drawMu(_lot);
+        assert (G::_est_lambda);
+        _forest.drawTurnover(_lot);
     }
 
     inline void Particle::drawRootAge() {
         assert (G::_est_root_age > 0.0);
         _forest.drawRootAge(_lot);
     }
+    
+    inline void Particle::calculateLambdaAndMu() {
+        _forest.calculateLambdaAndMu();
+    }
+
+    inline void Particle::drawLambda() {
+        _forest.drawLambda(_lot);
+    }
 
     inline void Particle::operator=(const Particle & other) {
         _forest = other._forest;
         _log_weight = other._log_weight;
+#if defined (FOSSILS)
+        _fossil_number = other._fossil_number;
+#endif
     }
     
 }

@@ -1,5 +1,9 @@
 #pragma once
 
+#if defined (FOSSILS)
+    #include <codecvt>
+#endif
+
 using boost::filesystem::current_path;
 using boost::algorithm::join;
 using boost::is_any_of;
@@ -41,8 +45,8 @@ namespace proj {
 
             void smc();
             void summarizeData(Data::SharedPtr);
-            void proposeParticles(vector<Particle> &particles);
-            void proposeParticleRange(unsigned first, unsigned last, vector<Particle> &particles);
+            void proposeParticles(vector<Particle> &particles, unsigned step_number);
+            void proposeParticleRange(unsigned first, unsigned last, vector<Particle> &particles, unsigned step_number);
             double filterParticles(unsigned step, vector<Particle> & particles);
             double computeEffectiveSampleSize(const vector<double> & probs) const;
             void writeTreeFile (vector<Particle> &v) const;
@@ -50,6 +54,11 @@ namespace proj {
             void writeLogMarginalLikelihoodFile() const;
             void handleBaseFrequencies();
             void handleRelativeRates();
+        
+#if defined(FOSSILS)
+            Fossil parseFossilDefinition(string & fossil_def);
+            TaxSet parseTaxsetDefinition(string & taxset_def);
+#endif
 
             vector<Particle>     _particle_vec;
         
@@ -75,6 +84,12 @@ namespace proj {
     inline void Proj::processCommandLineOptions(int argc, const char * argv[]) {
         vector<string> partition_subsets;
         variables_map vm;
+        
+#if defined(FOSSILS)
+        vector<string> taxsets;
+        vector<string> fossils;
+#endif
+        
         options_description desc("Allowed options");
         desc.add_options()
         ("help,h", "produce help message")
@@ -104,6 +119,10 @@ namespace proj {
         ("estimate_lambda", boost::program_options::value(&G::_est_lambda)->default_value("false"), "estimate birth rate")
         ("estimate_mu", boost::program_options::value(&G::_est_mu)->default_value("false"), "estimate death rate")
         ("upgma_completion",  value(&G::_upgma_completion)->default_value(true), "complete SMC tree using UPGMA at each step")
+#if defined(FOSSILS)
+        ("fossil",  value(&fossils), "a string defining a fossil, e.g. 'Ursus_abstrusus         1.8–5.3 4.3' (4.3 is time, 1.8-5.3 is prior range)")
+        ("taxset",  value(&taxsets), "a string defining a taxon set, e.g. 'Ursinae: Helarctos_malayanus Melursus_ursinus Ursus_abstrusus Ursus_americanus Ursus_arctos Ursus_maritimus Ursus_spelaeus Ursus_thibetanus'")
+#endif
         ;
         
         store(parse_command_line(argc, argv, desc), vm);
@@ -167,6 +186,11 @@ namespace proj {
             throw XProj(format("must specify a value of mu >= 0 but %d was specified")%G::_mu);
         }
         
+        // If user specified estimate_mu but not estimate_lambda or vice versa, throw an exception
+        if ((G::_est_mu && !G::_est_lambda) || (G::_est_lambda && !G::_est_mu && G::_mu != 0.0)) {
+            throw XProj(format("must estimate both lambda and mu or neither under birth-death model"));
+        }
+        
         // If user specified root age <= 0, throw an exception
         if (G::_root_age <= 0.0) {
             throw XProj(format("must specify a value of root age >= 0 but %d was specified")%G::_root_age);
@@ -176,7 +200,180 @@ namespace proj {
         if (G::_mu == 0.0 && G::_est_mu) {
             output(format("warning: extinction rate specified to be estimated but mean rate set to %d; extinction rate will be set to 0 and Yule model will be used\n")%G::_mu, 1);
         }
+        
+#if defined(FOSSILS)
+        // If user specified --fossil on command line, break specified
+        // fossil definition into species name, taxset name, and age
+        if (vm.count("fossil") > 0) {
+            G::_fossils.clear();
+            for (auto fdef : fossils) {
+                G::_fossils.push_back(parseFossilDefinition(fdef));
+            }
+        }
+        
+        // If user specified --taxset on command line, break specified
+        // taxset definition into name and species included
+        if (vm.count("taxset") > 0) {
+            G::_taxsets.clear();
+            for (auto tdef : taxsets) {
+                G::_taxsets.push_back(parseTaxsetDefinition(tdef));
+            }
+        }
+#endif
     }
+
+#if defined(FOSSILS)
+    // Note: This code is unduly complex because of the fact that there are
+    // many different kinds of dashes that can be used in a utf8-encoded text file.
+    // One solution is to eliminate the dash separating the lower and upper
+    // bounds for the age range, but I felt that using a dash makes it clear that
+    // it is an age range and I didn't want to put the onus on the user to use one
+    // particular kind of dash (especially since I could not figure out how to
+    // use the right kind of dash myself in a text file created using BBEdit).
+    
+    // The ws_to_utf8 and utf8_to_ws functions below are
+    // slightly modified from Galik's answer at
+    // stackoverflow.com/questions/43302279
+    //   /any-good-solutions-for-c-string-code-point-and-code-unit
+    //   /43302460#43302460
+    string ws_to_utf8(wstring const & s) {
+        wstring_convert<codecvt_utf8<wchar_t>, wchar_t> cnv;
+        string utf8 = cnv.to_bytes(s);
+        if(cnv.converted() < s.size())
+            throw XProj("incomplete conversion to utf8");
+        return utf8;
+    }
+
+    wstring utf8_to_ws(string const & utf8) {
+        wstring_convert<codecvt_utf8<wchar_t>, wchar_t> cnv;
+        wstring s = cnv.from_bytes(utf8);
+        if(cnv.converted() < utf8.size())
+            throw XProj("incomplete conversion to wstring");
+        return s;
+    }
+
+    inline Fossil Proj::parseFossilDefinition(string & fossil_def) {
+        // Examples showing range of possible inputs:
+        //   fossil_def = "Ursus_abstrusus 1.8–5.3 4.3"
+        //   fossil_def = "Parictis_montanus      33.90  – 37.20  36.6"
+
+        // Vector to hold strings obtained by parsing fossil_def
+        vector<string> v;
+        
+        // Separate fossil_def into 4 strings:
+        //  v[0] = fossil species name
+        //  v[1] = fossil age lower bound
+        //  v[2] = fossil age upper bound
+        //  v[3] = fossil age
+
+        // regex_pattern specifies string of characters that do not
+        // represent a tab (\u0009), space (\u0020), or dash of any kind:
+        //  \u002D Hyphen-minus
+        //  \u058A Armenian Hyphen
+        //  \u05BE Hebrew Punctuation Maqaf
+        //  \u2010 Hyphen
+        //  \u2011 Non-Breaking Hyphen
+        //  \u2012 Figure Dash
+        //  \u2013 En dash
+        //  \u2014 Em dash
+        //  \u2015 Horizontal bar
+        //  \u2E3A Two-Em Dash
+        //  \u2E3B Three-Em Dash
+        //  \uFE58 Small Em Dash
+        //  \uFE63 Small Hyphen-Minus
+        //  \uFF0D Fullwidth Hyphen-Minus
+        wregex regex_pattern(utf8_to_ws("[^\\u0020\\u0009\\u002D\\u058A\\u05BE\\u2010\\u2011\\u2012\\u2013\\u2014\\u2015\\u2E3A\\u2E3B\\uFE58\\uFE63\\uFF0D]+"));
+
+        // 0 means keep whole match:
+        //     1 would mean keep first match only
+        //     2 would mean keep second match only
+        //     {1,2} would mean keep first and secod matches only
+        //    -1 means use regex_pattern as delimiter
+        wstring ws_fossil_def = utf8_to_ws(fossil_def);
+        wsregex_token_iterator regex_iter(ws_fossil_def.begin(), ws_fossil_def.end(), regex_pattern, 0);
+
+        // regex_end is, by default, signifies the end of the input
+        wsregex_token_iterator regex_end;
+
+        // iterate to get matches
+        for ( ; regex_iter != regex_end; ++regex_iter) {
+            wstring s = *regex_iter;
+            v.push_back(ws_to_utf8(s));
+        }
+
+        string fossil_species_name = v[0];
+        string fossil_age_lower_str  = v[1];
+        string fossil_age_upper_str  = v[2];
+        string fossil_age_str   = v[3];
+        
+        double fossil_age_lower;
+        try {
+            fossil_age_lower = stof(fossil_age_lower_str);
+        }
+        catch (const std::invalid_argument& ia) {
+            throw XProj(format("Could not convert fossil age lower bound \"%s\" to a floating point value") % fossil_age_lower_str);
+        }
+
+        double fossil_age_upper;
+        try {
+            fossil_age_upper = stof(fossil_age_upper_str);
+        }
+        catch (const std::invalid_argument& ia) {
+            throw XProj(format("Could not convert fossil age upper bound \"%s\" to a floating point value") % fossil_age_upper_str);
+        }
+        
+        double fossil_age;
+        try {
+            fossil_age = stof(fossil_age_str);
+        }
+        catch (const std::invalid_argument& ia) {
+            throw XProj(format("Could not convert fossil age \"%s\" to a floating point value") % fossil_age_str);
+        }
+        
+        return Fossil(fossil_species_name, fossil_age_lower, fossil_age_upper, fossil_age);
+    }
+    
+    inline TaxSet Proj::parseTaxsetDefinition(string & taxset_def) {
+        // Example:
+        //   taxset_def = "Ursinae = Helarctos_malayanus Melursus_ursinus Ursus_abstrusus Ursus_americanus Ursus_arctos Ursus_maritimus Ursus_spelaeus Ursus_thibetanus;"
+        vector<string> v;
+        
+        // Separate taxset_def into 2 strings at equal sign:
+        //  v[0] = taxset name
+        //  v[1] = list of species in taxset
+        split(v, taxset_def, boost::is_any_of(":"));
+        if (v.size() != 2)
+            throw XProj(format("Expecting exactly 2 items separated by colon (:) in taxset definition but instead found %d") % v.size());
+        string taxset_name = v[0];
+        string taxset_species_list  = v[1];
+        
+        // Trim whitespace from both ends
+        trim(taxset_name);
+        trim(taxset_species_list);
+        
+        // Separate taxset_species_list into strings separated by spaces
+        
+        // regex_pattern specifies string of characters not a hyphen or whitespace
+        regex regex_pattern("[^\\s]+");
+        
+        // 0 means keep whole match:
+        //     1 would mean keep first match only
+        //     2 would mean keep second match only
+        //     {1,2} would mean keep first and secod matches only
+        //    -1 means use regex_pattern as delimiter
+        sregex_token_iterator regex_iter(taxset_species_list.begin(), taxset_species_list.end(), regex_pattern, 0);
+        
+        // regex_end is, by default, signifies the end of the input
+        sregex_token_iterator regex_end;
+        
+        v.clear();
+        for ( ; regex_iter != regex_end; ++regex_iter) {
+            v.push_back(*regex_iter);
+        }
+        return TaxSet(taxset_name, v);
+    }
+    
+#endif
 
     inline void Proj::handleBaseFrequencies() {
         vector <string> temp;
@@ -292,13 +489,11 @@ namespace proj {
         
         _sim_tree = Forest::SharedPtr(new Forest);
         
-        if (G::_mu > 0.0) {
-            _sim_tree->buildBirthDeathTree();
-        }
-        else {
-            // using birth death function will condition on root age
-            _sim_tree->buildYuleTree();
-        }
+#if defined (INCREMENT_COMPARISON_TEST)
+        _sim_tree->buildBirthDeathTreeTest();
+#else
+        _sim_tree->buildBirthDeathTree();
+#endif
     }
         
     inline void Proj::simulateSave(string fnprefix) {
@@ -436,7 +631,6 @@ namespace proj {
             
             for (unsigned g=0; g<nsteps; g++){
                 
-                
                 // set random number seeds
                 unsigned psuffix = 1;
                 for (auto &p:_particle_vec) {
@@ -447,8 +641,8 @@ namespace proj {
                 unsigned step_plus_one = g+1;
                 output(format("Step %d of %d.\n") % step_plus_one % nsteps, 1);
                 
-                proposeParticles(_particle_vec);
-                
+                proposeParticles(_particle_vec, g);
+                                
 //                debugSaveParticleVectorInfo("debug-proposed.txt", g+1);
                 
                 double ess = filterParticles(g, _particle_vec);
@@ -579,11 +773,11 @@ namespace proj {
         return ess;
     }
 
-    inline void Proj::proposeParticles(vector<Particle> & particles) {
+    inline void Proj::proposeParticles(vector<Particle> & particles, unsigned step_number) {
         assert(G::_nthreads > 0);
         if (G::_nthreads == 1) {
           for (auto & p : particles) {
-              p.proposal();
+              p.proposal(step_number);
           }
         }
         else {
@@ -609,7 +803,7 @@ namespace proj {
                     last = G::_nparticles;
                 }
                 
-                threads.push_back(thread(&Proj::proposeParticleRange, this, first, last, std::ref(particles)));
+                threads.push_back(thread(&Proj::proposeParticleRange, this, first, last, std::ref(particles), step_number));
             }
 
 
@@ -620,9 +814,9 @@ namespace proj {
         }
     }
 
-    inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle> &particles) {
+    inline void Proj::proposeParticleRange(unsigned first, unsigned last, vector<Particle> &particles, unsigned step_number) {
         for (unsigned i=first; i<last; i++){
-            particles[i].proposal();
+            particles[i].proposal(step_number);
         }
     }
 
@@ -659,11 +853,16 @@ namespace proj {
              psuffix += 2;
              
              if (G::_est_lambda) {
-                 p.drawLambda();
-             }
-             
-             if (G::_est_mu && G::_mu > 0.0) {
-                 p.drawMu();
+                 assert (G::_est_mu);
+                 if (G::_mu > 0.0) {
+                     p.drawBirthDiff();
+                     p.drawTurnover();
+                     p.calculateLambdaAndMu();
+                 }
+                 else {
+                     // Yule model
+                     p.drawLambda();
+                 }
              }
              
              if (G::_est_root_age) {
@@ -685,6 +884,14 @@ namespace proj {
                 particle_num++;
             }
         }
+        
+#if defined (FOSSILS)
+        // sort fossils from youngest to oldest for use in later proposal
+        sort(G::_fossils.begin(), G::_fossils.end(), [](Fossil & left, Fossil & right) {
+            return left._age < right._age;
+        });
+        // TODO: for now, set root age to at least the largest fossil age
+#endif
     }
 
     inline void Proj::writeTreeFile(vector<Particle> &particles) const {
