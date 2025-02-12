@@ -88,6 +88,7 @@ namespace proj {
 #if defined(FOSSILS)
         vector<string> taxsets;
         vector<string> fossils;
+        vector<string> sim_fossils;
 #endif
         
         options_description desc("Allowed options");
@@ -122,6 +123,7 @@ namespace proj {
 #if defined(FOSSILS)
         ("fossil",  value(&fossils), "a string defining a fossil, e.g. 'Ursus_abstrusus         1.8–5.3 4.3' (4.3 is time, 1.8-5.3 is prior range)")
         ("taxset",  value(&taxsets), "a string defining a taxon set, e.g. 'Ursinae: Helarctos_malayanus Melursus_ursinus Ursus_abstrusus Ursus_americanus Ursus_arctos Ursus_maritimus Ursus_spelaeus Ursus_thibetanus'")
+        ("simfossil",  value(&sim_fossils), "a string defining a fossil, e.g. 'Ursus_abstrusus         1.8–5.3 4.3' (4.3 is time, 1.8-5.3 is prior range)")
 #endif
         ;
         
@@ -208,6 +210,15 @@ namespace proj {
             G::_fossils.clear();
             for (auto fdef : fossils) {
                 G::_fossils.push_back(parseFossilDefinition(fdef));
+            }
+        }
+        
+        // If user specified --simfossil on command line, break specified
+        // fossil definition into species name, taxset name, and age
+        if (vm.count("simfossil") > 0) {
+            G::_sim_fossils.clear();
+            for (auto fdef : sim_fossils) {
+                G::_sim_fossils.push_back(parseFossilDefinition(fdef));
             }
         }
         
@@ -445,7 +456,6 @@ namespace proj {
         
         // Simulate the tree
         simulateTree();
-        
         // Interrogate _partition to determine number of genes, gene names, and
         // number of sites in each gene
         G::_nloci = _partition->getNumSubsets();
@@ -469,7 +479,7 @@ namespace proj {
         // Simulate data for each locus given the tree
         unsigned starting_site = 0;
         for (unsigned g = 0; g < G::_nloci; ++g) {
-            _sim_tree->simulateData(::rng, _data, starting_site, G::_nsites_per_locus[g]);
+            _sim_tree->simulateData(::rng, _data, starting_site, G::_nsites_per_locus[g]); // TODO: account for fossil in simulation
             starting_site += G::_nsites_per_locus[g];
         }
         
@@ -645,6 +655,9 @@ namespace proj {
                                 
 //                debugSaveParticleVectorInfo("debug-proposed.txt", g+1);
                 
+//                for (auto &p:_particle_vec) {
+//                    p.showParticle();
+//                }
                 double ess = filterParticles(g, _particle_vec);
                 output(format("     ESS = %d\n") % ess, 2);
                 

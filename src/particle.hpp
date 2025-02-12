@@ -116,24 +116,40 @@ class Particle {
             // TODO: for now, just use existing ages
 #if defined (FOSSILS)
                 bool fossil_added = false;
-            if ((_fossil_number < G::_fossils.size()) || (_fossil_number == 0 && G::_fossils.size() == 1)) {
-                fossil_added = _forest.addIncrementFossil(_lot, G::_fossils[_fossil_number]._age, G::_fossils[_fossil_number]._name);
-            }
-            else {
-                fossil_added = _forest.addIncrementFossil(_lot, -1, "placeholder");
-                assert (!fossil_added);
-            }
-            if (fossil_added) {
-                _fossil_number++;
+            bool done_adding_increment = false;
+            
+            while (!done_adding_increment) {
+                // loop through until you have ended on a non-fossil increment added
+                if ((_fossil_number < G::_fossils.size()) || (_fossil_number == 0 && G::_fossils.size() == 1)) {
+                    fossil_added = _forest.addIncrementFossil(_lot, G::_fossils[_fossil_number]._age, G::_fossils[_fossil_number]._name);
+                    if (fossil_added) {
+                        _fossil_number++;
+                        done_adding_increment = false;
+                    }
+                    else {
+                        done_adding_increment = true;
+                    }
+                }
+                else {
+                    fossil_added = _forest.addIncrementFossil(_lot, -1, "placeholder");
+                    assert (!fossil_added);
+                    done_adding_increment = true;
+                }
             }
 #else
             _forest.addIncrement(_lot);
 #endif
             _log_weight = _forest.joinTaxa(prev_log_likelihood, _lot);
             // step is done when log weight is not 0 or when all the lineages are joined and all the fossils have been added
+#if defined (FOSSILS)
             if (_log_weight != 0.0 || (_forest._lineages.size() == 1 && _fossil_number == (unsigned) (G::_fossils.size()))) {
                 done = true;
             }
+#else
+            if (_log_weight != 0.0 || (_forest._lineages.size() == 1)) {
+                done = true;
+            }
+#endif
             
             // if you are on the last step and still have fossils to join, keep going
             if (step_number == (G::_ntaxa-2) && _forest._lineages.size() > 1) {
