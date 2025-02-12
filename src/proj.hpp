@@ -479,7 +479,7 @@ namespace proj {
         // Simulate data for each locus given the tree
         unsigned starting_site = 0;
         for (unsigned g = 0; g < G::_nloci; ++g) {
-            _sim_tree->simulateData(::rng, _data, starting_site, G::_nsites_per_locus[g]); // TODO: account for fossil in simulation
+            _sim_tree->simulateData(::rng, _data, starting_site, G::_nsites_per_locus[g]);
             starting_site += G::_nsites_per_locus[g];
         }
         
@@ -903,7 +903,12 @@ namespace proj {
         sort(G::_fossils.begin(), G::_fossils.end(), [](Fossil & left, Fossil & right) {
             return left._age < right._age;
         });
-        // TODO: for now, set root age to at least the largest fossil age
+        
+        for (auto &f:G::_fossils) {
+            if (G::_root_age < f._age) {
+                throw XProj(format("Root age set to %d but oldest fossil has age %d; root age must be older than fossils")% G::_root_age % f._age);
+            }
+        }
 #endif
     }
 

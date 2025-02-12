@@ -282,11 +282,9 @@ class Forest {
         Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(i);
         _first_pattern = gene_begin_end.first;
         
-//        for (auto &nd:_lineages) {
         for (auto &nd:_nodes) {
-//            if (nd->_set_partials) { // TODO: ignore fossils in likelihood calculations
             if (nd._use_in_likelihood) {
-                assert (nd._partials != nullptr);
+                assert (nd._partials != nullptr); // ignore fossils and fake nodes in likelihood calculations
                 double log_like = 0.0;
                 for (unsigned p=_first_pattern; p<_npatterns + _first_pattern; p++) {
                     double site_like = 0.0;
@@ -407,7 +405,7 @@ class Forest {
         // Draw n-1 internal node heights and store in vector heights
         vector<double> heights(n - 1, 0.0);
         
-        double rho = 1.0; // TODO: for now, assume rho = 1.0
+        double rho = 1.0;
         
         double birth_rate = G::_lambda;
         if (_estimated_lambda > 0.0) {
@@ -418,7 +416,6 @@ class Forest {
         if (_estimated_mu > 0.0) {
             death_rate = _estimated_mu;
         }
-            // TODO: be careful
             _estimated_root_age = 1.0;
         double exp_death_minus_birth = exp(death_rate - birth_rate);
         double phi = 0.0;
@@ -455,13 +452,6 @@ class Forest {
                     n = getNumLineages();
                 }
         }
-        
-        // lorad only works if all topologies the same - then don't include the prior on joins because it is fixed
-//        double rate = 0.0; // TODO: need to modify this for birth-death
-//        rate = getNumLineages() * birth_rate;
-//        double increment_prior = (log(rate)-t*rate);
-        
-//        _increments_and_priors.push_back(make_pair(t, increment_prior));
         }
         cout << "stop";
     }
@@ -546,15 +536,12 @@ class Forest {
 
                 new_nd->_name = fossil_name + "_FOSSIL";
                 new_nd->_set_partials = false; // do not include this node in likelihood calculation
-//                new_nd->_edge_length = edge_len;
-//                new_nd->_accumulated_height = edge_len; // TODO: add height here or not?
-                // TODO: I think no, then go back and draw another increment
+                // don't add anything to fossil edge length; go back and draw another increment
                 new_nd->_position_in_lineages = (unsigned) _lineages.size();
                 new_nd->_use_in_likelihood = false;
                 _lineages.push_back(new_nd);
                 
                 fossil_added = true;
-//                showForest();
             }
         }
             
@@ -784,7 +771,6 @@ class Forest {
     inline double Forest::joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot) {
         // find the new_nd from the previous step and accumulate height if needed
         
-//        // TODO: does this work if two fossils sister?
         // if lineages.back() is a fossil, go to the previous node
         unsigned end_node = (unsigned) _lineages.size() - 1;
         Node *node_to_check = _lineages[end_node];
@@ -1841,17 +1827,11 @@ class Forest {
         
 # if defined (FOSSILS)
         nd = findNextPreorder(nd);
-//        bool done = false;
-        
-        showForest();
-        
-        // TODO: if the root node is not a real node, need to find the first real one to start with
-        
+                
         while (nd) {
             if (nd->_set_partials) {
                 ndnum = nd->_number;
-//                assert(ndnum < nnodes);
-
+                
                 // Get reference to parent sequence
                 assert(nd->_parent);
                 
@@ -1861,13 +1841,14 @@ class Forest {
                 Node parent = _nodes[parnum];
                 
                 while (!parent_found) {
-                    if (!parent._set_partials) {
+                    if (!parent._set_partials) { // if parent is not a real node, use its parent
                         if (parent._parent) {
                             parnum = parent._parent->_number;
                             parent = _nodes[parnum];
                         }
                         else {
                             skip_node = true;
+                            // skip node if the parent is not a real node and neither is its parent
                             parent_found = true;
                         }
                     }
@@ -1876,49 +1857,27 @@ class Forest {
                     }
                 }
                 
-                // TODO: check if the parent is not a real node and neither is its parent
-
-                // if parent is not a real node, use its parent
-                // TODO: what if the parent is not a real node either then skip this node entirely?
-//                while(!parent._set_partials) {
-//                if (!parent._set_partials) { // TODO: what if root node is not real?
-//                    assert (parent._parent);
-////                    if (parent._parent) {
-//                        parnum = parent._parent->_number;
-//                        parent = _nodes[parnum];
-//                }
-//                    }
-//                    else {
-//                        done = true;
-//                    }
-                    
-//                    if (!done) {
                 if (!skip_node) {
-                        assert (_nodes[parnum]._set_partials);
-//                        assert(parnum < nnodes);
+                    assert (_nodes[parnum]._set_partials);
                         
                         // Evolve nd's sequence given parent's sequence and edge length
-                            for (unsigned i = 0; i < nsites; i++) {
-                                // Choose relative rate for this site
-                                double site_relrate = 1.0;
-                                if (G::_asrv_shape != G::_infinity)
-                                    site_relrate = lot->gamma(G::_asrv_shape, 1.0/G::_asrv_shape);
-//                                unsigned from_state = sequences[parnum][i];
-                                unsigned from_state = sequences[_nodes[parnum]._renumber][i];
-                                double cum_prob = 0.0;
-                                double u = lot->uniform();
-                                for (unsigned to_state = 0; to_state < 4; to_state++) {
-                                    cum_prob += calcSimTransitionProbability(from_state, to_state, basefreq, site_relrate*nd->_accumulated_height);
-                                    if (u < cum_prob) {
-//                                        sequences[ndnum][i] = to_state;
-                                        sequences[_nodes[ndnum]._renumber][i] = to_state;
-                                        break;
-                                    }
-                                }
-//                                assert(sequences[ndnum][i] < 4);
-                                assert(sequences[_nodes[ndnum]._renumber][i] < 4);
+                    for (unsigned i = 0; i < nsites; i++) {
+                        // Choose relative rate for this site
+                        double site_relrate = 1.0;
+                        if (G::_asrv_shape != G::_infinity)
+                            site_relrate = lot->gamma(G::_asrv_shape, 1.0/G::_asrv_shape);
+                        unsigned from_state = sequences[_nodes[parnum]._renumber][i];
+                        double cum_prob = 0.0;
+                        double u = lot->uniform();
+                        for (unsigned to_state = 0; to_state < 4; to_state++) {
+                            cum_prob += calcSimTransitionProbability(from_state, to_state, basefreq, site_relrate*nd->_accumulated_height);
+                            if (u < cum_prob) {
+                                sequences[_nodes[ndnum]._renumber][i] = to_state;
+                                break;
                             }
-//                    }
+                        }
+                        assert(sequences[_nodes[ndnum]._renumber][i] < 4);
+                    }
                 }
             }
             // else, node is not a real node and should not be included in the data
@@ -2223,12 +2182,6 @@ inline void Forest::buildBirthDeathTree() {
         advanceAllLineagesBy(t);
 #endif
         
-//#if defined (FOSSILS)
-//        for (auto &nd:_lineages) {
-//            nd->_accumulated_height += t;
-//        }
-//#endif
-        
         joinRandomLineagePair(rng);
     }
 #else
@@ -2280,7 +2233,7 @@ inline void Forest::buildBirthDeathTree() {
 #endif
     assert(getNumLineages() == 1);
 
-    // Scale all edge lengths by G::_sim_root_age
+    // Scale all edge lengths by G::_sim_root_age // TODO: what happens to the fossil age if the root is not 1.0?
     scaleAllEdgeLengthsBy(G::_sim_root_age);
     
     refreshPreorder();
@@ -2297,7 +2250,7 @@ inline void Forest::buildBirthDeathTree() {
         unsigned nsteps = G::_ntaxa - 1;
         double cum_height = 0.0;
 //        for (unsigned i = 0; i < nsteps; i++) {
-            for (unsigned i = 0; i < 2; i++) { // TODO: be careful
+            for (unsigned i = 0; i < 2; i++) {
             // Determine number of lineages remaining
             unsigned n = getNumLineages();
                 if (i == 1) {
@@ -2338,10 +2291,6 @@ inline void Forest::buildBirthDeathTree() {
             logf << a;
             logf << "\t" << heights[7] - heights[6] << endl;
             }
-            
-            // TODO: uncomment these
-//            advanceAllLineagesBy(t);
-//            joinRandomLineagePair(rng);
         }
         }
 #else
@@ -2388,25 +2337,7 @@ inline void Forest::buildBirthDeathTree() {
         //         +--+--+ i = 3
             
         }
-        
-        // TODO: be careful
-//        double t0 = 0.0;
-//        for (unsigned i = 0; i < n - 1; i++) {
-//            double t = heights[i];
-//            double dt = t - t0;
-//            advanceAllLineagesBy(dt);
-//            joinRandomLineagePair(rng);
-//            t0 = t;
-//        }
 #endif
-
-// TODO: be careful
-//        assert(getNumLineages() == 1);
-//
-//        // Scale all edge lengths by G::_sim_root_age
-//        scaleAllEdgeLengthsBy(G::_sim_root_age);
-//
-//        refreshPreorder();
     }
 #endif
 
