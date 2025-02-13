@@ -140,6 +140,7 @@ class Particle {
             _forest.addIncrement(_lot);
 #endif
             _log_weight = _forest.joinTaxa(prev_log_likelihood, _lot);
+//            _forest.showForest();
             // step is done when log weight is not 0 or when all the lineages are joined and all the fossils have been added
 #if defined (FOSSILS)
             if (_log_weight != 0.0 || (_forest._lineages.size() == 1 && _fossil_number == (unsigned) (G::_fossils.size()))) {

@@ -292,6 +292,9 @@ class Forest {
                         double partial = (*nd._partials)[p*G::_nstates+s];
                         site_like += 0.25*partial;
                     }
+                    if (site_like == 0) {
+                        showForest();
+                    }
                     assert(site_like>0);
                     log_like += log(site_like)*counts[p];
                 }
@@ -453,7 +456,6 @@ class Forest {
                 }
         }
         }
-        cout << "stop";
     }
 #endif
 
@@ -771,6 +773,7 @@ class Forest {
     inline double Forest::joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot) {
         // find the new_nd from the previous step and accumulate height if needed
         
+        // TODO: somewhere, node 5 needs to have next real node set, and it's not being set - why?
         // if lineages.back() is a fossil, go to the previous node
         unsigned end_node = (unsigned) _lineages.size() - 1;
         Node *node_to_check = _lineages[end_node];
@@ -787,30 +790,50 @@ class Forest {
             }
         }
         
-        if (!node_to_check->_set_partials &&node_to_check->_left_child) {
-            if (!boost::ends_with(node_to_check->_left_child->_name, "FOSSIL")) {
-                // add extra branch length to the next node
-                int next_node = node_to_check->_left_child->_next_real_node;
-                if (next_node > -1) {
-                    _nodes[next_node]._accumulated_height += node_to_check->_edge_length;
-                    node_to_check->_next_real_node = _nodes[next_node]._number;
-                }
-                else {
-                    node_to_check->_left_child->_accumulated_height += node_to_check->_edge_length;
-                    node_to_check->_next_real_node = node_to_check->_left_child->_number;
-                }
-            }
-            else if (!boost::ends_with(node_to_check->_left_child->_right_sib->_name, "FOSSIL")) {
-                // add extra branch length to the next node
-                // can't accumulate to a fake node - if the node is fake, find its next real node
-                int next_node = node_to_check->_left_child->_right_sib->_next_real_node;
-                if (next_node > -1) {
-                    _nodes[next_node]._accumulated_height += node_to_check->_edge_length;
-                    node_to_check->_next_real_node = _nodes[next_node]._number;
-                }
-                else {
-                    node_to_check->_left_child->_right_sib->_accumulated_height += node_to_check->_edge_length;
-                    node_to_check->_next_real_node = node_to_check->_left_child->_right_sib->_number;
+        int next_node = -1;
+        
+        
+        // TODO: if either of a node's children is not real, that node is not real either
+//        if (!node_to_check->_set_partials &&node_to_check->_left_child) { // TODO: can't accumulate to a fake node - if the node in question is fake, go to its next real node and accumulate height onto that node
+//            if (!boost::ends_with(node_to_check->_left_child->_name, "FOSSIL")) {
+//                // add extra branch length to the next node
+//                next_node = node_to_check->_left_child->_next_real_node;
+//                if (next_node > -1) {
+//                    _nodes[next_node]._accumulated_height += node_to_check->_edge_length;
+////                    node_to_check->_next_real_node = _nodes[next_node]._number;
+//                }
+//                else {
+//                    if (node_to_check->_left_child->_set_partials) {
+//                        node_to_check->_left_child->_accumulated_height += node_to_check->_edge_length;
+////                        node_to_check->_next_real_node = node_to_check->_left_child->_number;
+//                    }
+//                }
+//            }
+//            else if (!boost::ends_with(node_to_check->_left_child->_right_sib->_name, "FOSSIL")) {
+//                // add extra branch length to the next node
+//                // can't accumulate to a fake node - if the node is fake, find its next real node
+//                next_node = node_to_check->_left_child->_right_sib->_next_real_node;
+//                if (next_node > -1) {
+//                    _nodes[next_node]._accumulated_height += node_to_check->_edge_length;
+////                    node_to_check->_next_real_node = _nodes[next_node]._number;
+//                }
+//                else {
+//                    if (node_to_check->_left_child->_right_sib->_set_partials) {
+//                        node_to_check->_left_child->_right_sib->_accumulated_height += node_to_check->_edge_length;
+////                        node_to_check->_next_real_node = node_to_check->_left_child->_right_sib->_number;
+//                    }
+//                }
+//            }
+//        }
+        
+        // TODO: can speed this up? for now, at every step, go through every node and reset accumulated height to 0
+        // TODO: if a node is fake, add its edge length to its next node accumulated height
+        for (auto &nd:_nodes) {
+            nd._accumulated_height = nd._edge_length;
+            if (!nd._set_partials && !boost::ends_with(nd._name, "FOSSIL")) {
+                int next_node = nd._next_real_node;
+                if (next_node != -1) {
+                    _nodes[next_node]._accumulated_height += nd._edge_length;
                 }
             }
         }
@@ -832,7 +855,8 @@ class Forest {
         }
         
         pair <unsigned, unsigned> t = make_pair (0, 1); // if there is only choice, 0 and 1 will be chosen
-        
+//        t = make_pair(_lineages.size()-1, _lineages.size()-2);
+        // TODO: BE CAREFUL
         if (nlineages > 2) {
             t = chooseTaxaToJoin(nlineages, lot);
         }
@@ -852,23 +876,51 @@ class Forest {
         subtree2->_parent=new_nd;
         
         // if subtree1 or subtree2 is a fossil, set partials to false for the new node
-        if (boost::ends_with(subtree1->_name, "FOSSIL") || boost::ends_with(subtree2->_name, "FOSSIL")) {
+//        if (boost::ends_with(subtree1->_name, "FOSSIL") || boost::ends_with(subtree2->_name, "FOSSIL")) {
+        // if new node has any child that is not a real node (set partials = false) and has no next node (next node != -1), the new node is not a real node either
+        bool fake_node = false;
+        if (!subtree1->_set_partials) {
+            int next_node = subtree1->_next_real_node;
+            if (next_node == -1) {
+                fake_node = true;
+            }
+            else {
+                if (next_node == -1 && !_nodes[next_node]._set_partials) {
+                    fake_node = true;
+                }
+            }
+        }
+        
+        if (!subtree2->_set_partials) {
+            int next_node = subtree2->_next_real_node;
+            if (next_node == -1) {
+                fake_node = true;
+            }
+            else {
+                if (next_node == -1 && !_nodes[next_node]._set_partials) {
+                    fake_node = true;
+                }
+            }
+        }
+//        if (!subtree1->_set_partials || !subtree2->_set_partials) {
+        if (fake_node) {
             new_nd->_set_partials = false;
             new_nd->_use_in_likelihood = false;
+            // TODO: here, set next real node?
         }
         // check if both of child's children are fossils
-        if (subtree1->_left_child) {
-            if (boost::ends_with(subtree1->_left_child->_name, "FOSSIL") && boost::ends_with(subtree1->_left_child->_right_sib->_name, "FOSSIL")) {
-                new_nd->_set_partials = false;
-                new_nd->_use_in_likelihood = false;
-            }
-        }
-        if (subtree2->_left_child) {
-            if (boost::ends_with(subtree2->_left_child->_name, "FOSSIL") && boost::ends_with(subtree2->_left_child->_right_sib->_name, "FOSSIL")) {
-                new_nd->_set_partials = false;
-                new_nd->_use_in_likelihood = false;
-            }
-        }
+//        if (subtree1->_left_child) {
+//            if (boost::ends_with(subtree1->_left_child->_name, "FOSSIL") && boost::ends_with(subtree1->_left_child->_right_sib->_name, "FOSSIL")) {
+//                new_nd->_set_partials = false;
+//                new_nd->_use_in_likelihood = false;
+//            }
+//        }
+//        if (subtree2->_left_child) {
+//            if (boost::ends_with(subtree2->_left_child->_name, "FOSSIL") && boost::ends_with(subtree2->_left_child->_right_sib->_name, "FOSSIL")) {
+//                new_nd->_set_partials = false;
+//                new_nd->_use_in_likelihood = false;
+//            }
+//        }
 
         if (new_nd->_set_partials) {
             // calculate new partials
@@ -945,7 +997,47 @@ class Forest {
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
 
         for (unsigned index = 0; index<G::_nloci; index++) {
+//            showForest();
             calcSubsetLogLikelihood(index); // TODO: work on likelihood
+        }
+        
+        // after a new node is created, check if it's fake
+        // if it is, set the next real node
+        if (!new_nd->_set_partials) {
+            if (new_nd->_left_child) {
+                if (!boost::ends_with(new_nd->_left_child->_name, "FOSSIL")) {
+                    // if new node's left child is not a fossil, use it to find the next real node
+                    int next_node = new_nd->_left_child->_next_real_node;
+                    if (next_node > -1) {
+                        new_nd->_next_real_node = new_nd->_left_child->_number;
+                    }
+                    else {
+                        if (new_nd->_left_child->_set_partials) {
+                            new_nd->_next_real_node = new_nd->_left_child->_number;
+                        }
+                    }
+                }
+                if (!boost::ends_with(new_nd->_left_child->_right_sib->_name, "FOSSIL")) { // TODO: if or else if?
+                    int next_node = new_nd->_left_child->_right_sib->_next_real_node;
+                    if (next_node > -1) {
+                        new_nd->_next_real_node = new_nd->_left_child->_right_sib->_number;
+                    }
+                    else {
+                        if (new_nd->_left_child->_right_sib->_set_partials) {
+                            new_nd->_next_real_node = new_nd->_left_child->_right_sib->_number;
+                        }
+                    }
+                }
+            }
+//            if (new_nd->_left_child) {
+//                if (!new_nd->_left_child->_set_partials && !boost::ends_with(new_nd->_name, "FOSSIL")) { // if new node's left child is fake but not a fossil, find the next real node
+//                    new_nd->_next_real_node = new_nd->_left_child->_next_real_node;
+//                }
+//
+//                else {
+//                    new_nd->_next_real_node = new_nd->_left_child->_number;
+//                }
+//            }
         }
         
         double new_log_likelihood = 0.0;
@@ -1235,7 +1327,6 @@ class Forest {
                 }
                 
                 if (child->_set_partials) {
-//                    if (child->_partials == nullptr || child->_number == next_real_node) {
                     if (child->_partials == nullptr) {
                         child->_partials = ps.getPartial(npatterns_total*G::_nstates);
                         calcPartialArray(child);
