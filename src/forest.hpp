@@ -940,7 +940,6 @@ class Forest {
                     }
                 }
             }
-                
             calcPartialArray(new_nd);
             
             subtree1->_use_in_likelihood = false;
@@ -997,7 +996,6 @@ class Forest {
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
 
         for (unsigned index = 0; index<G::_nloci; index++) {
-//            showForest();
             calcSubsetLogLikelihood(index); // TODO: work on likelihood
         }
         
@@ -1882,7 +1880,7 @@ class Forest {
         }
         
 #if defined (FOSSILS)
-        // TODO: need to skip some nodes - renumber the nodes?
+        // skip some nodes by renumbering everything
         unsigned new_node_number = 0;
         for (auto &nd:_nodes) {
             if (nd._set_partials) {
@@ -2177,9 +2175,9 @@ class Forest {
     
 
 inline void Forest::buildBirthDeathTree() {
-    int fossil_number = -1;
+    int fossil_number = 0;
 # if defined (FOSSILS)
-    fossil_number = (unsigned) G::_sim_fossils.size() - 1;
+//    fossil_number = (unsigned) G::_sim_fossils.size() - 1;
     // sort fossils from youngest to oldest for use in later proposal
     sort(G::_sim_fossils.begin(), G::_sim_fossils.end(), [](Fossil & left, Fossil & right) {
         return left._age < right._age;
@@ -2228,7 +2226,7 @@ inline void Forest::buildBirthDeathTree() {
         double t = heights[0]*(1.0 - cum_height);
         
 # if defined (FOSSILS)
-        if (fossil_number >= 0) {
+        if (fossil_number < G::_sim_fossils.size()) {
             if (cum_height + t > G::_sim_fossils[fossil_number]._age) {
                 // add fossil
                 t = G::_sim_fossils[fossil_number]._age - cum_height;
@@ -2249,7 +2247,7 @@ inline void Forest::buildBirthDeathTree() {
                 new_nd->_use_in_likelihood = false;
                 _lineages.push_back(new_nd);
                 
-                fossil_number--;
+                fossil_number++;
             }
             else {
                 for (auto &nd:_lineages) {
@@ -2324,7 +2322,7 @@ inline void Forest::buildBirthDeathTree() {
 #endif
     assert(getNumLineages() == 1);
 
-    // Scale all edge lengths by G::_sim_root_age // TODO: what happens to the fossil age if the root is not 1.0?
+    // Scale all edge lengths by G::_sim_root_age
     scaleAllEdgeLengthsBy(G::_sim_root_age);
     
     refreshPreorder();
