@@ -39,8 +39,8 @@ class Forest {
         void refreshPreorder();
         double calcSubsetLogLikelihood(unsigned i);
         void addIncrement(Lot::SharedPtr lot);
-        double joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot);
-        double joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot);
+        pair<double, bool> joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot);
+        pair<double, bool> joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot);
         double joinPriorPost(Lot::SharedPtr lot);
         pair<pair<Node*, Node*>, double> chooseAllPairs(Lot::SharedPtr lot);
         void calcPartialArray(Node* new_nd);
@@ -590,16 +590,18 @@ class Forest {
 #endif
     }
 
-    inline double Forest::joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot) {
+    inline pair<double, bool> Forest::joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot) {
         double log_weight = 0.0;
+        pair<double, bool> output;
+        
         if (G::_proposal == "prior-prior") {
-            log_weight = joinPriorPrior(prev_log_likelihood, lot);
+            output = joinPriorPrior(prev_log_likelihood, lot);
         }
         else {
             log_weight = joinPriorPost(lot);
         }
 
-        return log_weight;
+        return output;
     }
 
     inline double Forest::joinPriorPost(Lot::SharedPtr lot) {
@@ -770,7 +772,8 @@ class Forest {
          return make_tuple(subtree1, subtree2, new_nd);
      }
 
-    inline double Forest::joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot) {
+    inline pair<double, bool> Forest::joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot) {
+        bool filter = false;
         // find the new_nd from the previous step and accumulate height if needed
         
         // TODO: somewhere, node 5 needs to have next real node set, and it's not being set - why?
@@ -902,25 +905,11 @@ class Forest {
                 }
             }
         }
-//        if (!subtree1->_set_partials || !subtree2->_set_partials) {
+
         if (fake_node) {
             new_nd->_set_partials = false;
             new_nd->_use_in_likelihood = false;
-            // TODO: here, set next real node?
         }
-        // check if both of child's children are fossils
-//        if (subtree1->_left_child) {
-//            if (boost::ends_with(subtree1->_left_child->_name, "FOSSIL") && boost::ends_with(subtree1->_left_child->_right_sib->_name, "FOSSIL")) {
-//                new_nd->_set_partials = false;
-//                new_nd->_use_in_likelihood = false;
-//            }
-//        }
-//        if (subtree2->_left_child) {
-//            if (boost::ends_with(subtree2->_left_child->_name, "FOSSIL") && boost::ends_with(subtree2->_left_child->_right_sib->_name, "FOSSIL")) {
-//                new_nd->_set_partials = false;
-//                new_nd->_use_in_likelihood = false;
-//            }
-//        }
 
         if (new_nd->_set_partials) {
             // calculate new partials
@@ -942,10 +931,10 @@ class Forest {
             }
             calcPartialArray(new_nd);
             
+            filter = true;
+            
             subtree1->_use_in_likelihood = false;
             subtree2->_use_in_likelihood = false;
-//            subtree1->_partials = nullptr;
-//            subtree2->_partials = nullptr;
         }
         
         else {
@@ -988,15 +977,11 @@ class Forest {
             }
         }
         
-        // throw away subtree partials now, no longer needed
-//        subtree1->_partials=nullptr;
-//        subtree2->_partials=nullptr;
-        
         //update node lists
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
 
         for (unsigned index = 0; index<G::_nloci; index++) {
-            calcSubsetLogLikelihood(index); // TODO: work on likelihood
+            calcSubsetLogLikelihood(index);
         }
         
         // after a new node is created, check if it's fake
@@ -1027,15 +1012,6 @@ class Forest {
                     }
                 }
             }
-//            if (new_nd->_left_child) {
-//                if (!new_nd->_left_child->_set_partials && !boost::ends_with(new_nd->_name, "FOSSIL")) { // if new node's left child is fake but not a fossil, find the next real node
-//                    new_nd->_next_real_node = new_nd->_left_child->_next_real_node;
-//                }
-//
-//                else {
-//                    new_nd->_next_real_node = new_nd->_left_child->_number;
-//                }
-//            }
         }
         
         double new_log_likelihood = 0.0;
@@ -1053,7 +1029,7 @@ class Forest {
         
         calcTopologyPrior(getNumLineages() +1);
         
-        return log_weight;
+        return make_pair(log_weight, filter);
     }
 
     inline void Forest::updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode) {

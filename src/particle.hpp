@@ -45,6 +45,10 @@ class Particle {
         vector<map<Node*,  unsigned>> getStartingRowCount();
         void setStartingRowCount(vector<map<Node*,  unsigned>> starting_row_count_by_gene);
         void calcStartingRowCount();
+#if defined (FOSSILS)
+        void setFossils() {_particle_fossils = G::_fossils;}
+        void drawFossilAges();
+#endif
     
     private:
         mutable                                 Lot::SharedPtr _lot;
@@ -54,6 +58,7 @@ class Particle {
         double                                  _log_weight;
 #if defined (FOSSILS)
         unsigned                                _fossil_number;
+        vector<Fossil>                          _particle_fossils; // each particle needs it own set of fossils with their own ages
 #endif
 };
 
@@ -121,7 +126,8 @@ class Particle {
             while (!done_adding_increment) {
                 // loop through until you have ended on a non-fossil increment added
                 if ((_fossil_number < G::_fossils.size()) || (_fossil_number == 0 && G::_fossils.size() == 1)) {
-                    fossil_added = _forest.addIncrementFossil(_lot, G::_fossils[_fossil_number]._age, G::_fossils[_fossil_number]._name);
+//                    fossil_added = _forest.addIncrementFossil(_lot, G::_fossils[_fossil_number]._age, G::_fossils[_fossil_number]._name);
+                    fossil_added = _forest.addIncrementFossil(_lot, _particle_fossils[_fossil_number]._age, _particle_fossils[_fossil_number]._name);
                     if (fossil_added) {
                         _fossil_number++;
                         done_adding_increment = false;
@@ -139,11 +145,14 @@ class Particle {
 #else
             _forest.addIncrement(_lot);
 #endif
-            _log_weight = _forest.joinTaxa(prev_log_likelihood, _lot);
-//            _forest.showForest();
+            pair<double, bool> output = _forest.joinTaxa(prev_log_likelihood, _lot);
+            _log_weight = output.first;
+            bool filter = output.second;
             // step is done when log weight is not 0 or when all the lineages are joined and all the fossils have been added
 #if defined (FOSSILS)
-            if (_log_weight != 0.0 || (_forest._lineages.size() == 1 && _fossil_number == (unsigned) (G::_fossils.size()))) {
+            // TODO: if the branch is really long, joining nodes will not change the likelihood
+//            if (_log_weight != 0.0 || (_forest._lineages.size() == 1 && _fossil_number == (unsigned) (_particle_fossils.size()))) {
+            if (filter || (_forest._lineages.size() == 1 && _fossil_number == (unsigned) (_particle_fossils.size()))) {
                 done = true;
             }
 #else
@@ -161,6 +170,7 @@ class Particle {
                 _log_weight = _forest.buildRestOfTreeUPGMA();
             }
         }
+//        _forest.showForest();
     }
 
     inline void Particle::showParticle() {
@@ -288,11 +298,23 @@ class Particle {
         _forest.drawLambda(_lot);
     }
 
+    inline void Particle::drawFossilAges() {
+        // draw an age for each fossil, using the upper and lower bounds as specified
+         for (auto &f:_particle_fossils) {
+            f._age = _lot->uniformConstrained(f._lower, f._upper); // TODO: unsure if this lot function is working correctly
+        }
+        
+        sort(_particle_fossils.begin(), _particle_fossils.end(), [](Fossil & left, Fossil & right) {
+            return left._age < right._age;
+        });
+    }
+
     inline void Particle::operator=(const Particle & other) {
         _forest = other._forest;
         _log_weight = other._log_weight;
 #if defined (FOSSILS)
         _fossil_number = other._fossil_number;
+        _particle_fossils = other._particle_fossils;
 #endif
     }
     
