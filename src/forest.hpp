@@ -776,7 +776,6 @@ class Forest {
         bool filter = false;
         // find the new_nd from the previous step and accumulate height if needed
         
-        // TODO: somewhere, node 5 needs to have next real node set, and it's not being set - why?
         // if lineages.back() is a fossil, go to the previous node
         unsigned end_node = (unsigned) _lineages.size() - 1;
         Node *node_to_check = _lineages[end_node];
@@ -792,45 +791,8 @@ class Forest {
                 done = true;
             }
         }
-        
-        int next_node = -1;
-        
-        
-        // TODO: if either of a node's children is not real, that node is not real either
-//        if (!node_to_check->_set_partials &&node_to_check->_left_child) { // TODO: can't accumulate to a fake node - if the node in question is fake, go to its next real node and accumulate height onto that node
-//            if (!boost::ends_with(node_to_check->_left_child->_name, "FOSSIL")) {
-//                // add extra branch length to the next node
-//                next_node = node_to_check->_left_child->_next_real_node;
-//                if (next_node > -1) {
-//                    _nodes[next_node]._accumulated_height += node_to_check->_edge_length;
-////                    node_to_check->_next_real_node = _nodes[next_node]._number;
-//                }
-//                else {
-//                    if (node_to_check->_left_child->_set_partials) {
-//                        node_to_check->_left_child->_accumulated_height += node_to_check->_edge_length;
-////                        node_to_check->_next_real_node = node_to_check->_left_child->_number;
-//                    }
-//                }
-//            }
-//            else if (!boost::ends_with(node_to_check->_left_child->_right_sib->_name, "FOSSIL")) {
-//                // add extra branch length to the next node
-//                // can't accumulate to a fake node - if the node is fake, find its next real node
-//                next_node = node_to_check->_left_child->_right_sib->_next_real_node;
-//                if (next_node > -1) {
-//                    _nodes[next_node]._accumulated_height += node_to_check->_edge_length;
-////                    node_to_check->_next_real_node = _nodes[next_node]._number;
-//                }
-//                else {
-//                    if (node_to_check->_left_child->_right_sib->_set_partials) {
-//                        node_to_check->_left_child->_right_sib->_accumulated_height += node_to_check->_edge_length;
-////                        node_to_check->_next_real_node = node_to_check->_left_child->_right_sib->_number;
-//                    }
-//                }
-//            }
-//        }
-        
+
         // TODO: can speed this up? for now, at every step, go through every node and reset accumulated height to 0
-        // TODO: if a node is fake, add its edge length to its next node accumulated height
         for (auto &nd:_nodes) {
             nd._accumulated_height = nd._edge_length;
             if (!nd._set_partials && !boost::ends_with(nd._name, "FOSSIL")) {
@@ -858,8 +820,6 @@ class Forest {
         }
         
         pair <unsigned, unsigned> t = make_pair (0, 1); // if there is only choice, 0 and 1 will be chosen
-//        t = make_pair(_lineages.size()-1, _lineages.size()-2);
-        // TODO: BE CAREFUL
         if (nlineages > 2) {
             t = chooseTaxaToJoin(nlineages, lot);
         }
@@ -878,8 +838,6 @@ class Forest {
         subtree1->_parent=new_nd;
         subtree2->_parent=new_nd;
         
-        // if subtree1 or subtree2 is a fossil, set partials to false for the new node
-//        if (boost::ends_with(subtree1->_name, "FOSSIL") || boost::ends_with(subtree2->_name, "FOSSIL")) {
         // if new node has any child that is not a real node (set partials = false) and has no next node (next node != -1), the new node is not a real node either
         bool fake_node = false;
         if (!subtree1->_set_partials) {
@@ -931,7 +889,7 @@ class Forest {
             }
             calcPartialArray(new_nd);
             
-            filter = true;
+            filter = true; // must filter if a real node has been added
             
             subtree1->_use_in_likelihood = false;
             subtree2->_use_in_likelihood = false;

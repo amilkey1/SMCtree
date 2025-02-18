@@ -117,8 +117,6 @@ class Particle {
         bool done = false;
         
         while (!done) {
-            // TODO: need to draw an age for each fossil and sort the fossils by age
-            // TODO: for now, just use existing ages
 #if defined (FOSSILS)
                 bool fossil_added = false;
             bool done_adding_increment = false;
@@ -126,7 +124,6 @@ class Particle {
             while (!done_adding_increment) {
                 // loop through until you have ended on a non-fossil increment added
                 if ((_fossil_number < G::_fossils.size()) || (_fossil_number == 0 && G::_fossils.size() == 1)) {
-//                    fossil_added = _forest.addIncrementFossil(_lot, G::_fossils[_fossil_number]._age, G::_fossils[_fossil_number]._name);
                     fossil_added = _forest.addIncrementFossil(_lot, _particle_fossils[_fossil_number]._age, _particle_fossils[_fossil_number]._name);
                     if (fossil_added) {
                         _fossil_number++;
@@ -150,8 +147,7 @@ class Particle {
             bool filter = output.second;
             // step is done when log weight is not 0 or when all the lineages are joined and all the fossils have been added
 #if defined (FOSSILS)
-            // TODO: if the branch is really long, joining nodes will not change the likelihood
-//            if (_log_weight != 0.0 || (_forest._lineages.size() == 1 && _fossil_number == (unsigned) (_particle_fossils.size()))) {
+            // if the branch is really long, joining nodes will not change the likelihood
             if (filter || (_forest._lineages.size() == 1 && _fossil_number == (unsigned) (_particle_fossils.size()))) {
                 done = true;
             }
@@ -170,7 +166,6 @@ class Particle {
                 _log_weight = _forest.buildRestOfTreeUPGMA();
             }
         }
-//        _forest.showForest();
     }
 
     inline void Particle::showParticle() {
