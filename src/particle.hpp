@@ -48,6 +48,7 @@ class Particle {
 #if defined (FOSSILS)
         void setFossils() {_particle_fossils = G::_fossils;}
         void drawFossilAges();
+        void setParticleTaxSets();
 #endif
     
     private:
@@ -59,6 +60,7 @@ class Particle {
 #if defined (FOSSILS)
         unsigned                                _fossil_number;
         vector<Fossil>                          _particle_fossils; // each particle needs it own set of fossils with their own ages
+        vector<TaxSet>                          _particle_taxsets; // update this as nodes are joined
 #endif
 };
 
@@ -120,8 +122,10 @@ class Particle {
 #if defined (FOSSILS)
                 bool fossil_added = false;
             bool done_adding_increment = false;
+            bool valid = false;
             
-            while (!done_adding_increment) {
+            while (!done_adding_increment || !valid) {
+                _forest._valid_taxsets.clear();
                 // loop through until you have ended on a non-fossil increment added
                 if ((_fossil_number < G::_fossils.size()) || (_fossil_number == 0 && G::_fossils.size() == 1)) {
                     fossil_added = _forest.addIncrementFossil(_lot, _particle_fossils[_fossil_number]._age, _particle_fossils[_fossil_number]._name);
@@ -138,11 +142,14 @@ class Particle {
                     assert (!fossil_added);
                     done_adding_increment = true;
                 }
+                
+                // check that at least one taxon set is valid
+                valid = _forest.checkForValidTaxonSet(_particle_taxsets);
             }
 #else
             _forest.addIncrement(_lot);
 #endif
-            pair<double, bool> output = _forest.joinTaxa(prev_log_likelihood, _lot);
+            pair<double, bool> output = _forest.joinTaxa(prev_log_likelihood, _lot, _particle_taxsets);
             _log_weight = output.first;
             bool filter = output.second;
             // step is done when log weight is not 0 or when all the lineages are joined and all the fossils have been added
@@ -304,12 +311,17 @@ class Particle {
         });
     }
 
+    inline void Particle::setParticleTaxSets() {
+        _particle_taxsets = G::_taxsets;
+    }
+
     inline void Particle::operator=(const Particle & other) {
         _forest = other._forest;
         _log_weight = other._log_weight;
 #if defined (FOSSILS)
         _fossil_number = other._fossil_number;
         _particle_fossils = other._particle_fossils;
+        _particle_taxsets = other._particle_taxsets;
 #endif
     }
     

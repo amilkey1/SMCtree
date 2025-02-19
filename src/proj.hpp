@@ -899,10 +899,10 @@ namespace proj {
         }
         
 #if defined (FOSSILS)
-        // TODO: draw a separate age for each particle
         for (auto &p:particles) {
             p.setFossils();
-            p.drawFossilAges();
+            p.drawFossilAges(); // draw a separate fossil age for each particle
+            p.setParticleTaxSets();
         }
         // sort fossils from youngest to oldest for use in later proposal
         sort(G::_fossils.begin(), G::_fossils.end(), [](Fossil & left, Fossil & right) {

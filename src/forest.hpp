@@ -39,8 +39,8 @@ class Forest {
         void refreshPreorder();
         double calcSubsetLogLikelihood(unsigned i);
         void addIncrement(Lot::SharedPtr lot);
-        pair<double, bool> joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot);
-        pair<double, bool> joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot);
+        pair<double, bool> joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset);
+        pair<double, bool> joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset);
         double joinPriorPost(Lot::SharedPtr lot);
         pair<pair<Node*, Node*>, double> chooseAllPairs(Lot::SharedPtr lot);
         void calcPartialArray(Node* new_nd);
@@ -91,6 +91,7 @@ class Forest {
         bool addIncrementFossil(Lot::SharedPtr lot, double age, string fossil_name);
         bool addBirthDeathIncrementFossil(Lot::SharedPtr lot, double age, string fossil_name);
         double calcTransitionProbabilityFossil(Node* child, double s, double s_child, unsigned locus);
+        bool checkForValidTaxonSet(vector<TaxSet> taxset);
 #endif
     
         Data::SharedPtr _data;
@@ -119,6 +120,7 @@ class Forest {
     
 #if defined (FOSSILS)
         double _tree_height;
+        vector<bool> _valid_taxsets;
 #endif
 };
 
@@ -177,6 +179,7 @@ class Forest {
         _previous_upgma_log_likelihood = 0.0;
 #if defined (FOSSILS)
         _tree_height = 0.0;
+        _valid_taxsets.clear();
 #endif
     }
 
@@ -590,12 +593,12 @@ class Forest {
 #endif
     }
 
-    inline pair<double, bool> Forest::joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot) {
+    inline pair<double, bool> Forest::joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset) {
         double log_weight = 0.0;
         pair<double, bool> output;
         
         if (G::_proposal == "prior-prior") {
-            output = joinPriorPrior(prev_log_likelihood, lot);
+            output = joinPriorPrior(prev_log_likelihood, lot, taxset);
         }
         else {
             log_weight = joinPriorPost(lot);
@@ -772,12 +775,14 @@ class Forest {
          return make_tuple(subtree1, subtree2, new_nd);
      }
 
-    inline pair<double, bool> Forest::joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot) {
+    inline pair<double, bool> Forest::joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset) {
         bool filter = false;
         // find the new_nd from the previous step and accumulate height if needed
         
         // if lineages.back() is a fossil, go to the previous node
         unsigned end_node = (unsigned) _lineages.size() - 1;
+        vector<unsigned> set_counts;
+        
         Node *node_to_check = _lineages[end_node];
         
         // check for the new node that was added in the previous step
@@ -791,6 +796,8 @@ class Forest {
                 done = true;
             }
         }
+        
+        int chosen_taxset = -1;
 
         // TODO: can speed this up? for now, at every step, go through every node and reset accumulated height to 0
         for (auto &nd:_nodes) {
@@ -820,12 +827,110 @@ class Forest {
         }
         
         pair <unsigned, unsigned> t = make_pair (0, 1); // if there is only choice, 0 and 1 will be chosen
-        if (nlineages > 2) {
-            t = chooseTaxaToJoin(nlineages, lot);
+        if (taxset.size() > 0) {
+            // if no taxsets, can choose any remaining nodes
+            vector<double> set_sizes;
+            bool taxa_not_included_in_sets = false;
+            unsigned total_nodes_in_sets = 0;
+            
+            vector<string> names_of_nodes_in_sets;
+            for (auto &t:taxset) {
+                for (auto &n:t._species_included) {
+                    names_of_nodes_in_sets.push_back(n);
+                }
+            }
+            
+            for (unsigned t=0; t<taxset.size(); t++) {
+                if (_valid_taxsets[t]) {
+                    set_sizes.push_back((unsigned) taxset[t]._species_included.size());
+                    set_counts.push_back(t);
+                    total_nodes_in_sets += (unsigned) taxset[t]._species_included.size();
+                }
+            }
+                
+                unsigned nnodes = (unsigned) _lineages.size();
+                
+                for (auto &nd:_lineages) {
+                    if (std::find(names_of_nodes_in_sets.begin(), names_of_nodes_in_sets.end(), nd->_name) != names_of_nodes_in_sets.end()) {
+                        nnodes--;
+                    }
+                }
+                
+                if (nnodes > 1) {
+                    taxa_not_included_in_sets = true;
+                    set_counts.push_back((unsigned) taxset.size());
+                    set_sizes.push_back(nnodes);
+                    total_nodes_in_sets += nnodes;
+                }
+            
+            vector<double> set_probabilities = set_sizes;
+            unsigned total_choices = 0;
+            
+            for (unsigned s=0; s<set_sizes.size(); s++) {
+                unsigned num_choices = (set_sizes[s] * (set_sizes[s] - 1)) / 2;
+                set_probabilities[s] = num_choices;
+                total_choices += num_choices;
+            } // TODO: if 3 choices and one is a fossil, must join the fossil next - what about multiple fossils?
+            
+            for (auto &s:set_probabilities) {
+                s /= total_choices;
+            }
+            
+            assert (set_probabilities.size() > 0);
+            
+            unsigned chosen_set = G::multinomialDraw(lot, set_probabilities);
+            
+            t = chooseTaxaToJoin(set_sizes[chosen_set], lot);
+            
+            if (taxa_not_included_in_sets && chosen_set == set_sizes.size()-1) {
+                int nd_count = -1;
+                
+                for (auto &nd:_lineages) {
+                    if (std::find(names_of_nodes_in_sets.begin(), names_of_nodes_in_sets.end(), nd->_name) != names_of_nodes_in_sets.end()) {
+                        // TODO: put something here?
+                    }
+                    else {
+                        nd_count++;
+                    }
+                    
+                    if (nd_count == t.first && subtree1 == NULL) {
+                        subtree1 = nd;
+                    }
+                    else if (nd_count == t.second && subtree2 == NULL) {
+                        subtree2 = nd;
+                    }
+                }
+                // TODO: make sure fossils are not the last thing to join - if there are only 3 nodes left and one is a fossil, must join the fossil
+            }
+            else {
+                chosen_taxset = chosen_set;
+                
+                string name1 = taxset[chosen_set]._species_included[t.first];
+                string name2 = taxset[chosen_set]._species_included[t.second];
+                
+                bool found1 = false;
+                bool found2 = false;
+                for (auto &nd:_lineages) {
+                    if (nd->_name == name1) {
+                        subtree1 = nd;
+                        found1 = true;
+                    }
+                    else if (nd->_name == name2) {
+                        subtree2 = nd;
+                        found2 = true;
+                    }
+                }
+                assert (found1);
+                assert (found2);
+            }
         }
-        
-        subtree1 = _lineages[t.first];
-        subtree2 = _lineages[t.second];
+        else {
+            if (nlineages > 2) {
+                t = chooseTaxaToJoin(nlineages, lot);
+            }
+            subtree1 = _lineages[t.first];
+            subtree2 = _lineages[t.second];
+        }
         
         assert (subtree1 != subtree2);
 
@@ -937,6 +1042,17 @@ class Forest {
         
         //update node lists
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+        
+        // TODO: update taxset
+        if (chosen_taxset != -1) {
+            taxset[chosen_taxset]._species_included.erase(remove(taxset[chosen_taxset]._species_included.begin(), taxset[chosen_taxset]._species_included.end(), subtree1->_name));
+            taxset[chosen_taxset]._species_included.erase(remove(taxset[chosen_taxset]._species_included.begin(), taxset[chosen_taxset]._species_included.end(), subtree2->_name));
+            taxset[chosen_taxset]._species_included.push_back(new_nd->_name);
+            
+            if (taxset[chosen_taxset]._species_included.size() == 1) {
+                taxset.erase(taxset.begin() + chosen_taxset);
+            }
+        }
 
         for (unsigned index = 0; index<G::_nloci; index++) {
             calcSubsetLogLikelihood(index);
@@ -986,6 +1102,8 @@ class Forest {
        }
         
         calcTopologyPrior(getNumLineages() +1);
+        
+        _valid_taxsets.clear();
         
         return make_pair(log_weight, filter);
     }
@@ -1387,6 +1505,85 @@ class Forest {
     }
 
 #if defined (FOSSILS)
+    inline bool Forest::checkForValidTaxonSet(vector<TaxSet> taxset) {
+        bool valid = false;
+        unsigned taxa_in_taxset = 0;
+        
+        vector<string> names_of_nodes_in_sets;
+        for (auto &t:taxset) {
+            for (auto &n:t._species_included) {
+                names_of_nodes_in_sets.push_back(n);
+            }
+        }
+        
+        for (auto &t:taxset) {
+            // if taxset size is > 3, it's valid
+            if (t._species_included.size() > 3) {
+                valid = true;
+            }
+            else if (t._species_included.size() == 3) {
+                // TODO: if not, need to check that all taxa in the set are included in lineages
+                bool found1 = false;
+                bool found2 = false;
+                bool found3 = false;
+                for (auto &nd:_lineages) {
+                    if (nd->_name == t._species_included[0]) {
+                        found1 = true;
+                    }
+                    else if (nd->_name == t._species_included[1]) {
+                        found2 = true;
+                    }
+                    if (nd->_name == t._species_included[2]) {
+                        found3 = true;
+                    }
+                }
+                if (found1 && found2 && found3) {
+                    valid = true;
+                }
+            }
+            else if (t._species_included.size() == 2) {
+                bool found1 = false;
+                bool found2 = false;
+                for (auto &nd:_lineages) {
+                    if (nd->_name == t._species_included[0]) {
+                        found1 = true;
+                    }
+                    else if (nd->_name == t._species_included[1]) {
+                        found2 = true;
+                    }
+                }
+                if (found1 && found2) {
+                    valid = true;
+                }
+            }
+            taxa_in_taxset += t._species_included.size();
+            _valid_taxsets.push_back(valid);
+        }
+        
+        // if valid = false, check ifthere are any taxa that are not in the taxset
+        // if >1 taxon not in the taxset, valid = true
+//        if (G::_ntaxa + G::_fossils.size() - taxa_in_taxset > 1) { // TODO: this isn't right - how to figure out what is left over
+//            valid = true;
+//        }
+        unsigned nnodes = (unsigned) _lineages.size();
+        
+        for (auto &nd:_lineages) {
+            if (std::find(names_of_nodes_in_sets.begin(), names_of_nodes_in_sets.end(), nd->_name) != names_of_nodes_in_sets.end()) {
+                nnodes--;
+            }
+        }
+        
+        if (nnodes > 1) {
+            valid = true;
+        }
+        
+        _valid_taxsets.push_back(valid);
+        
+        return valid;
+    }
+#endif
+
+#if defined (FOSSILS)
     inline double Forest::calcTransitionProbabilityFossil(Node* child, double s, double s_child, unsigned locus) {
         // this function uses accumulated branch lengths for the likelihood calculations
         double relative_rate = G::_double_relative_rates[locus];
@@ -1650,6 +1847,7 @@ class Forest {
         _turnover = other._turnover;
 #if defined (FOSSILS)
         _tree_height = other._tree_height;
+        _valid_taxsets = other._valid_taxsets;
 #endif
         
         _starting_row.clear();
@@ -1980,6 +2178,7 @@ class Forest {
         new_nd->clear();
         new_nd->_number = _nleaves + _ninternals;
         new_nd->_split.resize(G::_ntaxa);
+        new_nd->_name=boost::str(boost::format("node-%d")%new_nd->_number);
 
         // Increment number of internals
         _ninternals++;
