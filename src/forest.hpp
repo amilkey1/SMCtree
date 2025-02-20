@@ -840,37 +840,63 @@ class Forest {
                 }
             }
             
+            // TODO: for now, don't worry about overlapping taxsets
+            vector<vector<unsigned>> node_choices;
+            
+            // figure out which taxon set choices are valid (exist in _lineages)
             for (unsigned t=0; t<taxset.size(); t++) {
                 if (_valid_taxsets[t]) {
-                    set_sizes.push_back((unsigned) taxset[t]._species_included.size());
+                    node_choices.resize(node_choices.size() + 1);
+                    unsigned real_count = 0;
+                    for (auto &n:taxset[t]._species_included) {
+                        for (unsigned l=0; l<_lineages.size(); l++) {
+                            if (_lineages[l]->_name == n) {
+                                node_choices[node_choices.size()-1].push_back(_lineages[l]->_position_in_lineages);
+                                real_count++;
+                                break;
+                            }
+                        }
+                    }
+//                    set_sizes.push_back((unsigned) taxset[t]._species_included.size());
+                    set_sizes.push_back((unsigned) node_choices.back().size());
                     set_counts.push_back(t);
-                    total_nodes_in_sets += (unsigned) taxset[t]._species_included.size();
+//                    total_nodes_in_sets += (unsigned) taxset[t]._species_included.size();
+                    total_nodes_in_sets += (unsigned) node_choices.back().size();
                 }
             }
                 
-                unsigned nnodes = (unsigned) _lineages.size();
+            unsigned nnodes = (unsigned) _lineages.size();
                 
-                for (auto &nd:_lineages) {
-                    if (std::find(names_of_nodes_in_sets.begin(), names_of_nodes_in_sets.end(), nd->_name) != names_of_nodes_in_sets.end()) {
-                        nnodes--;
-                    }
+            vector<unsigned> nodes_not_in_taxon_sets;
+            for (auto &nd:_lineages) {
+                if (std::find(names_of_nodes_in_sets.begin(), names_of_nodes_in_sets.end(), nd->_name) != names_of_nodes_in_sets.end()) {
+                    nnodes--;
                 }
+                else {
+                    // node is not in the taxon sets
+                    nodes_not_in_taxon_sets.push_back(nd->_position_in_lineages);
+                }
+            }
                 
-                if (nnodes > 1) {
-                    taxa_not_included_in_sets = true;
-                    set_counts.push_back((unsigned) taxset.size());
-                    set_sizes.push_back(nnodes);
-                    total_nodes_in_sets += nnodes;
-                }
+            if (nnodes > 1) {
+                assert (_valid_taxsets.back()); // last taxset must be valid
+                taxa_not_included_in_sets = true;
+                set_counts.push_back((unsigned) taxset.size());
+                set_sizes.push_back(nnodes);
+                node_choices.push_back(nodes_not_in_taxon_sets);
+                total_nodes_in_sets += nnodes;
+            }
             
             vector<double> set_probabilities = set_sizes;
             unsigned total_choices = 0;
             
             for (unsigned s=0; s<set_sizes.size(); s++) {
-                unsigned num_choices = (set_sizes[s] * (set_sizes[s] - 1)) / 2;
+                // TODO: need to figure out how many real nodes are in the taxon set
+                unsigned num_choices = (unsigned) (node_choices[s].size() * (node_choices[s].size() - 1)) / 2;
+//                unsigned num_choices = (set_sizes[s] * (set_sizes[s] - 1)) / 2;
                 set_probabilities[s] = num_choices;
                 total_choices += num_choices;
-            } // TODO: if 3 choices and one is a fossil, must join the fossil next - what about multiple fossils?
+            }
             
             for (auto &s:set_probabilities) {
                 s /= total_choices;
@@ -878,51 +904,66 @@ class Forest {
             
             assert (set_probabilities.size() > 0);
             
-            unsigned chosen_set = G::multinomialDraw(lot, set_probabilities);
+            chosen_taxset = G::multinomialDraw(lot, set_probabilities); // TODO: chosen taxset is only among the valid ones
+            unsigned node_choice_index = chosen_taxset;
             
-            t = chooseTaxaToJoin(set_sizes[chosen_set], lot);
+            int taxset_count = -1;
+            for (unsigned v=0; v<_valid_taxsets.size(); v++) {
+                if (_valid_taxsets[v]) {
+                    taxset_count++;
+                }
+                if (taxset_count == chosen_taxset) {
+                    chosen_taxset = v;
+                    break;
+                }
+            }
             
-            if (taxa_not_included_in_sets && chosen_set == set_sizes.size()-1) {
-                int nd_count = -1;
-                
-                for (auto &nd:_lineages) {
-                    if (std::find(names_of_nodes_in_sets.begin(), names_of_nodes_in_sets.end(), nd->_name) != names_of_nodes_in_sets.end()) {
-                        // TODO: put something here?
-                    }
-                    else {
-                        nd_count++;
-                    }
-                    
-                    if (nd_count == t.first && subtree1 == NULL) {
-                        subtree1 = nd;
-                    }
-                    else if (nd_count == t.second && subtree2 == NULL) {
-                        subtree2 = nd;
-                    }
-                }
-                // TODO: make sure fossils are not the last thing to join - if there are only 3 nodes left and one is a fossil, must join the fossil
-            }
-            else {
-                chosen_taxset = chosen_set;
-                
-                string name1 = taxset[chosen_set]._species_included[t.first];
-                string name2 = taxset[chosen_set]._species_included[t.second];
-                
-                bool found1 = false;
-                bool found2 = false;
-                for (auto &nd:_lineages) {
-                    if (nd->_name == name1) {
-                        subtree1 = nd;
-                        found1 = true;
-                    }
-                    else if (nd->_name == name2) {
-                        subtree2 = nd;
-                        found2 = true;
-                    }
-                }
-                assert (found1);
-                assert (found2);
-            }
+            t = chooseTaxaToJoin(set_sizes[node_choice_index], lot);
+            
+            
+            subtree1 = _lineages[node_choices[node_choice_index][t.first]];
+            subtree2 = _lineages[node_choices[node_choice_index][t.second]];
+            
+//            if (taxa_not_included_in_sets && chosen_set == set_sizes.size()-1) {
+//                int nd_count = -1;
+//
+//                for (auto &nd:_lineages) {
+//                    if (std::find(names_of_nodes_in_sets.begin(), names_of_nodes_in_sets.end(), nd->_name) != names_of_nodes_in_sets.end()) {
+//                        // TODO: put something here?
+//                    }
+//                    else {
+//                        nd_count++;
+//                    }
+//
+//                    if (nd_count == t.first && subtree1 == NULL) {
+//                        subtree1 = nd;
+//                    }
+//                    else if (nd_count == t.second && subtree2 == NULL) {
+//                        subtree2 = nd;
+//                    }
+//                }
+//            }
+//            else {
+//                chosen_taxset = chosen_set;
+//
+//                string name1 = taxset[chosen_set]._species_included[t.first];
+//                string name2 = taxset[chosen_set]._species_included[t.second];
+//
+//                bool found1 = false;
+//                bool found2 = false;
+//                for (auto &nd:_lineages) {
+//                    if (nd->_name == name1) {
+//                        subtree1 = nd;
+//                        found1 = true;
+//                    }
+//                    else if (nd->_name == name2) {
+//                        subtree2 = nd;
+//                        found2 = true;
+//                    }
+//                }
+//                assert (found1);
+//                assert (found2);
+//            }
         }
         else {
             if (nlineages > 2) {
@@ -1043,8 +1084,10 @@ class Forest {
         //update node lists
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
         
+        // TODO: if down to one speceis in a taxon set, need to delete it? and update taxon sets as things are joined
         // TODO: update taxset
-        if (chosen_taxset != -1) {
+        // TODO: don't need to upate taxset if it's not a real set (just leftover nodes)
+        if (chosen_taxset != -1 && chosen_taxset != _valid_taxsets.size()-1) { // nothing to update if this was not a real taxon set
             taxset[chosen_taxset]._species_included.erase(remove(taxset[chosen_taxset]._species_included.begin(), taxset[chosen_taxset]._species_included.end(), subtree1->_name));
             taxset[chosen_taxset]._species_included.erase(remove(taxset[chosen_taxset]._species_included.begin(), taxset[chosen_taxset]._species_included.end(), subtree2->_name));
             taxset[chosen_taxset]._species_included.push_back(new_nd->_name);
@@ -1507,8 +1550,7 @@ class Forest {
 #if defined (FOSSILS)
     inline bool Forest::checkForValidTaxonSet(vector<TaxSet> taxset) {
         bool valid = false;
-        unsigned taxa_in_taxset = 0;
-        
+                
         vector<string> names_of_nodes_in_sets;
         for (auto &t:taxset) {
             for (auto &n:t._species_included) {
@@ -1517,54 +1559,34 @@ class Forest {
         }
         
         for (auto &t:taxset) {
-            // if taxset size is > 3, it's valid
-            if (t._species_included.size() > 3) {
+            // if there are at least two nodes in the set that existing in _lineages, it's valid
+            unsigned real_count = 0;
+                for (auto &nd:_lineages) {
+                    if (!valid) { // if already valid, can stop looking
+                        for (auto &name:t._species_included) {
+                            if (nd->_name == name) {
+                                real_count++;
+                                if (real_count == 2) {
+                                    valid = true;
+                                }
+                                break;
+                            }
+                            if (real_count == 2) {
+                                valid = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            
+            if (real_count == t._species_included.size()) {
                 valid = true;
             }
-            else if (t._species_included.size() == 3) {
-                // TODO: if not, need to check that all taxa in the set are included in lineages
-                bool found1 = false;
-                bool found2 = false;
-                bool found3 = false;
-                for (auto &nd:_lineages) {
-                    if (nd->_name == t._species_included[0]) {
-                        found1 = true;
-                    }
-                    else if (nd->_name == t._species_included[1]) {
-                        found2 = true;
-                    }
-                    if (nd->_name == t._species_included[2]) {
-                        found3 = true;
-                    }
-                }
-                if (found1 && found2 && found3) {
-                    valid = true;
-                }
-            }
-            else if (t._species_included.size() == 2) {
-                bool found1 = false;
-                bool found2 = false;
-                for (auto &nd:_lineages) {
-                    if (nd->_name == t._species_included[0]) {
-                        found1 = true;
-                    }
-                    else if (nd->_name == t._species_included[1]) {
-                        found2 = true;
-                    }
-                }
-                if (found1 && found2) {
-                    valid = true;
-                }
-            }
-            taxa_in_taxset += t._species_included.size();
             _valid_taxsets.push_back(valid);
-        }
+            valid = false;
+            }
         
-        // if valid = false, check ifthere are any taxa that are not in the taxset
-        // if >1 taxon not in the taxset, valid = true
-//        if (G::_ntaxa + G::_fossils.size() - taxa_in_taxset > 1) { // TODO: this isn't right - how to figure out what is left over
-//            valid = true;
-//        }
+        // check if there are any taxa that are not in the taxset
         unsigned nnodes = (unsigned) _lineages.size();
         
         for (auto &nd:_lineages) {
@@ -1579,7 +1601,15 @@ class Forest {
         
         _valid_taxsets.push_back(valid);
         
-        return valid;
+        bool at_least_one_valid = false;
+        for (unsigned v=0; v<_valid_taxsets.size(); v++) {
+            if (_valid_taxsets[v]) {
+                at_least_one_valid = true;
+                break;
+            }
+        }
+        
+        return at_least_one_valid;
     }
 #endif
 
