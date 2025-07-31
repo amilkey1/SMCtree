@@ -39,7 +39,7 @@ class Forest {
         void refreshPreorder();
         double calcSubsetLogLikelihood(unsigned i);
         void addIncrement(Lot::SharedPtr lot);
-        pair<double, bool> joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset);
+        pair<double, bool> joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, bool last_step);
         pair<double, bool> joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset);
         double joinPriorPost(Lot::SharedPtr lot);
         pair<pair<Node*, Node*>, double> chooseAllPairs(Lot::SharedPtr lot);
@@ -82,13 +82,8 @@ class Forest {
         void addYuleTreeIncrement(Lot::SharedPtr lot);
         void addBirthDeathTreeIncrement(Lot::SharedPtr lot);
     
-        void buildStartingUPGMAMatrix();
-        void buildStartingRow();
-        double buildRestOfTreeUPGMA();
-        void debugShowDistanceMatrix(const vector<double> & d) const;
-    
 #if defined (FOSSILS)
-        bool addIncrementFossil(Lot::SharedPtr lot, double age, string fossil_name);
+        bool addIncrementFossil(Lot::SharedPtr lot, double age, string fossil_name, bool last_step);
         bool addBirthDeathIncrementFossil(Lot::SharedPtr lot, double age, string fossil_name);
         double calcTransitionProbabilityFossil(Node* child, double s, double s_child, unsigned locus);
         bool checkForValidTaxonSet(vector<TaxSet> taxset);
@@ -104,19 +99,13 @@ class Forest {
         unsigned _ninternals;
         unsigned _nleaves;
         double _log_joining_prob;
-        vector<pair<double, double>> _increments_and_priors;
+        vector<double> _increments;
         vector<pair<Node*, Node*>> _node_choices;
         double _estimated_lambda;
         double _estimated_mu;
         double _estimated_root_age;
         double _estimated_birth_difference;
         double _turnover;
-    
-        stack<Node *> _upgma_additions;
-        map<Node *, double> _upgma_starting_edgelen;
-        vector<double> _starting_dij;
-        map<Node*,  unsigned> _starting_row;
-        double _previous_upgma_log_likelihood;
     
 #if defined (FOSSILS)
         double _tree_height;
@@ -164,19 +153,14 @@ class Forest {
         _gene_tree_log_likelihoods.clear();
         _ninternals = 0;
         _log_joining_prob = 0.0;
-        _increments_and_priors.clear();
+        _increments.clear();
         _nleaves = 0;
         _node_choices.clear();
         _estimated_lambda = G::_lambda;
         _estimated_mu = G::_mu;
         _estimated_root_age = G::_root_age;
-        _upgma_additions = stack<Node*>();
-        _upgma_starting_edgelen.clear();
-        _starting_dij.clear();
-        _starting_row.clear();
         _estimated_birth_difference = 0.0;
         _turnover = 0.0;
-        _previous_upgma_log_likelihood = 0.0;
 #if defined (FOSSILS)
         _tree_height = 0.0;
         _valid_taxsets.clear();
@@ -330,7 +314,7 @@ class Forest {
         // lorad only works if all topologies the same - then don't include the prior on joins because it is fixed
         double increment_prior = (log(rate)-increment*rate);
                     
-        _increments_and_priors.push_back(make_pair(increment, increment_prior));
+        _increments.push_back(increment);
     }
 
     inline void Forest::addBirthDeathTreeIncrement(Lot::SharedPtr lot) {
@@ -388,7 +372,7 @@ class Forest {
         rate = getNumLineages() * birth_rate;
         double increment_prior = (log(rate)-t*rate);
         
-        _increments_and_priors.push_back(make_pair(t, increment_prior));
+        _increments.push_back(increment_prior);
     }
 
 #if defined (INCREMENT_COMPARISON_TEST)
@@ -463,11 +447,180 @@ class Forest {
 #endif
 
 #if defined (FOSSILS)
-    bool Forest::addIncrementFossil(Lot::SharedPtr lot, double age, string fossil_name) {
+    bool Forest::addIncrementFossil(Lot::SharedPtr lot, double age, string fossil_name, bool last_step) {
         bool fossil_added = addBirthDeathIncrementFossil(lot, age, fossil_name);
         return fossil_added;
     }
 
+//    bool Forest::addBirthDeathIncrementFossil(Lot::SharedPtr lot, double age, string fossil_name, bool last_step) {
+//        bool fossil_added = false;
+//
+//        // if there is only one lineage left, all extant taxa have been joined and remaining fossils must be added
+//
+//        // birth death
+//        double cum_height = _tree_height;
+//        // Determine number of lineages remaining
+//        unsigned n = getNumLineages();
+//
+//        double birth_rate = G::_lambda;
+//        if (_estimated_lambda > 0.0) {
+//            birth_rate = _estimated_lambda;
+//        }
+//
+//        double death_rate = G::_mu;
+//        if (_estimated_mu > 0.0) {
+//            death_rate = _estimated_mu;
+//        }
+//
+//        if (n > 1) {
+//            // Draw n-1 internal node heights and store in vector heights
+//            vector<double> heights(n - 1, 0.0);
+//
+//            double rho = 1.0; // TODO: for now, assume rho = 1.0
+//
+//            double exp_death_minus_birth = exp(death_rate - birth_rate);
+//            double phi = 0.0;
+//            phi += rho*birth_rate*(exp_death_minus_birth - 1.0);
+//            phi += (death_rate - birth_rate)*exp_death_minus_birth;
+//            phi /= (exp_death_minus_birth - 1.0);
+//            for (unsigned i = 0; i < n - 2; i++) {
+//                double u = lot->uniform();
+//                double y = u/(1.0 + birth_rate*rho*(1.0 - u));
+//                if (birth_rate > death_rate) {
+//                    y = log(phi - u*rho*birth_rate);
+//                    y -= log(phi - u*rho*birth_rate + u*(birth_rate - death_rate));
+//                    y /= (death_rate - birth_rate);
+//                }
+//                heights[i] = y;
+//            }
+//            heights[n-2] = 1.0;
+//            sort(heights.begin(), heights.end());
+//
+//            // Waiting time to next speciation event is first height
+//            // scaled so that max height is mu - cum_height
+//            double t = heights[0]*(_estimated_root_age - cum_height); // TODO: not sure this is right
+//            // TODO: waiting to add fossils until the end may not work if there are lots of fossils
+//
+//            showForest();
+//            assert (t > 0.0);
+//
+//            // if we are on the last step and there are still fossils to add, add them before doing anything else to avoid issues with adding fossils at the base
+//
+////            if (!last_step) {
+//                if ((t + _tree_height < age) || (age == -1)) { // don't add fossil
+//                    for (auto &nd:_lineages) {
+//                        nd->_edge_length += t;
+//                        nd->_accumulated_height += t;
+//                    }
+//                    _tree_height += t;
+//
+//                    _increments.push_back(t);
+//                }
+//
+//                else {
+//                    // add fossil
+//                    double edge_len = age - _tree_height;
+//                    _tree_height += edge_len;
+//
+//                    for (auto &nd:_lineages) {
+//                        nd->_edge_length += edge_len;
+//                        nd->_accumulated_height += edge_len;
+//                    }
+//
+//                    //new node is always needed
+//                    Node* new_nd = pullNode();
+//
+//                    new_nd->_name = fossil_name + "_FOSSIL";
+//                    new_nd->_set_partials = false; // do not include this node in likelihood calculation
+//                    // don't add anything to fossil edge length; go back and draw another increment
+//                    new_nd->_position_in_lineages = (unsigned) _lineages.size();
+//                    new_nd->_use_in_likelihood = false;
+//                    _lineages.push_back(new_nd);
+//
+//                    fossil_added = true;
+//
+//                    _increments.push_back(edge_len);
+//                }
+////            }
+//
+////            else {
+////                if (fossil_name == "placeholder") {
+////                    // don't add fossil
+////                    if ((t + _tree_height < age) || (age == -1)) {
+////                        for (auto &nd:_lineages) {
+////                            nd->_edge_length += t;
+////                            nd->_accumulated_height += t;
+////                        }
+////                        _tree_height += t;
+////
+////                        _increments.push_back(t);
+////                    }
+////                }
+////                else {
+////                    // add fossil
+////                    double edge_len = age - _tree_height;
+////                    _tree_height += edge_len;
+////
+////                    for (auto &nd:_lineages) {
+////                        nd->_edge_length += edge_len;
+////                        nd->_accumulated_height += edge_len;
+////                    }
+////
+////                    //new node is always needed
+////                    Node* new_nd = pullNode();
+////
+////                    new_nd->_name = fossil_name + "_FOSSIL";
+////                    new_nd->_set_partials = false; // do not include this node in likelihood calculation
+////                    // don't add anything to fossil edge length; go back and draw another increment
+////                    new_nd->_position_in_lineages = (unsigned) _lineages.size();
+////                    new_nd->_use_in_likelihood = false;
+////                    _lineages.push_back(new_nd);
+////
+////                    fossil_added = true;
+////
+////                    _increments.push_back(edge_len);
+////                }
+////            }
+//        }
+//
+//        else {
+//            // add fossil
+//            assert (age != -1.0);
+//            double edge_len = age - _tree_height;
+//            _tree_height += edge_len;
+//
+//            for (auto &nd:_lineages) {
+//                nd->_edge_length += edge_len;
+//                nd->_accumulated_height += edge_len;
+//            }
+//
+//            //new node is always needed
+//            Node* new_nd = pullNode();
+//
+//            new_nd->_name = fossil_name + "_FOSSIL";
+//            new_nd->_set_partials = false; // do not include this node in likelihood calculation
+//            new_nd->_edge_length = edge_len;
+//            new_nd->_accumulated_height = edge_len;
+//            new_nd->_position_in_lineages = (unsigned) _lineages.size();
+//            _lineages.push_back(new_nd);
+//
+//            fossil_added = true;
+//
+//            _increments.push_back(edge_len);
+//        }
+//
+//        // lorad only works if all topologies the same - then don't include the prior on joins because it is fixed
+////        double rate = 0.0; // TODO: need to modify this for birth-death
+////        rate = getNumLineages() * birth_rate;
+////        double increment_prior = (log(rate)-t*rate);
+////
+////        _increments_and_priors.push_back(make_pair(t, increment_prior));
+//
+//        return fossil_added;
+//    }
+#endif
+
+#if defined (FOSSILS)
     bool Forest::addBirthDeathIncrementFossil(Lot::SharedPtr lot, double age, string fossil_name) {
         bool fossil_added = false;
         
@@ -593,7 +746,7 @@ class Forest {
 #endif
     }
 
-    inline pair<double, bool> Forest::joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset) {
+    inline pair<double, bool> Forest::joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, bool last_step) {
         double log_weight = 0.0;
         pair<double, bool> output;
         
@@ -857,10 +1010,10 @@ class Forest {
                             }
                         }
                     }
-//                    set_sizes.push_back((unsigned) taxset[t]._species_included.size());
+    //                    set_sizes.push_back((unsigned) taxset[t]._species_included.size());
                     set_sizes.push_back((unsigned) node_choices.back().size());
                     set_counts.push_back(t);
-//                    total_nodes_in_sets += (unsigned) taxset[t]._species_included.size();
+    //                    total_nodes_in_sets += (unsigned) taxset[t]._species_included.size();
                     total_nodes_in_sets += (unsigned) node_choices.back().size();
                 }
             }
@@ -893,7 +1046,7 @@ class Forest {
             for (unsigned s=0; s<set_sizes.size(); s++) {
                 // TODO: need to figure out how many real nodes are in the taxon set
                 unsigned num_choices = (unsigned) (node_choices[s].size() * (node_choices[s].size() - 1)) / 2;
-//                unsigned num_choices = (set_sizes[s] * (set_sizes[s] - 1)) / 2;
+    //                unsigned num_choices = (set_sizes[s] * (set_sizes[s] - 1)) / 2;
                 set_probabilities[s] = num_choices;
                 total_choices += num_choices;
             }
@@ -924,46 +1077,46 @@ class Forest {
             subtree1 = _lineages[node_choices[node_choice_index][t.first]];
             subtree2 = _lineages[node_choices[node_choice_index][t.second]];
             
-//            if (taxa_not_included_in_sets && chosen_set == set_sizes.size()-1) {
-//                int nd_count = -1;
-//
-//                for (auto &nd:_lineages) {
-//                    if (std::find(names_of_nodes_in_sets.begin(), names_of_nodes_in_sets.end(), nd->_name) != names_of_nodes_in_sets.end()) {
-//                        // TODO: put something here?
-//                    }
-//                    else {
-//                        nd_count++;
-//                    }
-//
-//                    if (nd_count == t.first && subtree1 == NULL) {
-//                        subtree1 = nd;
-//                    }
-//                    else if (nd_count == t.second && subtree2 == NULL) {
-//                        subtree2 = nd;
-//                    }
-//                }
-//            }
-//            else {
-//                chosen_taxset = chosen_set;
-//
-//                string name1 = taxset[chosen_set]._species_included[t.first];
-//                string name2 = taxset[chosen_set]._species_included[t.second];
-//
-//                bool found1 = false;
-//                bool found2 = false;
-//                for (auto &nd:_lineages) {
-//                    if (nd->_name == name1) {
-//                        subtree1 = nd;
-//                        found1 = true;
-//                    }
-//                    else if (nd->_name == name2) {
-//                        subtree2 = nd;
-//                        found2 = true;
-//                    }
-//                }
-//                assert (found1);
-//                assert (found2);
-//            }
+    //            if (taxa_not_included_in_sets && chosen_set == set_sizes.size()-1) {
+    //                int nd_count = -1;
+    //
+    //                for (auto &nd:_lineages) {
+    //                    if (std::find(names_of_nodes_in_sets.begin(), names_of_nodes_in_sets.end(), nd->_name) != names_of_nodes_in_sets.end()) {
+    //                        // TODO: put something here?
+    //                    }
+    //                    else {
+    //                        nd_count++;
+    //                    }
+    //
+    //                    if (nd_count == t.first && subtree1 == NULL) {
+    //                        subtree1 = nd;
+    //                    }
+    //                    else if (nd_count == t.second && subtree2 == NULL) {
+    //                        subtree2 = nd;
+    //                    }
+    //                }
+    //            }
+    //            else {
+    //                chosen_taxset = chosen_set;
+    //
+    //                string name1 = taxset[chosen_set]._species_included[t.first];
+    //                string name2 = taxset[chosen_set]._species_included[t.second];
+    //
+    //                bool found1 = false;
+    //                bool found2 = false;
+    //                for (auto &nd:_lineages) {
+    //                    if (nd->_name == name1) {
+    //                        subtree1 = nd;
+    //                        found1 = true;
+    //                    }
+    //                    else if (nd->_name == name2) {
+    //                        subtree2 = nd;
+    //                        found2 = true;
+    //                    }
+    //                }
+    //                assert (found1);
+    //                assert (found2);
+    //            }
         }
         else {
             if (nlineages > 2) {
@@ -1044,11 +1197,11 @@ class Forest {
         else {
             if (!subtree1->_set_partials) {
                 subtree1->_use_in_likelihood = false;
-//                subtree1->_partials = nullptr;
+    //                subtree1->_partials = nullptr;
             }
             if (!subtree2->_set_partials) {
                 subtree2->_use_in_likelihood = false;
-//                subtree2->_partials = nullptr;
+    //                subtree2->_partials = nullptr;
             }
         }
         
@@ -1150,6 +1303,400 @@ class Forest {
         
         return make_pair(log_weight, filter);
     }
+
+//    inline pair<double, bool> Forest::joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, bool last_step) {
+//        bool filter = false;
+//        // find the new_nd from the previous step and accumulate height if needed
+//
+//        // if lineages.back() is a fossil, go to the previous node
+//        unsigned end_node = (unsigned) _lineages.size() - 1;
+//        vector<unsigned> set_counts;
+//
+//        Node *node_to_check = _lineages[end_node];
+//
+//        // check for the new node that was added in the previous step
+//        bool done = false;
+//        while (!done) {
+//            if (boost::ends_with(node_to_check->_name, "FOSSIL")) {
+//                end_node --;
+//                node_to_check = _lineages[end_node];
+//            }
+//            else {
+//                done = true;
+//            }
+//        }
+//
+//        int chosen_taxset = -1;
+//
+//        // TODO: can speed this up? for now, at every step, go through every node and reset accumulated height to 0
+//        for (auto &nd:_nodes) {
+//            nd._accumulated_height = nd._edge_length;
+//            if (!nd._set_partials && !boost::ends_with(nd._name, "FOSSIL")) {
+//                int next_node = nd._next_real_node;
+//                if (next_node != -1) {
+//                    _nodes[next_node]._accumulated_height += nd._edge_length;
+//                }
+//            }
+//        }
+//
+//        unsigned nlineages = getNumLineages();
+//        Node *subtree1 = nullptr;
+//        Node *subtree2 = nullptr;
+//
+//        if (G::_save_memory) {
+//            double npatterns_total = _data->getNumPatterns();
+//            for (auto &nd:_lineages) {
+//                if (nd->_set_partials) {
+//                    if (nd->_partials == nullptr) {
+//                        nd->_partials = ps.getPartial(npatterns_total * G::_nstates);
+//                        calcPartialArray(nd);
+//                    }
+//                }
+//            }
+//        }
+//
+//        pair <unsigned, unsigned> t = make_pair (0, 1); // if there is only choice, 0 and 1 will be chosen
+//        bool fossil_chosen = false;
+//
+//        if (taxset.size() > 0) {
+//            // if no taxsets, can choose any remaining nodes
+//            vector<double> set_sizes;
+//            bool taxa_not_included_in_sets = false;
+//            unsigned total_nodes_in_sets = 0;
+//
+//            vector<string> names_of_nodes_in_sets;
+//            for (auto &t:taxset) {
+//                for (auto &n:t._species_included) {
+//                    names_of_nodes_in_sets.push_back(n);
+//                }
+//            }
+//
+//            // TODO: for now, don't worry about overlapping taxsets
+//
+//            vector<vector<unsigned>> node_choices;
+//
+//            // figure out which taxon set choices are valid (exist in _lineages)
+//            for (unsigned t=0; t<taxset.size(); t++) {
+//                if (_valid_taxsets[t]) {
+//                    node_choices.resize(node_choices.size() + 1);
+//                    unsigned real_count = 0;
+//                    for (auto &n:taxset[t]._species_included) {
+//                        for (unsigned l=0; l<_lineages.size(); l++) {
+//                            if (_lineages[l]->_name == n) {
+//                                node_choices[node_choices.size()-1].push_back(_lineages[l]->_position_in_lineages);
+//                                real_count++;
+//                                break;
+//                            }
+//                        }
+//                    }
+//                    set_sizes.push_back((unsigned) node_choices.back().size());
+//                    set_counts.push_back(t);
+//                    total_nodes_in_sets += (unsigned) node_choices.back().size();
+//                }
+//            }
+//
+//            unsigned nnodes = (unsigned) _lineages.size();
+//
+//            vector<unsigned> nodes_not_in_taxon_sets;
+//            for (auto &nd:_lineages) {
+//                if (std::find(names_of_nodes_in_sets.begin(), names_of_nodes_in_sets.end(), nd->_name) != names_of_nodes_in_sets.end()) {
+//                    nnodes--;
+//                }
+//                else {
+//                    // node is not in the taxon sets
+//                    nodes_not_in_taxon_sets.push_back(nd->_position_in_lineages);
+//                }
+//            }
+//
+//            if (nnodes > 1) {
+//                assert (_valid_taxsets.back()); // last taxset must be valid
+//                taxa_not_included_in_sets = true;
+//                set_counts.push_back((unsigned) taxset.size());
+//                set_sizes.push_back(nnodes);
+//                node_choices.push_back(nodes_not_in_taxon_sets);
+//                total_nodes_in_sets += nnodes;
+//            }
+//
+//            vector<double> set_probabilities = set_sizes;
+//            unsigned total_choices = 0;
+//
+//            for (unsigned s=0; s<set_sizes.size(); s++) {
+//                // figure out how many real nodes are in the taxon set
+//                unsigned num_choices = (unsigned) (node_choices[s].size() * (node_choices[s].size() - 1)) / 2;
+//                set_probabilities[s] = num_choices;
+//                total_choices += num_choices;
+//            }
+//
+//            for (auto &s:set_probabilities) {
+//                s /= total_choices;
+//            }
+//
+//            assert (set_probabilities.size() > 0);
+//
+//            chosen_taxset = G::multinomialDraw(lot, set_probabilities);
+//            unsigned node_choice_index = chosen_taxset;
+//
+//            int taxset_count = -1;
+//            for (unsigned v=0; v<_valid_taxsets.size(); v++) {
+//                if (_valid_taxsets[v]) {
+//                    taxset_count++;
+//                }
+//                if (taxset_count == chosen_taxset) {
+//                    chosen_taxset = v;
+//                    break;
+//                }
+//            }
+//
+//            // TODO: what if there are nlineages = 4+ at this step?
+//            if (last_step && nlineages > 2) { // if last step, don't add a fossil at the very end
+//                bool fossil_chosen = false;
+//
+//                while (!fossil_chosen) {
+//                    t = chooseTaxaToJoin(set_sizes[node_choice_index], lot);
+//
+//                    vector<unsigned> fossil_positions;
+//
+//                    unsigned count = 0;
+//                    for (auto &nd:_lineages) {
+//                        if (boost::ends_with(nd->_name, "FOSSIL")) {
+//                            fossil_positions.push_back(count);
+//                        }
+//                        count++;
+//                    }
+//                    if (fossil_positions.size() == 0) {
+//                        fossil_chosen = true;
+//                    }
+//                    else {
+//                        auto it1 = std::find(fossil_positions.begin(), fossil_positions.end(), node_choices[node_choice_index][t.first]);
+//                        auto it2 = std::find(fossil_positions.begin(), fossil_positions.end(), node_choices[node_choice_index][t.second]);
+//
+//                        if (it1 != fossil_positions.end() || it2 != fossil_positions.end()) {
+//                            fossil_chosen = true;
+//                        } // check if a fossil was chosen on the last step if there is a fossil remaining; if not, continue
+//                    }
+//                }
+//
+//                subtree1 = _lineages[node_choices[node_choice_index][t.first]];
+//                subtree2 = _lineages[node_choices[node_choice_index][t.second]];
+//            }
+//                // if last step, don't add a fossil at the very end
+//
+//            else {
+//                t = chooseTaxaToJoin(set_sizes[node_choice_index], lot);
+//                subtree1 = _lineages[node_choices[node_choice_index][t.first]];
+//                subtree2 = _lineages[node_choices[node_choice_index][t.second]];
+//            }
+//        }
+//        else {
+//            if (nlineages > 2) {
+//                while (!fossil_chosen) {
+//                    t = chooseTaxaToJoin(nlineages, lot);
+//
+//                    vector<unsigned> fossil_positions;
+//                    if (last_step) {
+//                        unsigned count = 0;
+//                        for (auto &nd:_lineages) {
+//                            if (boost::ends_with(nd->_name, "FOSSIL")) {
+//                                fossil_positions.push_back(count);
+//                            }
+//                            count++;
+//                        }
+//                        if (fossil_positions.size() == 0) {
+//                            fossil_chosen = true;
+//                        }
+//                        else {
+//                            auto it1 = std::find(fossil_positions.begin(), fossil_positions.end(), t.first);
+//                            auto it2 = std::find(fossil_positions.begin(), fossil_positions.end(), t.second);
+//
+//                            if (it1 != fossil_positions.end() || it2 != fossil_positions.end()) {
+//                                fossil_chosen = true;
+//                            } // check if a fossil was chosen on the last step if there is a fossil remaining; if not, continue
+//                        }
+//                    }
+//                    else {
+//                        fossil_chosen = true;
+//                    }
+//                }
+//            }
+//            subtree1 = _lineages[t.first];
+//            subtree2 = _lineages[t.second];
+//        }
+//
+//        assert (subtree1 != subtree2);
+//
+//        //new node is always needed
+//        Node* new_nd = pullNode();
+//
+//        new_nd->_left_child=subtree1;
+//        subtree1->_right_sib=subtree2;
+//
+//        subtree1->_parent=new_nd;
+//        subtree2->_parent=new_nd;
+//
+//        // if new node has any child that is not a real node (set partials = false) and has no next node (next node != -1), the new node is not a real node either
+//        bool fake_node = false;
+//        if (!subtree1->_set_partials) {
+//            int next_node = subtree1->_next_real_node;
+//            if (next_node == -1) {
+//                fake_node = true;
+//            }
+//            else {
+//                if (next_node == -1 && !_nodes[next_node]._set_partials) {
+//                    fake_node = true;
+//                }
+//            }
+//        }
+//
+//        if (!subtree2->_set_partials) {
+//            int next_node = subtree2->_next_real_node;
+//            if (next_node == -1) {
+//                fake_node = true;
+//            }
+//            else {
+//                if (next_node == -1 && !_nodes[next_node]._set_partials) {
+//                    fake_node = true;
+//                }
+//            }
+//        }
+//
+//        if (fake_node) {
+//            new_nd->_set_partials = false;
+//            new_nd->_use_in_likelihood = false;
+//        }
+//
+//        if (new_nd->_set_partials) {
+//            // calculate new partials
+//            assert (new_nd->_partials == nullptr);
+//            double npatterns_total = _data->getNumPatterns();
+//            new_nd->_partials = ps.getPartial(G::_nstates*npatterns_total);
+//            assert(new_nd->_left_child->_right_sib);
+//
+//            if (G::_save_memory) {
+//                double npatterns_total = _data->getNumPatterns();
+//                new_nd->_partials = ps.getPartial(npatterns_total*G::_nstates);
+//
+//                for (auto &nd:_lineages) {
+//                    if (nd->_partials == nullptr) {
+//                        nd->_partials = ps.getPartial(npatterns_total * G::_nstates);
+//                        calcPartialArray(nd);
+//                    }
+//                }
+//            }
+//            calcPartialArray(new_nd);
+//
+//            filter = true; // must filter if a real node has been added
+//
+//            subtree1->_use_in_likelihood = false;
+//            subtree2->_use_in_likelihood = false;
+//        }
+//
+//        else {
+//            if (!subtree1->_set_partials) {
+//                subtree1->_use_in_likelihood = false;
+////                subtree1->_partials = nullptr;
+//            }
+//            if (!subtree2->_set_partials) {
+//                subtree2->_use_in_likelihood = false;
+////                subtree2->_partials = nullptr;
+//            }
+//        }
+//
+//        // if new_nd is a real node, none of its children should be used in the likelihood calculation
+//        // TODO: faster way to do this?
+//
+//        if (new_nd->_set_partials) {
+//            for (auto nd:_nodes){
+//                unsigned node_number = nd._number;
+//                bool done = false;
+//                while (!done) {
+//                    if (nd._parent) {
+//                        if (nd._parent == new_nd) {
+//                            _nodes[node_number]._use_in_likelihood = false;
+//                            done = true;
+//                        }
+//                        else {
+//                            if (nd._parent) {
+//                                nd = *nd._parent;
+//                            }
+//                            else {
+//                                done = true;
+//                            }
+//                        }
+//                    }
+//                    else {
+//                        done = true;
+//                    }
+//                }
+//            }
+//        }
+//
+//        //update node lists
+//        updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+//
+//        // update taxon set with nodes joined
+//        if (chosen_taxset != -1 && chosen_taxset != _valid_taxsets.size()-1) { // nothing to update if this was not a real taxon set (left over nodes)
+//            taxset[chosen_taxset]._species_included.erase(remove(taxset[chosen_taxset]._species_included.begin(), taxset[chosen_taxset]._species_included.end(), subtree1->_name));
+//            taxset[chosen_taxset]._species_included.erase(remove(taxset[chosen_taxset]._species_included.begin(), taxset[chosen_taxset]._species_included.end(), subtree2->_name));
+//            taxset[chosen_taxset]._species_included.push_back(new_nd->_name);
+//
+//            if (taxset[chosen_taxset]._species_included.size() == 1) {
+//                taxset.erase(taxset.begin() + chosen_taxset);
+//            }
+//        }
+//
+//        for (unsigned index = 0; index<G::_nloci; index++) {
+//            calcSubsetLogLikelihood(index);
+//        }
+//
+//        // after a new node is created, check if it's fake
+//        // if it is, set the next real node
+//        if (!new_nd->_set_partials) {
+//            if (new_nd->_left_child) {
+//                if (!boost::ends_with(new_nd->_left_child->_name, "FOSSIL")) {
+//                    // if new node's left child is not a fossil, use it to find the next real node
+//                    int next_node = new_nd->_left_child->_next_real_node;
+//                    if (next_node > -1) {
+//                        new_nd->_next_real_node = new_nd->_left_child->_number;
+//                    }
+//                    else {
+//                        if (new_nd->_left_child->_set_partials) {
+//                            new_nd->_next_real_node = new_nd->_left_child->_number;
+//                        }
+//                    }
+//                }
+//                if (!boost::ends_with(new_nd->_left_child->_right_sib->_name, "FOSSIL")) { // TODO: if or else if?
+//                    int next_node = new_nd->_left_child->_right_sib->_next_real_node;
+//                    if (next_node > -1) {
+//                        new_nd->_next_real_node = new_nd->_left_child->_right_sib->_number;
+//                    }
+//                    else {
+//                        if (new_nd->_left_child->_right_sib->_set_partials) {
+//                            new_nd->_next_real_node = new_nd->_left_child->_right_sib->_number;
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//
+//        double new_log_likelihood = 0.0;
+//        for (auto &g:_gene_tree_log_likelihoods) {
+//            new_log_likelihood += g;
+//        }
+//
+//        double log_weight = new_log_likelihood - prev_log_likelihood;
+//
+//       if (G::_save_memory) {
+//           for (auto &nd:_nodes) {
+//               nd._partials = nullptr;
+//           }
+//       }
+//
+//        calcTopologyPrior(getNumLineages() +1);
+//
+//        _valid_taxsets.clear();
+//
+//        return make_pair(log_weight, filter);
+//    }
 
     inline void Forest::updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode) {
         // Delete delnode1 from node_vector
@@ -1271,12 +1818,50 @@ class Forest {
     }
 
     inline double Forest::getTreePrior() {
-        double prior = 0.0;
-        for (auto &i:_increments_and_priors) {
-            prior += i.second;
+        double birth_death_prior = 0.0;
+        
+        // https://bio.libretexts.org/Bookshelves/Evolutionary_Developmental_Biology/Phylogenetic_Comparative_Methods_(Harmon)/10%3A_Introduction_to_Birth-Death_Models/10.02%3A_The_Birth-Death_Model
+        // Raup 1985
+        
+        // starting from the root, go increment by increment and calculate the following parameters:
+        // TODO: do fossil increments count?
+        
+        double E = _estimated_mu / _estimated_lambda;
+        double r = _estimated_lambda - _estimated_mu;
+        double t = 0.0;
+        unsigned count = (unsigned) _increments.size() - 1;
+        
+        for (unsigned i=1; i<G::_fossils.size() + G::_ntaxa + 1; i++) {
+            // i is number of species in existence
+            // density increment is the probability of having exactly i species at time t
+            // TODO: is t the increment or the accumulated height?
+            
+//            showForest();
+            t = _increments[count]; // TODO: = or += ?
+            double a = (E*(exp(r)*t - 1)) / (exp(r)*t - E);
+//            double B = (exp(r)*t - 1) / (exp(r)*t - E);
+            double B = a / E;
+            
+            if (birth_death_prior == 0) {
+                double density_increment = a; // starting with a single lineage
+                birth_death_prior += density_increment;
+            }
+            else {
+                double density_increment = (1-a)*(1-B)*pow(B, i-1);
+                birth_death_prior += density_increment;
+            }
+            
+//            double log_prob_density_increment = log((1-a)*(1-B)*pow(B, i-1));
+            
+//            birth_death_prior += log_prob_density_increment;
+            count--;
         }
-        prior += _log_joining_prob;
-        return prior;
+        
+        birth_death_prior = log(birth_death_prior);
+        
+//        assert(birth_death_prior == birth_death_prior); // TODO: why does this turn into Nan?
+        // check for NaN
+        return birth_death_prior;
     }
 
     inline double Forest::calcTopologyPrior(unsigned nlineages) {
@@ -1863,29 +2448,17 @@ class Forest {
         _ninternals                = other._ninternals;
         _nleaves                   = other._nleaves;
         _log_joining_prob          = other._log_joining_prob;
-        _increments_and_priors     = other._increments_and_priors;
+        _increments                = other._increments;
         _node_choices              = other._node_choices;
         _estimated_lambda          = other._estimated_lambda;
         _estimated_mu              = other._estimated_mu;
         _estimated_root_age        = other._estimated_root_age;
-        _upgma_additions = other._upgma_additions;
-        _upgma_starting_edgelen = other._upgma_starting_edgelen;
-        _starting_dij = other._starting_dij;
-        _starting_row = other._starting_row;
-        _previous_upgma_log_likelihood = other._previous_upgma_log_likelihood;
         _estimated_birth_difference = other._estimated_birth_difference;
         _turnover = other._turnover;
 #if defined (FOSSILS)
         _tree_height = other._tree_height;
         _valid_taxsets = other._valid_taxsets;
 #endif
-        
-        _starting_row.clear();
-        for (auto strow : other._starting_row) {
-            unsigned number = strow.first->_number;
-            Node* nd = &*next(_nodes.begin(), number);
-            _starting_row[nd] = strow.second;
-        }
 
         // Copy _nodes
         _nodes.clear();
@@ -2337,30 +2910,108 @@ class Forest {
     }
     
 
-inline void Forest::buildBirthDeathTree() {
-    int fossil_number = 0;
-# if defined (FOSSILS)
-//    fossil_number = (unsigned) G::_sim_fossils.size() - 1;
-    // sort fossils from youngest to oldest for use in later proposal
-    sort(G::_sim_fossils.begin(), G::_sim_fossils.end(), [](Fossil & left, Fossil & right) {
-        return left._age < right._age;
-    });
-#endif
-    
-    // Algorithm from Yang and Rannala. 1997. MBE 14(7):717-724.
-    createTrivialForest();
-#if 1
-    unsigned nsteps = G::_ntaxa - 1;
-# if defined (FOSSILS)
-    nsteps += G::_sim_fossils.size();
-#endif
-    double cum_height = 0.0;
-    for (unsigned i = 0; i < nsteps; i++) {
-        // Determine number of lineages remaining
-        unsigned n = getNumLineages();
-        assert(n > 1);
+    inline void Forest::buildBirthDeathTree() {
+        int fossil_number = 0;
+    # if defined (FOSSILS)
+    //    fossil_number = (unsigned) G::_sim_fossils.size() - 1;
+        // sort fossils from youngest to oldest for use in later proposal
+        sort(G::_sim_fossils.begin(), G::_sim_fossils.end(), [](Fossil & left, Fossil & right) {
+            return left._age < right._age;
+        });
+    #endif
         
+        // Algorithm from Yang and Rannala. 1997. MBE 14(7):717-724.
+        createTrivialForest();
+    #if 1
+        unsigned nsteps = G::_ntaxa - 1;
+    # if defined (FOSSILS)
+        nsteps += G::_sim_fossils.size();
+    #endif
+        double cum_height = 0.0;
+        for (unsigned i = 0; i < nsteps; i++) {
+            // Determine number of lineages remaining
+            unsigned n = getNumLineages();
+            assert(n > 1);
+            
+            // Draw n-1 internal node heights and store in vector heights
+            vector<double> heights(n - 1, 0.0);
+            
+            double rho = G::_sim_rho;
+            double birth_rate = G::_sim_lambda;
+            double death_rate = G::_sim_mu;
+            double exp_death_minus_birth = exp(death_rate - birth_rate);
+            double phi = 0.0;
+            phi += rho*birth_rate*(exp_death_minus_birth - 1.0);
+            phi += (death_rate - birth_rate)*exp_death_minus_birth;
+            phi /= (exp_death_minus_birth - 1.0);
+            for (unsigned i = 0; i < n - 2; i++) {
+                double u = rng->uniform();
+                double y = u/(1.0 + birth_rate*rho*(1.0 - u));
+                if (birth_rate > death_rate) {
+                    y = log(phi - u*rho*birth_rate);
+                    y -= log(phi - u*rho*birth_rate + u*(birth_rate - death_rate));
+                    y /= (death_rate - birth_rate);
+                }
+                heights[i] = y;
+            }
+            heights[n-2] = 1.0;
+            sort(heights.begin(), heights.end());
+            
+            // Waiting time to next speciation event is first height
+            // scaled so that max height is 1 - cum_height
+            double t = heights[0]*(1.0 - cum_height);
+            
+    # if defined (FOSSILS)
+            if (fossil_number < G::_sim_fossils.size()) {
+                if (cum_height + t > G::_sim_fossils[fossil_number]._age) {
+                    // add fossil
+                    t = G::_sim_fossils[fossil_number]._age - cum_height;
+                    
+                    for (auto &nd:_lineages) {
+                        nd->_edge_length += t;
+                        nd->_accumulated_height += t;
+                    }
+                    
+                    cum_height += t;
+                    
+                    //new node is always needed
+                    Node* new_nd = pullNode();
+
+                    new_nd->_name = G::_sim_fossils[fossil_number]._name + "_FOSSIL";
+                    new_nd->_set_partials = false; // do not include this node in likelihood calculation
+                    new_nd->_position_in_lineages = (unsigned) _lineages.size();
+                    new_nd->_use_in_likelihood = false;
+                    _lineages.push_back(new_nd);
+                    
+                    fossil_number++;
+                }
+                else {
+                    for (auto &nd:_lineages) {
+                        nd->_edge_length += t;
+                        nd->_accumulated_height +=t;
+                    }
+                    cum_height += t;
+                }
+            }
+            else {
+                for (auto &nd:_lineages) {
+                    nd->_edge_length += t;
+                    nd->_accumulated_height +=t;
+                }
+                cum_height += t;
+            }
+    #endif
+            
+    #if !defined (FOSSILS)
+            cum_height += t;
+            advanceAllLineagesBy(t);
+    #endif
+            
+            joinRandomLineagePair(rng); // TODO: is it okay to simulate a fossil with 0 branch length?
+        }
+    #else
         // Draw n-1 internal node heights and store in vector heights
+        unsigned n = getNumLineages();
         vector<double> heights(n - 1, 0.0);
         
         double rho = G::_sim_rho;
@@ -2384,112 +3035,34 @@ inline void Forest::buildBirthDeathTree() {
         heights[n-2] = 1.0;
         sort(heights.begin(), heights.end());
         
-        // Waiting time to next speciation event is first height
-        // scaled so that max height is 1 - cum_height
-        double t = heights[0]*(1.0 - cum_height);
+        // Now that we have the increments, perform the joins
+        //
+        // 1   2   3  4  5 n = 5, n - 1 = 4
+        // |   |   |  |  |
+        // +-+-+   |  |  | i = 0
+        //   |     |  |  |
+        //   +--+--+  |  | i = 1
+        //      |     |  |
+        //      +--+--+  | i = 2
+        //         |     |
+        //         +--+--+ i = 3
         
-# if defined (FOSSILS)
-        if (fossil_number < G::_sim_fossils.size()) {
-            if (cum_height + t > G::_sim_fossils[fossil_number]._age) {
-                // add fossil
-                t = G::_sim_fossils[fossil_number]._age - cum_height;
-                
-                for (auto &nd:_lineages) {
-                    nd->_edge_length += t;
-                    nd->_accumulated_height += t;
-                }
-                
-                cum_height += t;
-                
-                //new node is always needed
-                Node* new_nd = pullNode();
+        double t0 = 0.0;
+        for (unsigned i = 0; i < n - 1; i++) {
+            double t = heights[i];
+            double dt = t - t0;
+            advanceAllLineagesBy(dt);
+            joinRandomLineagePair(rng);
+            t0 = t;
+        }
+    #endif
+        assert(getNumLineages() == 1);
 
-                new_nd->_name = G::_sim_fossils[fossil_number]._name + "_FOSSIL";
-                new_nd->_set_partials = false; // do not include this node in likelihood calculation
-                new_nd->_position_in_lineages = (unsigned) _lineages.size();
-                new_nd->_use_in_likelihood = false;
-                _lineages.push_back(new_nd);
-                
-                fossil_number++;
-            }
-            else {
-                for (auto &nd:_lineages) {
-                    nd->_edge_length += t;
-                    nd->_accumulated_height +=t;
-                }
-                cum_height += t;
-            }
-        }
-        else {
-            for (auto &nd:_lineages) {
-                nd->_edge_length += t;
-                nd->_accumulated_height +=t;
-            }
-            cum_height += t;
-        }
-#endif
+        // Scale all edge lengths by G::_sim_root_age
+        scaleAllEdgeLengthsBy(G::_sim_root_age);
         
-#if !defined (FOSSILS)
-        cum_height += t;
-        advanceAllLineagesBy(t);
-#endif
-        
-        joinRandomLineagePair(rng);
+        refreshPreorder();
     }
-#else
-    // Draw n-1 internal node heights and store in vector heights
-    unsigned n = getNumLineages();
-    vector<double> heights(n - 1, 0.0);
-    
-    double rho = G::_sim_rho;
-    double birth_rate = G::_sim_lambda;
-    double death_rate = G::_sim_mu;
-    double exp_death_minus_birth = exp(death_rate - birth_rate);
-    double phi = 0.0;
-    phi += rho*birth_rate*(exp_death_minus_birth - 1.0);
-    phi += (death_rate - birth_rate)*exp_death_minus_birth;
-    phi /= (exp_death_minus_birth - 1.0);
-    for (unsigned i = 0; i < n - 2; i++) {
-        double u = rng->uniform();
-        double y = u/(1.0 + birth_rate*rho*(1.0 - u));
-        if (birth_rate > death_rate) {
-            y = log(phi - u*rho*birth_rate);
-            y -= log(phi - u*rho*birth_rate + u*(birth_rate - death_rate));
-            y /= (death_rate - birth_rate);
-        }
-        heights[i] = y;
-    }
-    heights[n-2] = 1.0;
-    sort(heights.begin(), heights.end());
-    
-    // Now that we have the increments, perform the joins
-    //
-    // 1   2   3  4  5 n = 5, n - 1 = 4
-    // |   |   |  |  |
-    // +-+-+   |  |  | i = 0
-    //   |     |  |  |
-    //   +--+--+  |  | i = 1
-    //      |     |  |
-    //      +--+--+  | i = 2
-    //         |     |
-    //         +--+--+ i = 3
-    
-    double t0 = 0.0;
-    for (unsigned i = 0; i < n - 1; i++) {
-        double t = heights[i];
-        double dt = t - t0;
-        advanceAllLineagesBy(dt);
-        joinRandomLineagePair(rng);
-        t0 = t;
-    }
-#endif
-    assert(getNumLineages() == 1);
-
-    // Scale all edge lengths by G::_sim_root_age
-    scaleAllEdgeLengthsBy(G::_sim_root_age);
-    
-    refreshPreorder();
-}
 
 #if defined (INCREMENT_COMPARISON_TEST)
     inline void Forest::buildBirthDeathTreeTest() {
@@ -2672,537 +3245,6 @@ inline void Forest::buildBirthDeathTree() {
             const vector<double> & _diff;
             double _v0;
     };
-
-    inline void Forest::buildStartingUPGMAMatrix() {
-        bool use_minimizer = true;
-        
-        if (!use_minimizer) {
-            // Get the number of patterns
-            unsigned npatterns = _data->getNumPatterns();
-            // Get the first and last pattern index for this gene's data
-
-            // Get pattern counts
-            auto counts = _data->getPatternCounts();
-            
-            // Create vectors to store products of same-state and different-state partials
-            vector<double> same_state(npatterns, 0.0);
-            vector<double> diff_state(npatterns, 0.0);
-            
-            // Create a map relating position in dij vector to row,col in distance matrix
-            map<unsigned, pair<unsigned, unsigned>> dij_row_col;
-            
-            // Create distance matrix dij and workspace dij2 used to build next dij
-            // Both dij and dij2 are 1-dimensional vectors that store only the
-            // lower diagonal of the distance matrix (excluding diagonal elements)
-            assert (getNumLineages() == G::_ntaxa);
-            unsigned n = G::_ntaxa;
-            vector<double> dij(n*(n-1)/2, G::_infinity);
-            vector<double> dij2;
-            
-            vector<tuple<unsigned, unsigned, unsigned, unsigned>> sites_tuples = _data->_partition->getSubsetRangeVect();
-            
-            for (unsigned i = 1; i < n; i++) {
-                for (unsigned j = 0; j < i; j++) {
-                    double ndiff = 0;
-                    double ntotal = 0;
-                    unsigned start_index = 0;
-                    unsigned start = get<0>(sites_tuples[start_index]) - 1;
-                    assert (start >= 0);
-                    assert (_data->_original_data_matrix.size() > 0);
-                    unsigned end = get<1>(sites_tuples[start_index]); // include last site
-                    for (unsigned m = start; m<end; m++) {
-                        if (_data->_original_data_matrix[i][m] < 15 && _data->_original_data_matrix[j][m] < 15) {// 15 is ambiguity?
-                            if (_data->_original_data_matrix[i][m] != _data->_original_data_matrix[j][m]) {
-                                ndiff++;
-                            }
-                            ntotal++;
-                        }
-                    }
-                        
-                    assert (ntotal > 0);
-                    
-                    double p = ndiff / ntotal;
-                    
-                    if (p >= 0.75) {
-                        p = 0.7499;
-                    }
-                    
-                    // TODO: if p > 0.75, this will cause a crash - v will be NaN
-                    // TODO: for now, just reset p to 0.7499
-                    
-                    double v = -0.75 * log(1 - 4.0/3.0 * p);
-                    
-                    assert (v != G::_infinity);
-                    
-                    unsigned k = i*(i-1)/2 + j;
-                    dij[k] = v;
-                    dij_row_col[k] = make_pair(i,j);
-                    
-                    assert (v == v);
-                }
-            }
-            
-            _starting_dij = dij;
-            
-            for (auto &d:_starting_dij) {
-                assert (d == d);
-            }
-            
-//            debugShowDistanceMatrix(_starting_dij);
-        }
-        
-        else {
-            _data->_original_data_matrix.clear();
-                
-            // Get the number of patterns
-            unsigned npatterns = _data->getNumPatterns();
-
-            // Get pattern counts
-            auto counts = _data->getPatternCounts();
-            
-            // Create vectors to store products of same-state and different-state partials
-            vector<double> same_state(npatterns, 0.0);
-            vector<double> diff_state(npatterns, 0.0);
-            
-            // Create a map relating position in dij vector to row,col in distance matrix
-            map<unsigned, pair<unsigned, unsigned>> dij_row_col;
-            
-            // Create distance matrix dij and workspace dij2 used to build next dij
-            // Both dij and dij2 are 1-dimensional vectors that store only the
-            // lower diagonal of the distance matrix (excluding diagonal elements)
-            unsigned n = getNumLineages();
-            vector<double> dij(n*(n-1)/2, G::_infinity);
-            vector<double> dij2;
-
-            // Calculate distances between all pairs of lineages
-            
-            for (unsigned i = 1; i < n; i++) {
-                for (unsigned j = 0; j < i; j++) {
-                    Node * lnode = _lineages[i];
-                    Node * rnode = _lineages[j];
-                    
-                    // Fill same_state and diff_state vectors
-                    same_state.assign(npatterns, 0.0);
-                    diff_state.assign(npatterns, 0.0);
-                    for (unsigned p = 0; p < npatterns; p++) {
-                        for (unsigned lstate = 0; lstate < G::_nstates; lstate++) {
-                            auto & l_partial_array = *(lnode->_partials);
-                            double lpartial = l_partial_array[p*G::_nstates + lstate];
-                            for (unsigned rstate = 0; rstate < G::_nstates; rstate++) {
-                                auto & r_partial_array = *(rnode->_partials);
-                                double rpartial = r_partial_array[p*G::_nstates + rstate];
-                                if (lstate == rstate)
-                                    same_state[p] += lpartial*rpartial;
-                                else
-                                    diff_state[p] += lpartial*rpartial;
-                            }
-                        }
-                    }
-                    
-                    double min_dist = 0.0;
-                    double max_dist = min_dist + 5.0; //TODO: replace arbitrary value 5.0
-                    
-                    double v0 = 0.0; // don't need to get edge lengths since we are starting from the trivial forest
-                    
-                    unsigned first_pattern = 0;
-                    negLogLikeDist f(npatterns, first_pattern, counts, same_state, diff_state, v0);
-                    auto r = boost::math::tools::brent_find_minima(f, min_dist, max_dist, std::numeric_limits<double>::digits);
-    //                double maximized_log_likelihood = -r.second;
-                    unsigned k = i*(i-1)/2 + j;
-                    dij[k] = r.first;
-                    dij_row_col[k] = make_pair(i,j);
-                                    
-        //                output(format("d[%d, %d] = %.7f (logL = %.5f") % i % j % d[ij] % maximized_log_likelihood, 1);
-                
-                }
-            }
-            _starting_dij = dij;
-            
-//                debugShowDistanceMatrix(_starting_dij);
-            
-            for (auto &d:_starting_dij) {
-                assert (d == d);
-            }
-        }
-    }
-        
-    inline void Forest::buildStartingRow() {
-        // first step, need to calculate previous likelihood
-        _previous_upgma_log_likelihood = 0.0;
-        for (unsigned g=0; g<G::_nloci; g++) {
-            _previous_upgma_log_likelihood += calcSubsetLogLikelihood(g);
-        }
-        
-        unsigned n = G::_ntaxa;
-        map<Node *, unsigned> row;
-        _upgma_starting_edgelen.clear();
-        for (unsigned i = 0; i < n; i++) {
-            Node * nd = _lineages[i];
-            _upgma_starting_edgelen[nd] = nd->_edge_length;
-            row[nd] = i;
-        }
-        _starting_row = row;
-    }
-
-    inline double Forest::buildRestOfTreeUPGMA() {
-        // concatenating all genes
-            
-        if (_data->_original_data_matrix.size() > 0) {
-            _data->_original_data_matrix.clear(); // if not using minimizer, can't clear this until all genes have gone through once
-        }
-
-        // debugShowDistanceMatrix(_starting_dij);
-            
-        vector<double> dij = _starting_dij;
-        vector<double> dij2;
-            
-        // debugShowDistanceMatrix(dij);
-            
-        // Create a map relating position in dij vector to row,col in distance matrix
-        map<unsigned, pair<unsigned, unsigned>> dij_row_col;
-            
-        // Create distance matrix dij and workspace dij2 used to build next dij
-        // Both dij and dij2 are 1-dimensional vectors that store only the
-        // lower diagonal of the distance matrix (excluding diagonal elements)
-            
-        unsigned temp1 = _lineages.back()->_left_child->_right_sib->_position_in_lineages;
-        unsigned temp2 = _lineages.back()->_left_child->_position_in_lineages;
-        unsigned i_to_delete = temp1;
-        unsigned j_to_delete = temp2;
-
-        if (temp2 > temp1) {
-            i_to_delete = temp2;
-            j_to_delete = temp1;
-        }
-
-        Node* parent = _lineages.back();
-        
-        unsigned n = getNumLineages() + 1;
-        
-        _starting_row[parent] = i_to_delete;
-        
-        for (unsigned k = 0; k < n; k++) {
-            if (k != i_to_delete && k != j_to_delete) {
-                unsigned ik = (i_to_delete > k) ? (i_to_delete*(i_to_delete-1)/2 + k) : (k*(k-1)/2 + i_to_delete);
-                unsigned jk = (j_to_delete > k) ? (j_to_delete*(j_to_delete-1)/2 + k) : (k*(k-1)/2 + j_to_delete);
-                double a = dij[ik];
-                double b = dij[jk];
-                dij[ik] = 0.5*(a + b);
-                dij[jk] = G::_infinity;
-            }
-        }
-            
-        // Build new distance matrix
-        unsigned n2 = getNumLineages();
-        assert(n2 == n - 1);
-        unsigned dim2 = n2*(n2-1)/2;
-        dij2.resize(dim2);
-        dij2.assign(dim2, G::_infinity);
-        
-        // Calculate distances between all pairs of lineages
-        dij_row_col.clear();
-        for (unsigned i2 = 1; i2 < n2; i2++) {
-            for (unsigned j2 = 0; j2 < i2; j2++) {
-                Node * lnode2 = _lineages[i2];
-                Node * rnode2 = _lineages[j2];
-                assert(_starting_row.find(lnode2) != _starting_row.end());
-                assert(_starting_row.find(rnode2) != _starting_row.end());
-                unsigned i = _starting_row[lnode2];
-                unsigned j = _starting_row[rnode2];
-                unsigned k2 = i2*(i2-1)/2 + j2;
-                unsigned k = i*(i-1)/2 + j;
-                if (j > i) {
-                    k = j*(j-1)/2 + i;
-                }
-                dij2[k2] = dij[k];
-                dij_row_col[k2] = make_pair(i2,j2);
-                
-                assert (dij[k] == dij[k]);
-            }
-        }
-            
-        map<Node*, unsigned> row;
-        dij = dij2;
-        n = n2;
-        for (unsigned i = 0; i < n; i++) {
-            Node * nd = _lineages[i];
-            row[nd] = i;
-        }
-
-        // save starting distance matrix to reuse in next step
-        _starting_dij = dij;
-        
-        // Create a map relating nodes in _lineages to rows of dij
-        // Also save starting edge lengths so they can be restored in destroyUPGMA()
-        row.clear();
-        _upgma_starting_edgelen.clear();
-        for (unsigned i = 0; i < n; i++) {
-            Node * nd = _lineages[i];
-            _upgma_starting_edgelen[nd] = nd->_edge_length;
-            row[nd] = i;
-        }
-        
-        // debugShowDistanceMatrix(_starting_dij);
-            
-        // Build UPGMA tree on top of existing forest
-        assert(_upgma_additions.empty());
-            
-        double upgma_height = getLineageHeight(_lineages.back());
-                    
-        unsigned nsteps = n - 1;
-        while (nsteps > 0) {
-            // Find smallest entry in d
-            auto it = min_element(dij.begin(), dij.end());
-            unsigned offset = (unsigned)std::distance(dij.begin(), it);
-            auto p = dij_row_col.at(offset);
-            unsigned i = p.first;
-            unsigned j = p.second;
-            
-            // Update all leading edge lengths
-            double v = *it;
-            
-            assert (v != G::_infinity);
-            
-            double edge_len_to_add = 0.5*v - upgma_height;
-            if (edge_len_to_add <= 0.0) {
-                edge_len_to_add = G::_small_enough; // to avoid likelihood issues, set v to very small if <=0
-                v = G::_small_enough;
-            }
-            
-            assert (edge_len_to_add > 0.0);
-            assert (v == v); // check v is not NaN
-            for (auto nd : _lineages) {
-                nd->_edge_length += edge_len_to_add;
-            }
-            
-            upgma_height += edge_len_to_add;
-            
-            //debugShowLineages();
-            
-            // Join lineages i and j
-            Node nd;
-            _nodes.push_back(nd);
-            Node* new_nd = &_nodes.back();
-
-            Node * subtree1 = _lineages[i];
-            Node * subtree2 = _lineages[j];
-            
-            new_nd->_parent=0;
-            new_nd->_number=_nleaves+_ninternals;
-            new_nd->_right_sib=0;
-
-            new_nd->_left_child=subtree1;
-            subtree1->_right_sib=subtree2;
-
-            subtree1->_parent=new_nd;
-            subtree2->_parent=new_nd;
-            
-            _ninternals++;
-            
-            // Nodes added to _upgma_additions will be removed in destroyUPGMA()
-            _upgma_additions.push(new_nd);
-            
-            // Remove lnode and rnode from _lineages and add anc at the end
-            updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-            row[new_nd] = i;
-                        
-            //debugShowLineages();
-            // output(format("\nJoining lineages %d and %d\n") % i % j, 0);
-
-            _npatterns = _data->getNumPatterns();
-            assert (new_nd->_partials == nullptr);
-            new_nd->_partials=ps.getPartial(_npatterns*G::_nstates);
-            assert(new_nd->_left_child->_right_sib);
-            calcPartialArray(new_nd);
-                        
-            // Update distance matrix
-            for (unsigned k = 0; k < n; k++) {
-                if (k != i && k != j) {
-                    unsigned ik = (i > k) ? (i*(i-1)/2 + k) : (k*(k-1)/2 + i);
-                    unsigned jk = (j > k) ? (j*(j-1)/2 + k) : (k*(k-1)/2 + j);
-                    double a = dij[ik];
-                    double b = dij[jk];
-                    dij[ik] = 0.5*(a + b);
-                    dij[jk] = G::_infinity;
-                }
-            }
-            
-            // Sanity check
-            for (auto nd : _lineages) {
-                assert(!nd->_right_sib);
-                assert(!nd->_parent);
-            }
-            
-            // Build new distance matrix
-            unsigned n2 = getNumLineages();
-            assert(n2 == n - 1);
-            unsigned dim2 = n2*(n2-1)/2;
-            dij2.resize(dim2);
-            dij2.assign(dim2, G::_infinity);
-            
-            // Calculate distances between all pairs of lineages
-            dij_row_col.clear();
-            for (unsigned i2 = 1; i2 < n2; i2++) {
-                for (unsigned j2 = 0; j2 < i2; j2++) {
-                    Node * lnode2 = _lineages[i2];
-                    Node * rnode2 = _lineages[j2];
-                    unsigned i = row[lnode2];
-                    unsigned j = row[rnode2];
-                    unsigned k2 = i2*(i2-1)/2 + j2;
-                    unsigned k = i*(i-1)/2 + j;
-                    if (j > i) {
-                        k = j*(j-1)/2 + i;
-                    }
-                    dij2[k2] = dij[k];
-                    dij_row_col[k2] = make_pair(i2,j2);
-                }
-            }
-                
-            // Set up for next iteration
-            dij = dij2;
-            n = n2;
-            for (unsigned i = 0; i < n; i++) {
-                Node * nd = _lineages[i];
-                row[nd] = i;
-            }
-            
-            --nsteps;
-            
-            // debugShowDistanceMatrix(_starting_dij);
-        }
-        
-        // debugging output
-        // output(format("\nGene forest for locus \"%s\" after UPGMA:\n%s\n") % gene_name % makeNewick(9, /*use_names*/true, /*coalunits*/false), 0);
-        // output(format("  Height after UPGMA = %g\n") % _forest_height, 0);
-        
-        double gene_tree_log_likelihood = 0.0;
-        for (unsigned g=0; g<G::_nloci; g++) {
-            gene_tree_log_likelihood += calcSubsetLogLikelihood(g);
-        }
-        double log_weight = gene_tree_log_likelihood - _previous_upgma_log_likelihood; // previous likelihood is the entire tree
-                
-        _previous_upgma_log_likelihood = gene_tree_log_likelihood;
-                        
-        if (G::_save_memory) {
-            for (auto &nd:_nodes) {
-                nd._partials=nullptr;
-            }
-        }
-        
-        // destroy upgma
-        while (!_upgma_additions.empty()) {
-            Node * parent = _upgma_additions.top();
-            Node* child1 = parent->_left_child;
-            Node* child2 = parent->_left_child->_right_sib;
-            
-            assert(child1);
-            assert(child2);
-            
-            revertNodeVector(_lineages, child1, child2, parent);
-
-            //reset siblings and parents of original nodes back to 0
-            child1->resetNode(); //subtree1
-            child2->resetNode(); //subtree2
-            
-            if (G::_save_memory) {
-                child1->_partials = nullptr;
-                child2->_partials = nullptr;
-            }
-
-            // clear new node from _nodes
-            //clear new node that was just created
-            parent->clear(); //new_nd
-
-            _upgma_additions.pop();
-            _nodes.pop_back(); // remove unused node from node list
-            
-            _ninternals--;
-        }
-        
-        // Restore starting edge lengths
-        for (auto nd : _lineages) {
-            nd->_edge_length = _upgma_starting_edgelen.at(nd);
-        }
-    
-        _upgma_starting_edgelen.clear();
-        
-        n = getNumLineages();
-        
-        _starting_row.clear();
-        for (unsigned i = 0; i < n; i++) {
-            Node * nd = _lineages[i];
-            _starting_row[nd] = i; // TODO: can save this earlier to not remake it
-        }
-            
-        return log_weight;
-    }
-        
-    inline void Forest::debugShowDistanceMatrix(const vector<double> & d) const {
-        // d is a 1-dimensional vector that stores the lower triangle of a square matrix
-        // (not including diagonals) in row order
-        //
-        // For example, for a 4x4 matrix (- means non-applicable):
-        //
-        //       0  1  2  3
-        //     +-----------
-        //  0  | -  -  -  -
-        //  1  | 0  -  -  -
-        //  2  | 1  2  -  -
-        //  3  | 3  4  5  -
-        //
-        // For this example, d = {0, 1, 2, 3, 4 ,5}
-        //
-        // See this explanation for how to index d:
-        //   https://math.stackexchange.com/questions/646117/how-to-find-a-function-mapping-matrix-indices
-        //
-        // In short, d[k] is the (i,j)th element, where k = i(i-1)/2 + j
-        //       i   j   k = i*(i-1)/2 + j
-        //       1   0   0 = 1*0/2 + 0
-        //       2   0   1 = 2*1/2 + 0
-        //       2   1   2 = 2*1/2 + 1
-        //       3   0   3 = 3*2/2 + 0
-        //       3   1   4 = 3*2/2 + 1
-        //       3   2   5 = 3*2/2 + 2
-        //
-        // Number of elements in d is n(n-1)/2
-        // Solving for n, and letting x = d.size(),
-        //  x = n(n-1)/2
-        //  2x = n^2 - n
-        //  0 = a n^2 + b n + c, where a = 1, b = -1, c = -2x
-        //  n = (-b += sqrt(b^2 - 4ac))/(2a)
-        //    = (1 + sqrt(1 + 8x))/2
-        double x = (double)d.size();
-        double dbln = (1.0 + sqrt(1.0 + 8.0*x))/2.0;
-        unsigned n = (unsigned)dbln;
-        
-        cout << format("\nDistance matrix (%d x %d):\n") % n % n;
-
-        // Column headers
-        cout << format("%12d") % " ";
-        for (unsigned j = 0; j < n; j++) {
-            cout << format("%12d") % j;
-        }
-        cout << "\n";
-        
-        unsigned k = 0;
-        for (unsigned i = 0; i < n; i++) {
-            cout << format("%12d") % i;
-            for (unsigned j = 0; j < n; j++) {
-                if (j < i) {
-                    double v = d[k++];
-                    if (v == G::_infinity)
-                        cout << "         inf";
-                    else
-                        cout << format("%12.5f") % v;
-                }
-                else {
-                    cout << "         inf";
-                }
-            }
-            cout << "\n";
-        }
-        cout << "\n";
-    }
 
     inline double Forest::getLineageHeight(Node* nd) {
         if (nd != nullptr) {

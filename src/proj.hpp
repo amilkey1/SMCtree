@@ -119,7 +119,6 @@ namespace proj {
         ("proposal", boost::program_options::value(&G::_proposal)->default_value("prior-prior"), "prior-prior or prior-post")
         ("estimate_lambda", boost::program_options::value(&G::_est_lambda)->default_value("false"), "estimate birth rate")
         ("estimate_mu", boost::program_options::value(&G::_est_mu)->default_value("false"), "estimate death rate")
-        ("upgma_completion",  value(&G::_upgma_completion)->default_value(true), "complete SMC tree using UPGMA at each step")
 #if defined(FOSSILS)
         ("fossil",  value(&fossils), "a string defining a fossil, e.g. 'Ursus_abstrusus         1.8–5.3 4.3' (4.3 is time, 1.8-5.3 is prior range)")
         ("taxset",  value(&taxsets), "a string defining a taxon set, e.g. 'Ursinae: Helarctos_malayanus Melursus_ursinus Ursus_abstrusus Ursus_americanus Ursus_arctos Ursus_maritimus Ursus_spelaeus Ursus_thibetanus'")
@@ -171,11 +170,6 @@ namespace proj {
         // If user specified a start mode other than "prior-prior" or "prior-post", throw an exception
         if (G::_proposal != "prior-prior" && G::_proposal != "prior-post") {
             throw XProj(format("must specify a proposal of either prior-prior or prior-post but %s was specified")%G::_proposal);
-        }
-        
-        // If user specified both "prior-post" and "upgma_completion", throw an exception
-        if (G::_proposal == "prior-post" && G::_upgma_completion) {
-            throw XProj("cannot specify both UPGMA completion and prior-post");
         }
         
         // If user specified lambda <= 0, throw an exception
@@ -584,10 +578,6 @@ namespace proj {
         output(format("Random seed: %d\n") % G::_rnseed, 1);
         output(format("Number of threads: %d\n") % G::_nthreads, 1);
         
-        if (G::_upgma_completion) {
-            output("Using UPGMA completion\n", 1);
-        }
-        
         try {
             _data = Data::SharedPtr(new Data());
             _data->setPartition(_partition);
@@ -610,6 +600,15 @@ namespace proj {
             for (unsigned i=0; i<G::_nparticles; i++) {
                 _particle_vec[i] = Particle();
             }
+            
+#if defined (FOSSILS)
+            // check that no fossil is older than the mean root age
+            for (auto &f:G::_fossils) {
+                if (f._upper >= G::_root_age) {
+                    throw XProj("fossil range cannot exceed or equal root age");
+                }
+            }
+#endif
             
             initializeParticles(_particle_vec); // initialize in parallel with multithreading
             
@@ -653,13 +652,14 @@ namespace proj {
                 
                 proposeParticles(_particle_vec, g);
                                 
-//                debugSaveParticleVectorInfo("debug-proposed.txt", g+1);
+                writeTreeFile(_particle_vec);
                 
-//                for (auto &p:_particle_vec) {
-//                    p.showParticle();
-//                }
+                debugSaveParticleVectorInfo("debug-proposed.txt", g+1);
+                
                 double ess = filterParticles(g, _particle_vec);
                 output(format("     ESS = %d\n") % ess, 2);
+                
+                writeTreeFile(_particle_vec);
                 
                 //debugSaveParticleVectorInfo("debug-filtered.txt", g+1);
             }
@@ -788,9 +788,11 @@ namespace proj {
 
     inline void Proj::proposeParticles(vector<Particle> & particles, unsigned step_number) {
         assert(G::_nthreads > 0);
+        unsigned count = 0;
         if (G::_nthreads == 1) {
           for (auto & p : particles) {
               p.proposal(step_number);
+              count ++;
           }
         }
         else {
@@ -883,21 +885,6 @@ namespace proj {
              }
          }
         
-        if (G::_upgma_completion) {
-            unsigned particle_num = 0;
-        
-            for (auto &p:particles) {
-                if (particle_num == 0) {
-                    p.calcStartingUPGMAMatrix();
-                }
-                else {
-                    p.setStartingUPGMAMatrix(particles[0].getStartingUPGMAMatrix());
-                }
-                p.calcStartingRowCount();
-                particle_num++;
-            }
-        }
-        
 #if defined (FOSSILS)
         for (auto &p:particles) {
             p.setFossils();
@@ -929,26 +916,6 @@ namespace proj {
         
         treef << "end;\n";
         treef.close();
-        
-        // save unique trees only
-        ofstream uniquetreef("unique_trees.trees");
-        uniquetreef << "#nexus\n\n";
-        uniquetreef << "begin trees;\n";
-        
-        vector<vector<pair<double, double>>> unique_increments_and_priors;
-        for (auto &p:particles) {
-            vector<pair<double, double>> increments_and_priors = p.getTreeIncrementPriors();
-            bool found = false;
-            if(std::find(unique_increments_and_priors.begin(), unique_increments_and_priors.end(), increments_and_priors) != unique_increments_and_priors.end()) {
-                found = true;
-            }
-            if (!found) {
-                unique_increments_and_priors.push_back(increments_and_priors);
-                uniquetreef << "  tree test = [&R] " << p.saveForestNewick()  << ";\n";
-            }
-        }
-        uniquetreef << "end;\n";
-        uniquetreef.close();
     }
 
     inline void Proj::writeLogFile(vector<Particle> &v) const {

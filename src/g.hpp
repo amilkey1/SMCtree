@@ -29,7 +29,6 @@ namespace proj {
         static bool                     _est_lambda;
         static bool                     _est_mu;
         static bool                     _est_root_age;
-        static bool                     _upgma_completion;
         
         // Candidates for setting status
         static double                   _asrv_shape;

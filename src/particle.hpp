@@ -25,7 +25,6 @@ class Particle {
         double                                  getYuleModel();
         double                                  getAllPriors();
         double                                  getBirthDeathModel();
-        vector<pair<double, double>>            getTreeIncrementPriors();
         void                                    setStartingLogLikelihoods(vector<double> starting_log_likelihoods);
         void                                    clearPartials();
         string                                  saveForestNewick() {
@@ -38,13 +37,7 @@ class Particle {
         void drawRootAge();
         void calculateLambdaAndMu();
         void drawLambda();
-    
-        void calcStartingUPGMAMatrix();
-        vector<vector<double>> getStartingUPGMAMatrix();
-        void setStartingUPGMAMatrix(vector<vector<double>> starting_upgma_matrices_by_gene);
-        vector<map<Node*,  unsigned>> getStartingRowCount();
-        void setStartingRowCount(vector<map<Node*,  unsigned>> starting_row_count_by_gene);
-        void calcStartingRowCount();
+ 
 #if defined (FOSSILS)
         void setFossils() {_particle_fossils = G::_fossils;}
         void drawFossilAges();
@@ -114,6 +107,10 @@ class Particle {
     }
 
     inline void Particle::proposal(unsigned step_number) {
+        bool last_step = false;
+        if (step_number == G::_ntaxa - 2) {
+            last_step = true;
+        }
         double prev_log_likelihood = _forest.getLogLikelihood();
         
         bool done = false;
@@ -128,7 +125,7 @@ class Particle {
                 _forest._valid_taxsets.clear();
                 // loop through until you have ended on a non-fossil increment added
                 if ((_fossil_number < G::_fossils.size()) || (_fossil_number == 0 && G::_fossils.size() == 1)) {
-                    fossil_added = _forest.addIncrementFossil(_lot, _particle_fossils[_fossil_number]._age, _particle_fossils[_fossil_number]._name);
+                    fossil_added = _forest.addIncrementFossil(_lot, _particle_fossils[_fossil_number]._age, _particle_fossils[_fossil_number]._name, last_step);
                     if (fossil_added) {
                         _fossil_number++;
                         done_adding_increment = false;
@@ -138,7 +135,7 @@ class Particle {
                     }
                 }
                 else {
-                    fossil_added = _forest.addIncrementFossil(_lot, -1, "placeholder");
+                    fossil_added = _forest.addIncrementFossil(_lot, -1, "placeholder", last_step);
                     assert (!fossil_added);
                     done_adding_increment = true;
                 }
@@ -149,29 +146,27 @@ class Particle {
 #else
             _forest.addIncrement(_lot);
 #endif
-            pair<double, bool> output = _forest.joinTaxa(prev_log_likelihood, _lot, _particle_taxsets);
+            pair<double, bool> output = _forest.joinTaxa(prev_log_likelihood, _lot, _particle_taxsets, last_step);
+            
             _log_weight = output.first;
             bool filter = output.second;
+            
             // step is done when log weight is not 0 or when all the lineages are joined and all the fossils have been added
 #if defined (FOSSILS)
             // if the branch is really long, joining nodes will not change the likelihood
             if (filter || (_forest._lineages.size() == 1 && _fossil_number == (unsigned) (_particle_fossils.size()))) {
                 done = true;
             }
+
 #else
             if (_log_weight != 0.0 || (_forest._lineages.size() == 1)) {
                 done = true;
             }
 #endif
-            
-            // if you are on the last step and still have fossils to join, keep going
-            if (step_number == (G::_ntaxa-2) && _forest._lineages.size() > 1) {
-                done = false;
-            }
-            
-            if (G::_upgma_completion) {
-                _log_weight = _forest.buildRestOfTreeUPGMA();
-            }
+        }
+        if (step_number == G::_ntaxa - 2) {
+            assert (_fossil_number == G::_fossils.size());
+            assert (_forest._lineages.size() == 1);
         }
     }
 
@@ -239,40 +234,8 @@ class Particle {
         _forest._gene_tree_log_likelihoods = starting_log_likelihoods;
     }
 
-    inline vector<pair<double, double>> Particle::getTreeIncrementPriors() {
-        return _forest._increments_and_priors;
-    }
-
     inline void Particle::clearPartials() {
         _forest.clearPartials();
-    }
-
-    inline void Particle::calcStartingUPGMAMatrix() {
-        _forest.buildStartingUPGMAMatrix();
-    }
-
-    inline vector<vector<double>> Particle::getStartingUPGMAMatrix() {
-        vector<vector<double>> starting_upgma_matrices_by_gene;
-        starting_upgma_matrices_by_gene.push_back(_forest._starting_dij);
-        return starting_upgma_matrices_by_gene;
-    }
-
-    inline void Particle::setStartingUPGMAMatrix(vector<vector<double>> starting_upgma_matrices_by_gene) {
-        _forest._starting_dij = starting_upgma_matrices_by_gene[0];
-    }
-
-    inline vector<map<Node*,  unsigned>> Particle::getStartingRowCount() {
-        vector<map<Node*,  unsigned>> starting_row_count_by_gene;
-        starting_row_count_by_gene.push_back(_forest._starting_row);
-        return starting_row_count_by_gene;
-    }
-
-    inline void Particle::setStartingRowCount(vector<map<Node*,  unsigned>> starting_row_count_by_gene) {
-        _forest._starting_row = starting_row_count_by_gene[0];
-    }
-
-    inline void Particle::calcStartingRowCount() {
-        _forest.buildStartingRow();
     }
 
     inline void Particle::drawBirthDiff() {
@@ -303,6 +266,10 @@ class Particle {
     inline void Particle::drawFossilAges() {
         // draw an age for each fossil, using the upper and lower bounds as specified
          for (auto &f:_particle_fossils) {
+             if (f._lower == f._upper) {
+                 f._lower -= 0.001;
+                 f._upper += 0.001; // make upper and lower slightly different if they are equal
+             }
             f._age = _lot->uniformConstrained(f._lower, f._upper); // TODO: unsure if this lot function is working correctly
         }
         
