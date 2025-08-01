@@ -123,9 +123,9 @@ class Particle {
             
             while (!done_adding_increment || !valid) {
                 _forest._valid_taxsets.clear();
-                // loop through until you have ended on a non-fossil increment added
+                // loop through until you have ended on a non-fossil increment added or forest is finished
                 if ((_fossil_number < G::_fossils.size()) || (_fossil_number == 0 && G::_fossils.size() == 1)) {
-                    fossil_added = _forest.addIncrementFossil(_lot, _particle_fossils[_fossil_number]._age, _particle_fossils[_fossil_number]._name, last_step);
+                    fossil_added = _forest.addIncrementFossil(_lot, _particle_fossils[_fossil_number]._age, _particle_fossils[_fossil_number]._name);
                     if (fossil_added) {
                         _fossil_number++;
                         done_adding_increment = false;
@@ -135,18 +135,25 @@ class Particle {
                     }
                 }
                 else {
-                    fossil_added = _forest.addIncrementFossil(_lot, -1, "placeholder", last_step);
+                    fossil_added = _forest.addIncrementFossil(_lot, -1, "placeholder");
                     assert (!fossil_added);
                     done_adding_increment = true;
                 }
                 
                 // check that at least one taxon set is valid
+                // if there is no valid taxon set, keep adding increments until a valid set has been reached
                 valid = _forest.checkForValidTaxonSet(_particle_taxsets);
+                
+                
+                if (_forest._lineages.size() == 1 && _fossil_number == G::_fossils.size() - 1) { // if forest is finished, break out of step even if we have ended on a fossil
+                    done_adding_increment = true;
+                    assert (valid == true);
+                }
             }
 #else
             _forest.addIncrement(_lot);
 #endif
-            pair<double, bool> output = _forest.joinTaxa(prev_log_likelihood, _lot, _particle_taxsets, last_step);
+            pair<double, bool> output = _forest.joinTaxa(prev_log_likelihood, _lot, _particle_taxsets);
             
             _log_weight = output.first;
             bool filter = output.second;
@@ -155,7 +162,10 @@ class Particle {
 #if defined (FOSSILS)
             // if the branch is really long, joining nodes will not change the likelihood
             if (filter || (_forest._lineages.size() == 1 && _fossil_number == (unsigned) (_particle_fossils.size()))) {
-                done = true;
+                done = true; // TODO: what if you still have fossils to add?
+                if (last_step && _fossil_number != (unsigned) _particle_fossils.size()) {
+                    done = false;
+                }
             }
 
 #else
