@@ -162,8 +162,8 @@ class Particle {
 #if defined (FOSSILS)
             // if the branch is really long, joining nodes will not change the likelihood
             if (filter || (_forest._lineages.size() == 1 && _fossil_number == (unsigned) (_particle_fossils.size()))) {
-                done = true; // TODO: what if you still have fossils to add?
-                if (last_step && _fossil_number != (unsigned) _particle_fossils.size()) {
+                done = true; // if the forest isn't finished and we're on the last step, keep going
+                if (last_step && (_fossil_number != (unsigned) _particle_fossils.size() || _forest._lineages.size() != 1)) {
                     done = false;
                 }
             }
