@@ -72,6 +72,7 @@ class Particle {
     }
 
     inline Particle::Particle(const Particle & other) {
+        _lot.reset(new Lot());
         *this = other;
     }
 
@@ -117,7 +118,7 @@ class Particle {
         
         while (!done) {
 #if defined (FOSSILS)
-                bool fossil_added = false;
+            bool fossil_added = false;
             bool done_adding_increment = false;
             bool valid = false;
             

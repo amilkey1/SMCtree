@@ -103,7 +103,7 @@ class Forest {
         vector<pair<Node*, Node*>> _node_choices;
         double _estimated_lambda;
         double _estimated_mu;
-        double _estimated_root_age;
+        double _estimated_root_age; // TODO: not estimating root age if fossils
         double _estimated_birth_difference;
         double _turnover;
     
@@ -329,15 +329,10 @@ class Forest {
         
         double rho = 1.0; // TODO: for now, assume rho = 1.0
         
-        double birth_rate = G::_lambda;
-        if (_estimated_lambda > 0.0) {
-            birth_rate = _estimated_lambda;
-        }
+        double birth_rate = _estimated_lambda;
         
-        double death_rate = G::_mu;
-        if (_estimated_mu > 0.0) {
-            death_rate = _estimated_mu;
-        }
+        double death_rate = _estimated_mu;
+
         double exp_death_minus_birth = exp(death_rate - birth_rate);
         double phi = 0.0;
         phi += rho*birth_rate*(exp_death_minus_birth - 1.0);
@@ -464,15 +459,9 @@ class Forest {
         // Determine number of lineages remaining
         unsigned n = getNumLineages();
         
-        double birth_rate = G::_lambda;
-        if (_estimated_lambda > 0.0) {
-            birth_rate = _estimated_lambda;
-        }
+        double birth_rate = _estimated_lambda;
         
-        double death_rate = G::_mu;
-        if (_estimated_mu > 0.0) {
-            death_rate = _estimated_mu;
-        }
+        double death_rate = _estimated_mu;
         
         if (n > 1) {
             // Draw n-1 internal node heights and store in vector heights
@@ -503,10 +492,9 @@ class Forest {
             double t = heights[0]*(_estimated_root_age - cum_height); // TODO: not sure this is right
             // TODO: what if the tree is already to the root age but there are more fossils to add?
             
-//            showForest();
             assert (t > 0.0);
                     
-            if ((t + _tree_height < age) || (age == -1)) { // don't add fossil
+            if ((t + _tree_height < age) || (age == -1)) { // don't add fossil because next fossil placement is deeper than current tree
                 for (auto &nd:_lineages) {
                     nd->_edge_length += t;
                     nd->_accumulated_height += t;
@@ -895,7 +883,7 @@ class Forest {
             
             assert (set_probabilities.size() > 0);
             
-            chosen_taxset = G::multinomialDraw(lot, set_probabilities); // TODO: chosen taxset is only among the valid ones
+            chosen_taxset = G::multinomialDraw(lot, set_probabilities);
             unsigned node_choice_index = chosen_taxset;
             
             int taxset_count = -1;
@@ -1139,7 +1127,6 @@ class Forest {
         
         _valid_taxsets.clear();
         
-//        showForest();
         return make_pair(log_weight, filter);
     }
 
@@ -1580,19 +1567,12 @@ class Forest {
 #if defined (FOSSILS)
     inline bool Forest::checkForValidTaxonSet(vector<TaxSet> taxset) {
         bool valid = false;
-        // TODO: this function is not woorking at all - fix this tomorrow
                 
         vector<string> names_of_nodes_in_sets;
         for (auto &t:taxset) {
             for (auto &n:t._species_included) {
                 names_of_nodes_in_sets.push_back(n);
             }
-        }
-        
-        // TODO: replace  with parent names as things are joined
-        
-        for (unsigned i=0; i<_nodes.size(); i++) {
-            
         }
         
         for (auto &t:taxset) {

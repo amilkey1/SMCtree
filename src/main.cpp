@@ -99,6 +99,7 @@ string G::_proposal = "prior-prior";
 bool G::_est_lambda = "false";
 bool G::_est_mu = "false";
 bool G::_est_root_age = "false";
+unsigned G::_ngroups = 1.0;
 #if defined (FOSSILS)
 vector<Fossil> G::_fossils;
 vector<TaxSet> G::_taxsets;
