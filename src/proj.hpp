@@ -48,6 +48,9 @@ namespace proj {
             void proposeParticles(unsigned step_number);
             void proposeParticleRange(unsigned first, unsigned last, unsigned step_number);
             double filterParticles(unsigned step, unsigned group_number);
+            double filterParticleGroup(unsigned step, unsigned start, unsigned end);
+            void filterParticlesThreading(unsigned step);
+            void filterParticlesRange(unsigned first, unsigned last, unsigned g);
             double computeEffectiveSampleSize(const vector<double> & probs) const;
             void writeTreeFile ();
             void writeLogFile();
@@ -678,14 +681,19 @@ namespace proj {
                 
                 debugSaveParticleVectorInfo("debug-proposed.txt", g+1);
                 
-                for (unsigned a=0; a<G::_ngroups; a++) {
-                    double ess = filterParticles(g, a);
-                    output(format("     ESS = %d\n") % ess, 2);
+                if (G::_nthreads == 1) {
+                    for (unsigned a=0; a<G::_ngroups; a++) {
+                        double ess = filterParticles(g, a);
+                        output(format("     ESS = %d\n") % ess, 2);
+                    }
+                    
+    //                writeTreeFile();
+                    
+                    //debugSaveParticleVectorInfo("debug-filtered.txt", g+1);
                 }
-                
-//                writeTreeFile();
-                
-                //debugSaveParticleVectorInfo("debug-filtered.txt", g+1);
+                else {
+                    filterParticlesThreading(g);
+                }
             }
             output(format("     log marginal likelihood = %d\n") % _log_marginal_likelihood, 2);
             
@@ -733,7 +741,7 @@ namespace proj {
 
         // Throw _nparticles darts
         for (unsigned i=0; i<G::_nparticles; i++) {
-            double u = rng->uniform();
+            double u = _group_rng[group_number]->uniform();
             auto it = find_if(probs.begin(), probs.end(), [u](double cump){return cump > u;});
             assert(it != probs.end());
             unsigned which = (unsigned)std::distance(probs.begin(), it);
@@ -785,6 +793,157 @@ namespace proj {
 
                 // Copy donor to recipient
                 _particle_vec[recipient] = _particle_vec[donor];
+
+                counts[donor]--;
+                counts[recipient]++;
+                nzeros--;
+
+                if (counts[donor] == 1) {
+                    // Move donor to next slot with count > 1
+                    donor++;
+                    while (donor < G::_nparticles && counts[donor] < 2) {
+                        donor++;
+                    }
+                }
+
+                // Move recipient to next slot with count equal to 0
+                recipient++;
+                while (recipient < G::_nparticles && counts[recipient] > 0) {
+                    recipient++;
+                }
+            } // while nzeros > 0
+        } // if copying_needed
+        return ess;
+    }
+
+    inline void Proj::filterParticlesThreading(unsigned g) {
+      // divide up the groups as evenly as possible across threads
+        unsigned first = 0;
+        unsigned last = 0;
+        unsigned stride = (G::_ngroups) / G::_nthreads; // divisor
+        unsigned r = (G::_ngroups) % G::_nthreads; // remainder
+        
+        // need a vector of threads because we have to wait for each one to finish
+        vector<thread> threads;
+
+        for (unsigned i=0; i<G::_nthreads; i++) {
+            first = last;
+            last = first + stride;
+            
+            if (r > 0) {
+                last += 1;
+                r -= 1;
+            }
+            
+            if (last > (G::_ngroups)) {
+                last = (G::_ngroups);
+            }
+            
+            threads.push_back(thread(&Proj::filterParticlesRange, this, first, last, g));
+        }
+
+
+      // the join function causes this loop to pause until the ith thread finishes
+      for (unsigned i = 0; i < threads.size(); i++) {
+        threads[i].join();
+      }
+    }
+
+    inline void Proj::filterParticlesRange(unsigned first, unsigned last, unsigned g) {
+        for (unsigned i=first; i<last; i++){
+            // i is the group number
+            unsigned start = i * G::_nparticles;
+            unsigned end = start + (G::_nparticles) - 1;
+            filterParticleGroup(g, start, end);
+        }
+    }
+
+    inline double Proj::filterParticleGroup(unsigned step, unsigned start, unsigned end) {
+//        unsigned nparticles = (unsigned) particles.size();
+        // Copy log weights for all particles to probs vector
+        double group_number = start / G::_nparticles;
+        
+        vector<double> probs(G::_nparticles, 0.0);
+        
+        unsigned prob_count = 0;
+        for (unsigned p=start; p < end; p++) {
+            probs[prob_count] = _particle_vec[p].getLogWeight();
+            prob_count++;
+        }
+        
+        // Normalize log_weights to create discrete probability distribution
+        double log_sum_weights = G::calcLogSum(probs);
+        transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
+        
+        // Compute component of the log marginal likelihood due to this step
+        _log_marginal_likelihood += log_sum_weights - log(G::_nparticles);
+        
+        double ess = 0.0;
+        if (G::_verbosity > 1) {
+            // Compute effective sample size
+            ess = computeEffectiveSampleSize(probs);
+        }
+
+        // Compute cumulative probabilities
+        partial_sum(probs.begin(), probs.end(), probs.begin());
+
+        // Initialize vector of counts storing number of darts hitting each particle
+        vector<unsigned> counts(G::_nparticles, 0);
+
+        // Throw _nparticles darts
+        for (unsigned i=0; i<G::_nparticles; i++) {
+            double u = _group_rng[group_number]->uniform();
+            auto it = find_if(probs.begin(), probs.end(), [u](double cump){return cump > u;});
+            assert(it != probs.end());
+            unsigned which = (unsigned)std::distance(probs.begin(), it);
+            counts[which]++;
+        }
+        
+        // Copy particles
+
+        int donor = -1;
+        for (unsigned i = 0; i < counts.size(); i++) {
+            if (counts[i] > 1) {
+                donor = i;
+                break;
+            }
+        }
+        bool copying_needed = (donor >= 0);
+
+#if 0 // saving until we're sure the method above works for e.g. 2 particles
+        bool copying_needed = true;
+      
+        // Locate first donor
+        unsigned donor = 0;
+        while (counts[donor] < 2) {
+            donor++;
+            if (donor >= counts.size()) {
+                copying_needed = false; // all the particle counts are 1
+                break;
+            }
+        }
+#endif
+
+      if (copying_needed) {
+            // Locate first recipient
+            unsigned recipient = 0;
+            while (counts[recipient] != 0) {
+                recipient++;
+            }
+
+            // Count number of cells with zero count that can serve as copy recipients
+            unsigned nzeros = 0;
+            for (unsigned i = 0; i < G::_nparticles; i++) {
+                if (counts[i] == 0)
+                    nzeros++;
+            }
+
+            while (nzeros > 0) {
+                assert(donor < G::_nparticles);
+                assert(recipient < G::_nparticles);
+
+                // Copy donor to recipient
+                _particle_vec[recipient + start] = _particle_vec[donor + start];
 
                 counts[donor]--;
                 counts[recipient]++;
