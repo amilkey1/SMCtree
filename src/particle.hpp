@@ -27,6 +27,7 @@ class Particle {
         double                                  getBirthDeathModel();
         void                                    setStartingLogLikelihoods(vector<double> starting_log_likelihoods);
         void                                    clearPartials();
+        double                                  getPartialCount();
         string                                  saveForestNewick() {
                                                         return _forest.makeNewick(8, true);}
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
@@ -291,6 +292,10 @@ class Particle {
 
     inline void Particle::setParticleTaxSets() {
         _particle_taxsets = G::_taxsets;
+    }
+
+    inline double Particle::getPartialCount() {
+        return _forest._partial_count;
     }
 
     inline void Particle::operator=(const Particle & other) {

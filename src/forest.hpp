@@ -106,6 +106,7 @@ class Forest {
         double _estimated_root_age; // TODO: not estimating root age if fossils
         double _estimated_birth_difference;
         double _turnover;
+        double _partial_count;
     
 #if defined (FOSSILS)
         double _tree_height;
@@ -161,6 +162,7 @@ class Forest {
         _estimated_root_age = G::_root_age;
         _estimated_birth_difference = 0.0;
         _turnover = 0.0;
+        _partial_count = 0;
 #if defined (FOSSILS)
         _tree_height = 0.0;
         _valid_taxsets.clear();
@@ -194,6 +196,7 @@ class Forest {
             _lineages.push_back(&_nodes[i]);
         }
         refreshPreorder();
+        _partial_count = 0;
     }
     
     inline void Forest::setForestData(Data::SharedPtr d, bool partials) {
@@ -1375,6 +1378,7 @@ class Forest {
     }
 
     inline void Forest::calcPartialArray(Node* new_nd) {
+        _partial_count++;
         auto &data_matrix=_data->getDataMatrix();
 
         for (unsigned i=0; i<G::_nloci; i++) {
@@ -1887,6 +1891,7 @@ class Forest {
         _estimated_root_age        = other._estimated_root_age;
         _estimated_birth_difference = other._estimated_birth_difference;
         _turnover = other._turnover;
+        _partial_count = other._partial_count;
 #if defined (FOSSILS)
         _tree_height = other._tree_height;
         _valid_taxsets = other._valid_taxsets;

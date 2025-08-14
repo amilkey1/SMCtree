@@ -57,6 +57,7 @@ namespace proj {
             void writeLogMarginalLikelihoodFile() const;
             void handleBaseFrequencies();
             void handleRelativeRates();
+            void writePartialCount();
         
 #if defined(FOSSILS)
             Fossil parseFossilDefinition(string & fossil_def);
@@ -678,6 +679,7 @@ namespace proj {
                 proposeParticles(g);
                                 
                 writeTreeFile();
+                writePartialCount();
                 
                 debugSaveParticleVectorInfo("debug-proposed.txt", g+1);
                 
@@ -698,6 +700,7 @@ namespace proj {
             output(format("     log marginal likelihood = %d\n") % _log_marginal_likelihood, 2);
             
             writeTreeFile();
+            writePartialCount();
             writeLogFile();
             writeLogMarginalLikelihoodFile();
         }
@@ -1079,6 +1082,17 @@ namespace proj {
             p.setParticleTaxSets();
         }
 #endif
+    }
+
+    inline void Proj::writePartialCount() {
+        // save all partials to a .txt file
+        ofstream partialf("partials.txt");
+        double total_partial_count = 0;
+        for (auto &p:_particle_vec) {
+            total_partial_count += p.getPartialCount();
+        }
+        partialf << total_partial_count << endl;
+        partialf.close();
     }
 
     inline void Proj::writeTreeFile() {
