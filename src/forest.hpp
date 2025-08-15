@@ -839,7 +839,7 @@ class Forest {
                             }
                         }
                     }
-    //                    set_sizes.push_back((unsigned) taxset[t]._species_included.size());
+    //                    set_sizes.push_back((unsigned) taxset[t]._species_included.size()); // can't do this because species_included may include a fossil that hasn't yet been added
                     set_sizes.push_back((unsigned) node_choices.back().size());
                     set_counts.push_back(t);
     //                    total_nodes_in_sets += (unsigned) taxset[t]._species_included.size();
@@ -890,7 +890,7 @@ class Forest {
             unsigned node_choice_index = chosen_taxset;
             
             int taxset_count = -1;
-            for (unsigned v=0; v<_valid_taxsets.size(); v++) {
+            for (unsigned v=0; v<_valid_taxsets.size(); v++) { // TODO: double check this
                 if (_valid_taxsets[v]) {
                     taxset_count++;
                 }
@@ -905,47 +905,6 @@ class Forest {
             
             subtree1 = _lineages[node_choices[node_choice_index][t.first]];
             subtree2 = _lineages[node_choices[node_choice_index][t.second]];
-            
-    //            if (taxa_not_included_in_sets && chosen_set == set_sizes.size()-1) {
-    //                int nd_count = -1;
-    //
-    //                for (auto &nd:_lineages) {
-    //                    if (std::find(names_of_nodes_in_sets.begin(), names_of_nodes_in_sets.end(), nd->_name) != names_of_nodes_in_sets.end()) {
-    //                        // TODO: put something here?
-    //                    }
-    //                    else {
-    //                        nd_count++;
-    //                    }
-    //
-    //                    if (nd_count == t.first && subtree1 == NULL) {
-    //                        subtree1 = nd;
-    //                    }
-    //                    else if (nd_count == t.second && subtree2 == NULL) {
-    //                        subtree2 = nd;
-    //                    }
-    //                }
-    //            }
-    //            else {
-    //                chosen_taxset = chosen_set;
-    //
-    //                string name1 = taxset[chosen_set]._species_included[t.first];
-    //                string name2 = taxset[chosen_set]._species_included[t.second];
-    //
-    //                bool found1 = false;
-    //                bool found2 = false;
-    //                for (auto &nd:_lineages) {
-    //                    if (nd->_name == name1) {
-    //                        subtree1 = nd;
-    //                        found1 = true;
-    //                    }
-    //                    else if (nd->_name == name2) {
-    //                        subtree2 = nd;
-    //                        found2 = true;
-    //                    }
-    //                }
-    //                assert (found1);
-    //                assert (found2);
-    //            }
         }
         else {
             if (nlineages > 2) {
@@ -1066,9 +1025,7 @@ class Forest {
         //update node lists
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
         
-        // TODO: if down to one speceis in a taxon set, need to delete it? and update taxon sets as things are joined
-        // TODO: update taxset
-        // TODO: don't need to upate taxset if it's not a real set (just leftover nodes)
+        // update taxset if needed
         if (chosen_taxset != -1 && chosen_taxset != _valid_taxsets.size()-1) { // nothing to update if this was not a real taxon set
             taxset[chosen_taxset]._species_included.erase(remove(taxset[chosen_taxset]._species_included.begin(), taxset[chosen_taxset]._species_included.end(), subtree1->_name));
             taxset[chosen_taxset]._species_included.erase(remove(taxset[chosen_taxset]._species_included.begin(), taxset[chosen_taxset]._species_included.end(), subtree2->_name));
