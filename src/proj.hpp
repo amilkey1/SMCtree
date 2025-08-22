@@ -649,7 +649,6 @@ namespace proj {
                 _log_marginal_likelihood += l;
             }
             
-            // TODO: unsure with multiple groups
             _log_marginal_likelihood *= G::_ngroups;
             
             // initialize starting log likelihoods for all other particles
@@ -1041,7 +1040,6 @@ namespace proj {
         }
         
         // Copy particles
-
         int donor = -1;
         for (unsigned i = 0; i < counts.size(); i++) {
             if (counts[i] > 1) {
@@ -1208,6 +1206,7 @@ namespace proj {
             p.setFossils();
             p.drawFossilAges(); // draw a separate fossil age for each particle
             p.setParticleTaxSets();
+            p.setOverlappingTaxSets();
         }
 #endif
     }

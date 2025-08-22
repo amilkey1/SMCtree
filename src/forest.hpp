@@ -39,8 +39,8 @@ class Forest {
         void refreshPreorder();
         double calcSubsetLogLikelihood(unsigned i);
         void addIncrement(Lot::SharedPtr lot);
-        pair<double, bool> joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset);
-        pair<double, bool> joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset);
+        pair<double, bool> joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset);
+        pair<double, bool> joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset);
         double joinPriorPost(Lot::SharedPtr lot);
         pair<pair<Node*, Node*>, double> chooseAllPairs(Lot::SharedPtr lot);
         void calcPartialArray(Node* new_nd);
@@ -86,7 +86,7 @@ class Forest {
         bool addIncrementFossil(Lot::SharedPtr lot, double age, string fossil_name);
         bool addBirthDeathIncrementFossil(Lot::SharedPtr lot, double age, string fossil_name);
         double calcTransitionProbabilityFossil(Node* child, double s, double s_child, unsigned locus);
-        bool checkForValidTaxonSet(vector<TaxSet> taxset);
+        bool checkForValidTaxonSet(vector<TaxSet> taxset, vector<TaxSet> unused_taxsets);
 #endif
     
         Data::SharedPtr _data;
@@ -103,7 +103,7 @@ class Forest {
         vector<pair<Node*, Node*>> _node_choices;
         double _estimated_lambda;
         double _estimated_mu;
-        double _estimated_root_age; // TODO: not estimating root age if fossils
+        double _estimated_root_age;
         double _estimated_birth_difference;
         double _turnover;
         double _partial_count;
@@ -268,7 +268,7 @@ class Forest {
         _gene_tree_log_likelihoods[i] = 0.0;
         
         auto &counts = _data->getPatternCounts();
-        _npatterns = _data->getNumPatternsInSubset(i); // TODO: make a vector of patterns by gene?
+        _npatterns = _data->getNumPatternsInSubset(i);
         Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(i);
         _first_pattern = gene_begin_end.first;
         
@@ -493,7 +493,6 @@ class Forest {
             // Waiting time to next speciation event is first height
             // scaled so that max height is mu - cum_height
             double t = heights[0]*(_estimated_root_age - cum_height); // TODO: not sure this is right
-            // TODO: what if the tree is already to the root age but there are more fossils to add?
             
             assert (t > 0.0);
                     
@@ -575,12 +574,12 @@ class Forest {
 #endif
     }
 
-    inline pair<double, bool> Forest::joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset) {
+    inline pair<double, bool> Forest::joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset) {
         double log_weight = 0.0;
         pair<double, bool> output;
         
         if (G::_proposal == "prior-prior") {
-            output = joinPriorPrior(prev_log_likelihood, lot, taxset);
+            output = joinPriorPrior(prev_log_likelihood, lot, taxset, unused_taxset);
         }
         else {
             log_weight = joinPriorPost(lot);
@@ -757,7 +756,7 @@ class Forest {
          return make_tuple(subtree1, subtree2, new_nd);
      }
 
-    inline pair<double, bool> Forest::joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset) {
+    inline pair<double, bool> Forest::joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset) {
         bool filter = false;
         // find the new_nd from the previous step and accumulate height if needed
         
@@ -822,7 +821,7 @@ class Forest {
                 }
             }
             
-            // TODO: for now, don't worry about overlapping taxsets
+            // TODO: reset unused taxsets
             vector<vector<unsigned>> node_choices;
             
             // figure out which taxon set choices are valid (exist in _lineages)
@@ -839,15 +838,23 @@ class Forest {
                             }
                         }
                     }
-    //                    set_sizes.push_back((unsigned) taxset[t]._species_included.size()); // can't do this because species_included may include a fossil that hasn't yet been added
+                    // need to use node_choices not taxset[t]._species_included because species_included may include a fossil that hasn't yet been added
                     set_sizes.push_back((unsigned) node_choices.back().size());
                     set_counts.push_back(t);
-    //                    total_nodes_in_sets += (unsigned) taxset[t]._species_included.size();
                     total_nodes_in_sets += (unsigned) node_choices.back().size();
                 }
             }
                 
             unsigned nnodes = (unsigned) _lineages.size();
+            
+            // add unused taxset taxa to names_of_nodes_in_sets
+            for (auto &t:unused_taxset) {
+                for (auto &name:t._species_included) {
+                    if (std::find(names_of_nodes_in_sets.begin(), names_of_nodes_in_sets.end(), name) == names_of_nodes_in_sets.end()) {
+                        names_of_nodes_in_sets.push_back(name); // don't include duplicates
+                    }
+                }
+            }
                 
             vector<unsigned> nodes_not_in_taxon_sets;
             for (auto &nd:_lineages) {
@@ -873,9 +880,8 @@ class Forest {
             unsigned total_choices = 0;
             
             for (unsigned s=0; s<set_sizes.size(); s++) {
-                // TODO: need to figure out how many real nodes are in the taxon set
+                // node_choices includes only nodes that exist
                 unsigned num_choices = (unsigned) (node_choices[s].size() * (node_choices[s].size() - 1)) / 2;
-    //                unsigned num_choices = (set_sizes[s] * (set_sizes[s] - 1)) / 2;
                 set_probabilities[s] = num_choices;
                 total_choices += num_choices;
             }
@@ -890,7 +896,7 @@ class Forest {
             unsigned node_choice_index = chosen_taxset;
             
             int taxset_count = -1;
-            for (unsigned v=0; v<_valid_taxsets.size(); v++) { // TODO: double check this
+            for (unsigned v=0; v<_valid_taxsets.size(); v++) {
                 if (_valid_taxsets[v]) {
                     taxset_count++;
                 }
@@ -1025,6 +1031,7 @@ class Forest {
         //update node lists
         updateNodeVector(_lineages, subtree1, subtree2, new_nd);
         
+        bool update_unused = false;
         // update taxset if needed
         if (chosen_taxset != -1 && chosen_taxset != _valid_taxsets.size()-1) { // nothing to update if this was not a real taxon set
             taxset[chosen_taxset]._species_included.erase(remove(taxset[chosen_taxset]._species_included.begin(), taxset[chosen_taxset]._species_included.end(), subtree1->_name));
@@ -1033,6 +1040,75 @@ class Forest {
             
             if (taxset[chosen_taxset]._species_included.size() == 1) {
                 taxset.erase(taxset.begin() + chosen_taxset);
+                update_unused = true;
+            }
+        }
+        
+        // update unused taxset with new names
+        if (unused_taxset.size() > 0) {
+            string name1 = subtree1->_name;
+            string name2 = subtree2->_name;
+            string new_name = new_nd->_name;
+            
+            for (auto &t:unused_taxset) {
+                bool new_name_added = false;
+                for (auto &name:t._species_included) {
+                    if (!new_name_added) {
+                        if (name == name1) {
+                            name = new_name;
+                            new_name_added = true;
+                        }
+                        else if (name == name2) {
+                            name = new_name;
+                            new_name_added = true;
+                        }
+                    }
+                    else {
+                        if (name == name1) {
+                            t._species_included.erase(remove(t._species_included.begin(), t._species_included.end(), name1));
+                        }
+                        else if (name == name2) {
+                            t._species_included.erase(remove(t._species_included.begin(), t._species_included.end(), name2));
+                        }
+                    }
+                }
+            }
+        }
+        
+        // TODO: find corresponding unused taxset and replace
+        // TODO: find unused taxsets with new_name in them
+        if (update_unused) {
+            vector<unsigned> updateable_unused;
+            vector<unsigned> updateable_unused_sizes;
+            string new_name = new_nd->_name;
+            for (unsigned count=0; count < unused_taxset.size(); count++) {
+                for (auto &n:unused_taxset[count]._species_included) {
+                    if (n == new_name) { // TODO: this doesn't work if there are multiple overlapping taxsets; need to check for that before adding in the new one
+                        updateable_unused.push_back(count);
+                        updateable_unused_sizes.push_back((unsigned) unused_taxset[count]._species_included.size());
+                        break;
+                    }
+                }
+            }
+            
+            if (updateable_unused.size() > 0) {
+                    // check for overlapping taxa with existing taxsets before adding anything in
+                    auto min_it = min_element(updateable_unused_sizes.begin(), updateable_unused_sizes.end());
+                    unsigned min_index = (unsigned) std::distance(updateable_unused_sizes.begin(), min_it);
+                    vector<string> common_elements;
+                    // Find the intersection of the two vectors
+
+                    for (unsigned count = 0; count < taxset.size(); count++) {
+                        std::set_intersection(taxset[count]._species_included.begin(), taxset[count]._species_included.end(),
+                                              unused_taxset[min_index]._species_included.begin(), unused_taxset[min_index]._species_included.end(),
+                                          std::back_inserter(common_elements));
+                    }
+                    
+                    if (common_elements.size() == 0) {
+                        // add unused taxset into taxsets
+                        taxset.push_back(unused_taxset[updateable_unused[min_index]]);
+                        unused_taxset.erase(unused_taxset.begin() + min_index);
+                    }
             }
         }
 
@@ -1056,7 +1132,7 @@ class Forest {
                         }
                     }
                 }
-                if (!boost::ends_with(new_nd->_left_child->_right_sib->_name, "FOSSIL")) { // TODO: if or else if?
+                if (!boost::ends_with(new_nd->_left_child->_right_sib->_name, "FOSSIL")) {
                     int next_node = new_nd->_left_child->_right_sib->_next_real_node;
                     if (next_node > -1) {
                         new_nd->_next_real_node = new_nd->_left_child->_right_sib->_number;
@@ -1228,7 +1304,6 @@ class Forest {
             // density increment is the probability of having exactly i species at time t
             // TODO: is t the increment or the accumulated height?
             
-//            showForest();
             t = _increments[count]; // TODO: = or += ?
             double a = (E*(exp(r)*t - 1)) / (exp(r)*t - E);
 //            double B = (exp(r)*t - 1) / (exp(r)*t - E);
@@ -1526,7 +1601,7 @@ class Forest {
     }
 
 #if defined (FOSSILS)
-    inline bool Forest::checkForValidTaxonSet(vector<TaxSet> taxset) {
+    inline bool Forest::checkForValidTaxonSet(vector<TaxSet> taxset, vector<TaxSet> unused_taxsets) {
         bool valid = false;
                 
         vector<string> names_of_nodes_in_sets;
@@ -1567,13 +1642,21 @@ class Forest {
         // check if there are any taxa that are not in the taxset
         unsigned nnodes = (unsigned) _lineages.size();
         
+        for (auto &t:unused_taxsets) {
+            for (auto &name:t._species_included) {
+                if (std::find(names_of_nodes_in_sets.begin(), names_of_nodes_in_sets.end(), name) == names_of_nodes_in_sets.end()) {
+                    names_of_nodes_in_sets.push_back(name); // don't include duplicates
+                }
+            }
+        }
+        
         for (auto &nd:_lineages) {
             if (std::find(names_of_nodes_in_sets.begin(), names_of_nodes_in_sets.end(), nd->_name) != names_of_nodes_in_sets.end()) {
                 nnodes--;
             }
         }
         
-        if (nnodes > 1) {
+        if (nnodes > 1) { // TODO: if you have overlapping taxsets, this may not be true
             valid = true;
         }
         
@@ -1967,7 +2050,7 @@ class Forest {
     inline void Forest::simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites) {
         
         // Create vector of states for each node in the tree
-        unsigned nnodes = (unsigned)_nodes.size(); // TODO: don't add sequences for fake nodes
+        unsigned nnodes = (unsigned)_nodes.size();
 #if defined (FOSSILS)
         nnodes = 0;
         for (auto &nd:_nodes) {
@@ -2401,7 +2484,7 @@ class Forest {
             advanceAllLineagesBy(t);
     #endif
             
-            joinRandomLineagePair(rng); // TODO: is it okay to simulate a fossil with 0 branch length?
+            joinRandomLineagePair(rng);
         }
     #else
         // Draw n-1 internal node heights and store in vector heights
@@ -2692,7 +2775,7 @@ class Forest {
         // for now, n = G::_root_age set by user
         _estimated_root_age = lot->gamma(1, G::_root_age);
 #if defined (FOSSILS)
-        _estimated_root_age = G::_root_age; // TODO: root age must be at least as large as the oldest fossil age
+        _estimated_root_age = G::_root_age;
 #endif
     }
 

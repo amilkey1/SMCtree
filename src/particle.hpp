@@ -10,7 +10,7 @@ class Particle {
 
         typedef std::shared_ptr<Particle>               SharedPtr;
     
-        void                                            setParticleData(Data::SharedPtr d, bool partials);
+        void                                    setParticleData(Data::SharedPtr d, bool partials);
         void                                    operator=(const Particle & other);
         vector<double>                          calcGeneTreeLogLikelihoods();
         double                                  getLogWeight() const {return _log_weight;}
@@ -43,6 +43,7 @@ class Particle {
         void setFossils() {_particle_fossils = G::_fossils;}
         void drawFossilAges();
         void setParticleTaxSets();
+        void setOverlappingTaxSets();
 #endif
     
     private:
@@ -55,6 +56,7 @@ class Particle {
         unsigned                                _fossil_number;
         vector<Fossil>                          _particle_fossils; // each particle needs it own set of fossils with their own ages
         vector<TaxSet>                          _particle_taxsets; // update this as nodes are joined
+        vector<TaxSet>                          _unused_particle_taxsets; // if there are overlapping taxa in taxsets, put the largest groups here until they can be used
 #endif
 };
 
@@ -144,7 +146,7 @@ class Particle {
                 
                 // check that at least one taxon set is valid
                 // if there is no valid taxon set, keep adding increments until a valid set has been reached
-                valid = _forest.checkForValidTaxonSet(_particle_taxsets);
+                valid = _forest.checkForValidTaxonSet(_particle_taxsets, _unused_particle_taxsets);
                 
                 
                 if (_forest._lineages.size() == 1 && _fossil_number == G::_fossils.size() - 1) { // if forest is finished, break out of step even if we have ended on a fossil
@@ -155,8 +157,9 @@ class Particle {
 #else
             _forest.addIncrement(_lot);
 #endif
-            pair<double, bool> output = _forest.joinTaxa(prev_log_likelihood, _lot, _particle_taxsets);
-            
+            pair<double, bool> output = _forest.joinTaxa(prev_log_likelihood, _lot, _particle_taxsets, _unused_particle_taxsets);
+                       
+//            _forest.showForest(); // TODO: bears - unused taxsets is not working correctly - 1_crownbears gets added too soon (in step 4 or 5?)
             _log_weight = output.first;
             bool filter = output.second;
             
@@ -294,6 +297,46 @@ class Particle {
         _particle_taxsets = G::_taxsets;
     }
 
+    inline void Particle::setOverlappingTaxSets() {
+        for (auto &t:_particle_taxsets) {
+            sort(t._species_included.begin(), t._species_included.end());
+        }
+        
+        vector<unsigned> unused_taxsets_index;
+        // go through taxsets one by one and check for duplicate taxa
+        for (unsigned count = 0; count < _particle_taxsets.size(); count++) {
+            for (unsigned comparison = count + 1; comparison < _particle_taxsets.size(); comparison++) {
+                vector<string> common_elements;
+                // Find the intersection of the two vectors
+
+                std::set_intersection(_particle_taxsets[count]._species_included.begin(), _particle_taxsets[count]._species_included.end(),
+                                  _particle_taxsets[comparison]._species_included.begin(), _particle_taxsets[comparison]._species_included.end(),
+                                  std::back_inserter(common_elements));
+                if (common_elements.size() > 0) { // the larger taxset  goes in unused taxsets
+                    if (_particle_taxsets[count]._species_included.size() > _particle_taxsets[comparison]._species_included.size()) {
+                        if (std::find(unused_taxsets_index.begin(), unused_taxsets_index.end(), count) == unused_taxsets_index.end()) {
+                            unused_taxsets_index.push_back(count); // don't include duplicates
+                        }
+                    }
+                    else {
+                        if (std::find(unused_taxsets_index.begin(), unused_taxsets_index.end(), comparison) == unused_taxsets_index.end()) {
+                            unused_taxsets_index.push_back(comparison); // don't include duplicates
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (unused_taxsets_index.size() > 0) {
+            for (unsigned i=0; i<unused_taxsets_index.size(); i++) {
+                _unused_particle_taxsets.push_back(_particle_taxsets[unused_taxsets_index[i]]);
+            }
+            for (int i = (int) unused_taxsets_index.size() - 1; i>=0; i--) {
+                _particle_taxsets.erase(_particle_taxsets.begin() + unused_taxsets_index[i]);
+            }
+        }
+    }
+
     inline double Particle::getPartialCount() {
         return _forest._partial_count;
     }
@@ -305,7 +348,9 @@ class Particle {
         _fossil_number = other._fossil_number;
         _particle_fossils = other._particle_fossils;
         _particle_taxsets = other._particle_taxsets;
+        _unused_particle_taxsets = other._unused_particle_taxsets;
 #endif
     }
     
 }
+
