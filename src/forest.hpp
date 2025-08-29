@@ -1033,47 +1033,107 @@ class Forest {
         
         bool update_unused = false;
         // update taxset if needed
-        if (chosen_taxset != -1 && chosen_taxset != _valid_taxsets.size()-1) { // nothing to update if this was not a real taxon set
-            taxset[chosen_taxset]._species_included.erase(remove(taxset[chosen_taxset]._species_included.begin(), taxset[chosen_taxset]._species_included.end(), subtree1->_name));
-            taxset[chosen_taxset]._species_included.erase(remove(taxset[chosen_taxset]._species_included.begin(), taxset[chosen_taxset]._species_included.end(), subtree2->_name));
-            taxset[chosen_taxset]._species_included.push_back(new_nd->_name);
-            
-            if (taxset[chosen_taxset]._species_included.size() == 1) {
-                taxset.erase(taxset.begin() + chosen_taxset);
-                update_unused = true;
-            }
-        }
+        // TODO: go through all taxsets in existence and look for chosen taxa, then update all of them
+        // TODO: because there might be multiple taxsets with the same taxon names
         
-        // update unused taxset with new names
-        if (unused_taxset.size() > 0) {
-            string name1 = subtree1->_name;
-            string name2 = subtree2->_name;
-            string new_name = new_nd->_name;
-            
-            for (auto &t:unused_taxset) {
-                bool new_name_added = false;
-                for (auto &name:t._species_included) {
-                    if (!new_name_added) {
-                        if (name == name1) {
-                            name = new_name;
-                            new_name_added = true;
-                        }
-                        else if (name == name2) {
-                            name = new_name;
-                            new_name_added = true;
-                        }
-                    }
-                    else {
-                        if (name == name1) {
-                            t._species_included.erase(remove(t._species_included.begin(), t._species_included.end(), name1));
-                        }
-                        else if (name == name2) {
-                            t._species_included.erase(remove(t._species_included.begin(), t._species_included.end(), name2));
-                        }
-                    }
+        string name1 = subtree1->_name;
+        string name2 = subtree2->_name;
+        
+        vector<bool> update_these_taxsets;
+        vector<bool> update_these_unused_taxsets;
+        
+        for (auto &t:taxset) {
+            bool update = false;
+            unsigned count = 0;
+            for (auto &n:t._species_included) {
+                if (n == name1 || n == name2) {
+                    update_these_taxsets.push_back(true);
+                    break;
+                }
+                count++;
+                if (count == t._species_included.size()) {
+                    update_these_taxsets.push_back(update);
                 }
             }
         }
+        
+        for (auto &t:unused_taxset) {
+            bool update = false;
+            unsigned count = 0;
+            for (auto &n:t._species_included) {
+                if (n == name1 || n == name2) {
+                    update_these_unused_taxsets.push_back(true);
+                    break;
+                }
+                count++;
+                if (count == t._species_included.size()) {
+                    update_these_unused_taxsets.push_back(update);
+                }
+            }
+        }
+        // TODO: update taxsets as needed
+        for (unsigned i=0; i<update_these_taxsets.size(); i++) {
+            if (update_these_taxsets[i] == true) {
+                taxset[i]._species_included.erase(remove(taxset[i]._species_included.begin(), taxset[i]._species_included.end(), subtree1->_name));
+                taxset[i]._species_included.erase(remove(taxset[i]._species_included.begin(), taxset[i]._species_included.end(), subtree2->_name));
+                taxset[i]._species_included.push_back(new_nd->_name);
+                
+                if (taxset[i]._species_included.size() == 1) {
+                    taxset.erase(taxset.begin() + i);
+                    update_unused = true;
+                }
+            }
+        }
+        
+        for (unsigned i=0; i<update_these_unused_taxsets.size(); i++) {
+            if (update_these_unused_taxsets[i] == true) {
+                unused_taxset[i]._species_included.erase(remove(unused_taxset[i]._species_included.begin(), unused_taxset[i]._species_included.end(), subtree1->_name));
+                unused_taxset[i]._species_included.erase(remove(unused_taxset[i]._species_included.begin(), unused_taxset[i]._species_included.end(), subtree2->_name));
+                unused_taxset[i]._species_included.push_back(new_nd->_name);
+            }
+        }
+        
+//        if (chosen_taxset != -1 && chosen_taxset != _valid_taxsets.size()-1) { // nothing to update if this was not a real taxon set
+//            taxset[chosen_taxset]._species_included.erase(remove(taxset[chosen_taxset]._species_included.begin(), taxset[chosen_taxset]._species_included.end(), subtree1->_name));
+//            taxset[chosen_taxset]._species_included.erase(remove(taxset[chosen_taxset]._species_included.begin(), taxset[chosen_taxset]._species_included.end(), subtree2->_name));
+//            taxset[chosen_taxset]._species_included.push_back(new_nd->_name);
+//
+//            if (taxset[chosen_taxset]._species_included.size() == 1) {
+//                taxset.erase(taxset.begin() + chosen_taxset);
+//                update_unused = true;
+//            }
+//        }
+        
+        // update unused taxset with new names
+//        if (unused_taxset.size() > 0) {
+//            string name1 = subtree1->_name;
+//            string name2 = subtree2->_name;
+//            string new_name = new_nd->_name;
+//
+//            for (auto &t:unused_taxset) {
+//                bool new_name_added = false;
+//                for (auto &name:t._species_included) {
+//                    if (!new_name_added) {
+//                        if (name == name1) {
+//                            name = new_name;
+//                            new_name_added = true;
+//                        }
+//                        else if (name == name2) {
+//                            name = new_name;
+//                            new_name_added = true;
+//                        }
+//                    }
+//                    else {
+//                        if (name == name1) {
+//                            t._species_included.erase(remove(t._species_included.begin(), t._species_included.end(), name1));
+//                        }
+//                        else if (name == name2) {
+//                            t._species_included.erase(remove(t._species_included.begin(), t._species_included.end(), name2));
+//                        }
+//                    }
+//                }
+//            }
+//        }
         
         // TODO: find corresponding unused taxset and replace
         // TODO: find unused taxsets with new_name in them

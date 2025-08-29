@@ -680,7 +680,7 @@ namespace proj {
                 
                 proposeParticles(g);
                 
-                debugSaveParticleVectorInfo("debug-proposed.txt", g+1);
+//                debugSaveParticleVectorInfo("debug-proposed.txt", g+1);
                 
                 if (G::_nthreads == 1) {
                     for (unsigned a=0; a<G::_ngroups; a++) {

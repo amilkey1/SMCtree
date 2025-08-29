@@ -146,6 +146,8 @@ class Particle {
                 
                 // check that at least one taxon set is valid
                 // if there is no valid taxon set, keep adding increments until a valid set has been reached
+//                _forest.showForest();
+                
                 valid = _forest.checkForValidTaxonSet(_particle_taxsets, _unused_particle_taxsets);
                 
                 
