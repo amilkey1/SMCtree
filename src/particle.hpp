@@ -21,9 +21,12 @@ class Particle {
         double                                  getTreeLength();
         double                                  getEstLambda() {return _forest._estimated_lambda;}
         double                                  getEstMu() {return _forest._estimated_mu;}
+        double                                  getEstRootAge() {return _forest._estimated_root_age;}
         double                                  getLogLikelihood();
         double                                  getYuleModel();
         double                                  getAllPriors();
+        double                                  getFBDModel();
+        vector<double>                          getTaxsetAges();
         double                                  getBirthDeathModel();
         void                                    setStartingLogLikelihoods(vector<double> starting_log_likelihoods);
         void                                    clearPartials();
@@ -38,7 +41,7 @@ class Particle {
         void drawRootAge();
         void calculateLambdaAndMu();
         void drawLambda();
- 
+
 #if defined (FOSSILS)
         void setFossils() {_particle_fossils = G::_fossils;}
         void drawFossilAges();
@@ -220,6 +223,10 @@ class Particle {
         return _forest.getTreePrior();
     }
 
+    inline double Particle::getFBDModel() {
+        return _forest.getTreePrior();
+    }
+
     inline double Particle::getAllPriors() {
         double tree_prior = _forest.getTreePrior();
         double param_prior = 0.0;
@@ -337,6 +344,14 @@ class Particle {
                 _particle_taxsets.erase(_particle_taxsets.begin() + unused_taxsets_index[i]);
             }
         }
+    }
+
+    inline vector<double> Particle::getTaxsetAges() {
+        vector<double> ages;
+        for (auto &t:_forest._taxset_ages) {
+            ages.push_back(t.second);
+        }
+        return ages;
     }
 
     inline double Particle::getPartialCount() {

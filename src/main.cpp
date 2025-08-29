@@ -96,9 +96,9 @@ vector<double> G::_base_frequencies;
 string   G::_string_relative_rates = "";
 vector<double> G::_double_relative_rates;
 string G::_proposal = "prior-prior";
-bool G::_est_lambda = "false";
-bool G::_est_mu = "false";
-bool G::_est_root_age = "false";
+bool G::_est_lambda = false;
+bool G::_est_mu = false;
+bool G::_est_root_age = false;
 unsigned G::_ngroups = 1.0;
 #if defined (FOSSILS)
 vector<Fossil> G::_fossils;

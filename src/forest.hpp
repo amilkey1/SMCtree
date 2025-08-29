@@ -107,6 +107,7 @@ class Forest {
         double _estimated_birth_difference;
         double _turnover;
         double _partial_count;
+        vector<pair<string, double>> _taxset_ages;
     
 #if defined (FOSSILS)
         double _tree_height;
@@ -1071,7 +1072,7 @@ class Forest {
                 }
             }
         }
-        // TODO: update taxsets as needed
+        // update taxsets as needed
         for (unsigned i=0; i<update_these_taxsets.size(); i++) {
             if (update_these_taxsets[i] == true) {
                 taxset[i]._species_included.erase(remove(taxset[i]._species_included.begin(), taxset[i]._species_included.end(), subtree1->_name));
@@ -1081,6 +1082,7 @@ class Forest {
                 if (taxset[i]._species_included.size() == 1) {
                     taxset.erase(taxset.begin() + i);
                     update_unused = true;
+                    _taxset_ages.push_back(make_pair(taxset[i]._name, _tree_height));
                 }
             }
         }
@@ -1093,57 +1095,14 @@ class Forest {
             }
         }
         
-//        if (chosen_taxset != -1 && chosen_taxset != _valid_taxsets.size()-1) { // nothing to update if this was not a real taxon set
-//            taxset[chosen_taxset]._species_included.erase(remove(taxset[chosen_taxset]._species_included.begin(), taxset[chosen_taxset]._species_included.end(), subtree1->_name));
-//            taxset[chosen_taxset]._species_included.erase(remove(taxset[chosen_taxset]._species_included.begin(), taxset[chosen_taxset]._species_included.end(), subtree2->_name));
-//            taxset[chosen_taxset]._species_included.push_back(new_nd->_name);
-//
-//            if (taxset[chosen_taxset]._species_included.size() == 1) {
-//                taxset.erase(taxset.begin() + chosen_taxset);
-//                update_unused = true;
-//            }
-//        }
-        
-        // update unused taxset with new names
-//        if (unused_taxset.size() > 0) {
-//            string name1 = subtree1->_name;
-//            string name2 = subtree2->_name;
-//            string new_name = new_nd->_name;
-//
-//            for (auto &t:unused_taxset) {
-//                bool new_name_added = false;
-//                for (auto &name:t._species_included) {
-//                    if (!new_name_added) {
-//                        if (name == name1) {
-//                            name = new_name;
-//                            new_name_added = true;
-//                        }
-//                        else if (name == name2) {
-//                            name = new_name;
-//                            new_name_added = true;
-//                        }
-//                    }
-//                    else {
-//                        if (name == name1) {
-//                            t._species_included.erase(remove(t._species_included.begin(), t._species_included.end(), name1));
-//                        }
-//                        else if (name == name2) {
-//                            t._species_included.erase(remove(t._species_included.begin(), t._species_included.end(), name2));
-//                        }
-//                    }
-//                }
-//            }
-//        }
-        
-        // TODO: find corresponding unused taxset and replace
-        // TODO: find unused taxsets with new_name in them
+        // if a taxset is down to one taxon, find corresponding unused taxset and replace
         if (update_unused) {
             vector<unsigned> updateable_unused;
             vector<unsigned> updateable_unused_sizes;
             string new_name = new_nd->_name;
             for (unsigned count=0; count < unused_taxset.size(); count++) {
                 for (auto &n:unused_taxset[count]._species_included) {
-                    if (n == new_name) { // TODO: this doesn't work if there are multiple overlapping taxsets; need to check for that before adding in the new one
+                    if (n == new_name) {
                         updateable_unused.push_back(count);
                         updateable_unused_sizes.push_back((unsigned) unused_taxset[count]._species_included.size());
                         break;
@@ -1152,23 +1111,23 @@ class Forest {
             }
             
             if (updateable_unused.size() > 0) {
-                    // check for overlapping taxa with existing taxsets before adding anything in
-                    auto min_it = min_element(updateable_unused_sizes.begin(), updateable_unused_sizes.end());
-                    unsigned min_index = (unsigned) std::distance(updateable_unused_sizes.begin(), min_it);
-                    vector<string> common_elements;
-                    // Find the intersection of the two vectors
+                // check for overlapping taxa with existing taxsets before adding anything in
+                auto min_it = min_element(updateable_unused_sizes.begin(), updateable_unused_sizes.end());
+                unsigned min_index = (unsigned) std::distance(updateable_unused_sizes.begin(), min_it);
+                vector<string> common_elements;
+                // Find the intersection of the two vectors
 
-                    for (unsigned count = 0; count < taxset.size(); count++) {
-                        std::set_intersection(taxset[count]._species_included.begin(), taxset[count]._species_included.end(),
-                                              unused_taxset[min_index]._species_included.begin(), unused_taxset[min_index]._species_included.end(),
-                                          std::back_inserter(common_elements));
-                    }
+                for (unsigned count = 0; count < taxset.size(); count++) {
+                    std::set_intersection(taxset[count]._species_included.begin(), taxset[count]._species_included.end(),
+                                          unused_taxset[min_index]._species_included.begin(), unused_taxset[min_index]._species_included.end(),
+                                      std::back_inserter(common_elements));
+                }
                     
-                    if (common_elements.size() == 0) {
-                        // add unused taxset into taxsets
-                        taxset.push_back(unused_taxset[updateable_unused[min_index]]);
-                        unused_taxset.erase(unused_taxset.begin() + min_index);
-                    }
+                if (common_elements.size() == 0) {
+                    // add unused taxset into taxsets
+                    taxset.push_back(unused_taxset[updateable_unused[min_index]]);
+                    unused_taxset.erase(unused_taxset.begin() + min_index);
+                }
             }
         }
 
@@ -1992,6 +1951,7 @@ class Forest {
         _estimated_birth_difference = other._estimated_birth_difference;
         _turnover = other._turnover;
         _partial_count = other._partial_count;
+        _taxset_ages = other._taxset_ages;
 #if defined (FOSSILS)
         _tree_height = other._tree_height;
         _valid_taxsets = other._valid_taxsets;

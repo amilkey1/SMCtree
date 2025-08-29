@@ -122,8 +122,9 @@ namespace proj {
         ("base_frequencies", boost::program_options::value(&G::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
         ("relative_rates", boost::program_options::value(&G::_string_relative_rates)->default_value("null"), "relative rates by locus")
         ("proposal", boost::program_options::value(&G::_proposal)->default_value("prior-prior"), "prior-prior or prior-post")
-        ("estimate_lambda", boost::program_options::value(&G::_est_lambda)->default_value("false"), "estimate birth rate")
-        ("estimate_mu", boost::program_options::value(&G::_est_mu)->default_value("false"), "estimate death rate")
+        ("estimate_lambda", boost::program_options::value(&G::_est_lambda)->default_value(false), "estimate birth rate")
+        ("estimate_mu", boost::program_options::value(&G::_est_mu)->default_value(false), "estimate death rate")
+        ("estimate_root_age", boost::program_options::value(&G::_est_root_age)->default_value(false), "estimate root age")
         ("ngroups", boost::program_options::value(&G::_ngroups)->default_value(1.0), "number of subgroups")
 #if defined(FOSSILS)
         ("fossil",  value(&fossils), "a string defining a fossil, e.g. 'Ursus_abstrusus         1.8–5.3 4.3' (4.3 is time, 1.8-5.3 is prior range)")
@@ -1250,15 +1251,20 @@ namespace proj {
         
         logf << "\t" << "Tree.height";
         logf << "\t" << "Tree.treeLength";
+        logf << "\t" << "clockRate";
         
-        if (G::_mu > 0.0) {
-            logf << "\t" << "BirthDeath";
-            logf << "\t" << "BDBirthRate";
-            logf << "\t" << "BDDeathRate";
-        }
-        else {
-            logf << "\t" << "YuleModel";
-            logf << "\t" << "birthRate";
+        logf << "\t" << "FBD";
+        
+        logf << "\t" << "diversificationRateFBD";
+        logf << "\t" << "turnoverFBD";
+        
+        logf << "\t" << "samplingProportionFBD";
+        logf << "\t" << "originFBD";
+        logf << "\t" << "SACountFBD";
+        
+        for (auto &t:G::_taxsets) {
+            string taxset_name = t._name;
+            logf << "\t" << "mrca.date-backward(" + taxset_name + ")";
         }
 
         logf << endl;
@@ -1277,6 +1283,9 @@ namespace proj {
             vector<double> tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
             double height = p.getTreeHeight();
             double length = p.getTreeLength();
+            double clock_rate = 1.0;
+            double FBD = p.getFBDModel();
+            double sampling_proportion = 1.0;
             
             double birth_death = 0.0;
             if (G::_mu > 0.0) {
@@ -1294,31 +1303,39 @@ namespace proj {
             }
             logf << "\t" << height;
             logf << "\t" << length;
+            logf << "\t" << clock_rate;
+            logf << "\t" << FBD;
             
-            if (G::_mu > 0.0) {
-                logf << "\t" << birth_death;
-            }
-            else {
-                logf << "\t" << yule;
-            }
+//            if (G::_mu > 0.0) {
+//                logf << "\t" << birth_death;
+//            }
+//            else {
+//                logf << "\t" << yule;
+//            }
             
             double lambda = 0.0;
             double mu = 0.0;
             
-            if (G::_lambda) {
+            if (G::_est_lambda) {
                 lambda = p.getEstLambda();
             }
             else {
                 lambda = G::_lambda;
             }
             
-            if (G::_mu > 0.0) {
-                if (G::_mu) {
+            if (G::_est_mu) {
                     mu = p.getEstMu();
-                }
-                else {
-                    mu = G::_mu;
-                }
+            }
+            else {
+                mu = G::_mu;
+            }
+            
+            double root_age = 0.0;
+            if (G::_est_root_age) {
+                root_age = p.getEstRootAge();
+            }
+            else {
+                root_age = G::_root_age;
             }
             
 //            to be consistent with beast output, birth rate is "effective birth rate": lambda - mu
@@ -1327,15 +1344,29 @@ namespace proj {
 //            https://beast2-dev.github.io/hmc/hmc//Priors/DeathRatePrior/
 //            https://beast2-dev.github.io/hmc/hmc//Priors/BirthRatePrior/
             
-            double effective_birth_rate = lambda - mu;
-            double bddeathrate = mu / lambda;
+            double diversification_rate = lambda - mu;
+            double turnover = mu / lambda;
+            double SACountFBD = 0;
             
-            logf << "\t" << effective_birth_rate;
+            
+            vector<double> taxset_ages = p.getTaxsetAges();
+            
+            logf << "\t" << diversification_rate;
             
             if (G::_mu > 0.0) {
-                logf << "\t" << bddeathrate;
+                logf << "\t" << turnover;
             }
             
+            logf << "\t" << sampling_proportion;
+            
+            logf << "\t" << root_age;
+            
+            logf << "\t" << SACountFBD;
+            
+            
+            for (auto &t:taxset_ages) {
+                logf << "\t" << t;
+            }
 
             logf << endl;
         }
