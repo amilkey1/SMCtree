@@ -56,6 +56,8 @@ namespace proj {
         static double                   _root_age;
         static vector<double>           _base_frequencies;
         static vector<double>           _double_relative_rates;
+        static unsigned                 _save_every;
+        
 #if defined(FOSSILS)
         static vector<Fossil>           _fossils;
         static vector<TaxSet>           _taxsets;

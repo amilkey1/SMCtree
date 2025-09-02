@@ -3,6 +3,7 @@
 #if defined (FOSSILS)
     #include <codecvt>
 #endif
+#include <random>
 
 using boost::filesystem::current_path;
 using boost::algorithm::join;
@@ -64,13 +65,14 @@ namespace proj {
             TaxSet parseTaxsetDefinition(string & taxset_def);
 #endif
 
-            vector<Particle>     _particle_vec;
+            vector<Particle>            _particle_vec;
         
-            Forest::SharedPtr    _sim_tree;
-            Partition::SharedPtr _partition;
-            Data::SharedPtr      _data;
-            double               _log_marginal_likelihood;
+            Forest::SharedPtr           _sim_tree;
+            Partition::SharedPtr        _partition;
+            Data::SharedPtr             _data;
+            double                      _log_marginal_likelihood;
             vector<Lot::SharedPtr>      _group_rng;
+            vector<unsigned>            _indices_to_keep; // indices of particles to write to output files
     };
 
     inline Proj::Proj() {
@@ -126,6 +128,7 @@ namespace proj {
         ("estimate_mu", boost::program_options::value(&G::_est_mu)->default_value(false), "estimate death rate")
         ("estimate_root_age", boost::program_options::value(&G::_est_root_age)->default_value(false), "estimate root age")
         ("ngroups", boost::program_options::value(&G::_ngroups)->default_value(1.0), "number of subgroups")
+        ("save_every", boost::program_options::value(&G::_save_every)->default_value(1.0), "save one out of this number of trees in params and tree files")
 #if defined(FOSSILS)
         ("fossil",  value(&fossils), "a string defining a fossil, e.g. 'Ursus_abstrusus         1.8–5.3 4.3' (4.3 is time, 1.8-5.3 is prior range)")
         ("taxset",  value(&taxsets), "a string defining a taxon set, e.g. 'Ursinae: Helarctos_malayanus Melursus_ursinus Ursus_abstrusus Ursus_americanus Ursus_arctos Ursus_maritimus Ursus_spelaeus Ursus_thibetanus'")
@@ -584,6 +587,25 @@ namespace proj {
         output(format("Current working directory: %s\n") % boost::filesystem::current_path(), 1);
         output(format("Random seed: %d\n") % G::_rnseed, 1);
         output(format("Number of threads: %d\n") % G::_nthreads, 1);
+        
+        // save indices of particles to keep when thinning output
+        for (unsigned p=0; p<G::_ngroups * G::_nparticles; p++) {
+            _indices_to_keep.push_back(p);
+        }
+        
+        std::shuffle(_indices_to_keep.begin(), _indices_to_keep.end(), std::default_random_engine(G::_rnseed)); // shuffle particle indices
+        
+        // save first sample_size of indices
+        unsigned sample_size = round(double (G::_nparticles * G::_ngroups) / double(G::_save_every) );
+        if (sample_size == 0) {
+            sample_size = G::_nparticles * G::_ngroups;
+        }
+        
+        unsigned n_indices_to_delete = (unsigned) _indices_to_keep.size() - sample_size;
+        
+        // delete last n_indices_to_delete elements of vector
+        _indices_to_keep.erase(_indices_to_keep.end() - n_indices_to_delete, _indices_to_keep.end());
+        assert (_indices_to_keep.size() == sample_size);
         
         try {
             _data = Data::SharedPtr(new Data());
@@ -1229,8 +1251,9 @@ namespace proj {
         treef << "#nexus\n\n";
         treef << "begin trees;\n";
         
-        for (auto &p:_particle_vec) {
-            treef << "  tree sample = [&R] " << p.saveForestNewick() << ";\n";
+        for (unsigned n = 0; n <_indices_to_keep.size(); n++) {
+            unsigned index = _indices_to_keep[n];
+            treef << "  tree sample = [&R] " << _particle_vec[index].saveForestNewick() << ";\n";
         }
         
         treef << "end;\n";
@@ -1268,9 +1291,11 @@ namespace proj {
         }
 
         logf << endl;
-
+        
         int iter = 0;
-        for (auto &p:_particle_vec) {
+        for (unsigned n = 0; n <_indices_to_keep.size(); n++) {
+            unsigned index = _indices_to_keep[n];
+            Particle p = _particle_vec[index];
             logf << iter;
             iter++;
             
