@@ -1373,8 +1373,7 @@ namespace proj {
             double turnover = mu / lambda;
             double SACountFBD = 0;
             
-            
-            vector<double> taxset_ages = p.getTaxsetAges();
+            map<string, double> particle_taxset_map = p.getTaxsetAges();
             
             logf << "\t" << diversification_rate;
             
@@ -1388,9 +1387,10 @@ namespace proj {
             
             logf << "\t" << SACountFBD;
             
-            
-            for (auto &t:taxset_ages) {
-                logf << "\t" << t;
+            for (auto &t:G::_taxsets) {
+                string name = t._name;
+                double age = particle_taxset_map[name];
+                logf << "\t" << age;
             }
 
             logf << endl;

@@ -26,7 +26,7 @@ class Particle {
         double                                  getYuleModel();
         double                                  getAllPriors();
         double                                  getFBDModel();
-        vector<double>                          getTaxsetAges();
+        map<string, double>                     getTaxsetAges();
         double                                  getBirthDeathModel();
         void                                    setStartingLogLikelihoods(vector<double> starting_log_likelihoods);
         void                                    clearPartials();
@@ -346,12 +346,8 @@ class Particle {
         }
     }
 
-    inline vector<double> Particle::getTaxsetAges() {
-        vector<double> ages;
-        for (auto &t:_forest._taxset_ages) {
-            ages.push_back(t.second);
-        }
-        return ages;
+    inline map<string, double> Particle::getTaxsetAges() {
+        return _forest._taxset_ages;
     }
 
     inline double Particle::getPartialCount() {

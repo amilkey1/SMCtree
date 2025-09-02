@@ -89,25 +89,25 @@ class Forest {
         bool checkForValidTaxonSet(vector<TaxSet> taxset, vector<TaxSet> unused_taxsets);
 #endif
     
-        Data::SharedPtr _data;
-        vector<Node *> _lineages;
-        vector<Node> _nodes;
-        vector<Node*> _preorder;
-        unsigned _first_pattern;
-        unsigned _npatterns;
-        vector<double> _gene_tree_log_likelihoods;
-        unsigned _ninternals;
-        unsigned _nleaves;
-        double _log_joining_prob;
-        vector<double> _increments;
-        vector<pair<Node*, Node*>> _node_choices;
-        double _estimated_lambda;
-        double _estimated_mu;
-        double _estimated_root_age;
-        double _estimated_birth_difference;
-        double _turnover;
-        double _partial_count;
-        vector<pair<string, double>> _taxset_ages;
+        Data::SharedPtr             _data;
+        vector<Node *>              _lineages;
+        vector<Node>                _nodes;
+        vector<Node*>               _preorder;
+        unsigned                    _first_pattern;
+        unsigned                    _npatterns;
+        vector<double>              _gene_tree_log_likelihoods;
+        unsigned                    _ninternals;
+        unsigned                    _nleaves;
+        double                      _log_joining_prob;
+        vector<double>              _increments;
+        vector<pair<Node*, Node*>>  _node_choices;
+        double                      _estimated_lambda;
+        double                      _estimated_mu;
+        double                      _estimated_root_age;
+        double                      _estimated_birth_difference;
+        double                      _turnover;
+        double                      _partial_count;
+        map<string, double>         _taxset_ages;
     
 #if defined (FOSSILS)
         double _tree_height;
@@ -1080,9 +1080,10 @@ class Forest {
                 taxset[i]._species_included.push_back(new_nd->_name);
                 
                 if (taxset[i]._species_included.size() == 1) {
-                    taxset.erase(taxset.begin() + i);
                     update_unused = true;
-                    _taxset_ages.push_back(make_pair(taxset[i]._name, _tree_height));
+                    string name = taxset[i]._name;
+                    _taxset_ages[name] = _tree_height;
+                    taxset.erase(taxset.begin() + i);
                 }
             }
         }
