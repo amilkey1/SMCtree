@@ -64,6 +64,9 @@ namespace proj {
         static vector<TaxSet>           _taxsets;
         static vector<Fossil>           _sim_fossils;
 #endif
+        
+        // validation
+        static bool                     _ruv;
 
         // Useful constants
         static double                   _small_enough;

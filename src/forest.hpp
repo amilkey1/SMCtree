@@ -2815,7 +2815,7 @@ class Forest {
             // for now, n = G::_root_age set by user
             _estimated_root_age = lot->gamma(1, G::_root_age);
 #if defined (FOSSILS)
-            if (_estimated_root_age > max_fossil_age ) {
+            if (_estimated_root_age > max_fossil_age) {
                 done = true;
             }
 #else

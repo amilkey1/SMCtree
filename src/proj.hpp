@@ -135,6 +135,8 @@ namespace proj {
         ("taxset",  value(&taxsets), "a string defining a taxon set, e.g. 'Ursinae: Helarctos_malayanus Melursus_ursinus Ursus_abstrusus Ursus_americanus Ursus_arctos Ursus_maritimus Ursus_spelaeus Ursus_thibetanus'")
         ("simfossil",  value(&sim_fossils), "a string defining a fossil, e.g. 'Ursus_abstrusus         1.8–5.3 4.3' (4.3 is time, 1.8-5.3 is prior range)")
 #endif
+        // the following variables relate to validation analyses
+        ("ruv", boost::program_options::value(&G::_ruv)->default_value(false), "run without likelihood")
         ;
         
         store(parse_command_line(argc, argv, desc), vm);
@@ -747,6 +749,30 @@ namespace proj {
             writePartialCount();
             writeLogFile();
             writeLogMarginalLikelihoodFile();
+            
+            if (G::_ruv) {
+                vector<pair<double, bool>> fossil_ages;
+                for (auto &p:_particle_vec) {
+                    double fossil_age = p.getLowestFossilAge();
+                    fossil_ages.push_back(make_pair(fossil_age, false));
+                    ofstream agef;
+                    string filename = "fossil_ages.txt";
+                    agef.open(filename, std::ios::app);
+                    agef << fossil_age << endl;
+                }
+                fossil_ages.push_back(make_pair(G::_fossils[0]._age, true)); // true fossil age
+                
+                // sort fossil ages
+                sort(fossil_ages.begin(), fossil_ages.end());
+                // find rank of truth
+                auto it = std::find_if(fossil_ages.begin(), fossil_ages.end(), [&](const pair<double, bool>& p) { return p.second == true;});
+                unsigned index_value = (unsigned) std::distance(fossil_ages.begin(), it);
+                
+                // write rank value to file
+                ofstream rankf("rank_lowest_fossil_age.txt");
+                rankf << "rank: " << index_value << endl;
+            }
+            
         }
         
         catch (XProj & x) {

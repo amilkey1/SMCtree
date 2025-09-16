@@ -103,6 +103,9 @@ unsigned G::_ngroups = 1.0;
 unsigned G::_save_every = 1.0;
 bool G::_run_on_empty = false;
 
+// validation
+bool G::_ruv = false;
+
 #if defined (FOSSILS)
 vector<Fossil> G::_fossils;
 vector<TaxSet> G::_taxsets;

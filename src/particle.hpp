@@ -54,6 +54,9 @@ class Particle {
         void setOverlappingTaxSets();
 #endif
     
+        // validation stuff
+        double getLowestFossilAge();
+    
     private:
         mutable                                 Lot::SharedPtr _lot;
         void                                    clear();
@@ -379,6 +382,10 @@ class Particle {
 
     inline string Particle::makeNewick(unsigned precision, bool use_names) {
         return _forest.makeNewick(precision, use_names);
+    }
+
+    inline double Particle::getLowestFossilAge() {
+        return _particle_fossils[0]._age;
     }
 
     inline void Particle::operator=(const Particle & other) {
