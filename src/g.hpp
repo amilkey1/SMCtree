@@ -30,6 +30,7 @@ namespace proj {
         static bool                     _est_mu;
         static bool                     _est_root_age;
         static unsigned                 _ngroups;
+        static bool                     _run_on_empty;
         
         // Candidates for setting status
         static double                   _asrv_shape;

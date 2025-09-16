@@ -31,6 +31,11 @@ class Particle {
         void                                    setStartingLogLikelihoods(vector<double> starting_log_likelihoods);
         void                                    clearPartials();
         double                                  getPartialCount();
+        void                                    drawClockRate();
+        void                                    createTrivialForest();
+        double                                  getClockRate() {return _forest._clock_rate;}
+        void                                    simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites);
+        string                                  makeNewick(unsigned precision, bool use_names);
         string                                  saveForestNewick() {
                                                         return _forest.makeNewick(8, true);}
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
@@ -98,6 +103,10 @@ class Particle {
         _forest.setForestData(d, partials);
     }
 
+    inline void Particle::createTrivialForest() {
+        _forest.createTrivialForest();
+    }
+
     inline vector<double> Particle::calcGeneTreeLogLikelihoods() {
         vector<double> gene_forest_likelihoods;
         gene_forest_likelihoods.resize(G::_nloci);
@@ -149,10 +158,8 @@ class Particle {
                 
                 // check that at least one taxon set is valid
                 // if there is no valid taxon set, keep adding increments until a valid set has been reached
-//                _forest.showForest();
                 
                 valid = _forest.checkForValidTaxonSet(_particle_taxsets, _unused_particle_taxsets);
-                
                 
                 if (_forest._lineages.size() == 1 && _fossil_number == G::_fossils.size() - 1) { // if forest is finished, break out of step even if we have ended on a fossil
                     done_adding_increment = true;
@@ -163,9 +170,8 @@ class Particle {
             _forest.addIncrement(_lot);
 #endif
             pair<double, bool> output = _forest.joinTaxa(prev_log_likelihood, _lot, _particle_taxsets, _unused_particle_taxsets);
-                       
-//            _forest.showForest(); // TODO: bears - unused taxsets is not working correctly - 1_crownbears gets added too soon (in step 4 or 5?)
-            _log_weight = output.first;
+
+            _log_weight = output.first; // TODO: how to decide when the step is done if there is no data and no likelihood change?
             bool filter = output.second;
             
             // step is done when log weight is not 0 or when all the lineages are joined and all the fossils have been added
@@ -187,6 +193,10 @@ class Particle {
         if (step_number == G::_ntaxa - 2) {
             assert (_fossil_number == G::_fossils.size());
             assert (_forest._lineages.size() == 1);
+        }
+        
+        if (G::_run_on_empty) {
+            _log_weight = 0.0;
         }
     }
 
@@ -276,7 +286,11 @@ class Particle {
 
     inline void Particle::drawRootAge() {
         assert (G::_est_root_age > 0.0);
-        _forest.drawRootAge(_lot);
+        double max_fossil_age = -1;
+#if defined (FOSSILS)
+        max_fossil_age = _particle_fossils.back()._age;
+#endif
+        _forest.drawRootAge(_lot, max_fossil_age);
     }
     
     inline void Particle::calculateLambdaAndMu() {
@@ -352,6 +366,19 @@ class Particle {
 
     inline double Particle::getPartialCount() {
         return _forest._partial_count;
+    }
+
+    inline void Particle::drawClockRate() {
+        double clock_rate = _lot->uniform(); // TODO: maybe not the best prior
+        _forest._clock_rate = clock_rate;
+    }
+
+    inline void Particle::simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites) {
+        _forest.simulateData(lot, data, starting_site, nsites);
+    }
+
+    inline string Particle::makeNewick(unsigned precision, bool use_names) {
+        return _forest.makeNewick(precision, use_names);
     }
 
     inline void Particle::operator=(const Particle & other) {

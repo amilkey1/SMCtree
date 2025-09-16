@@ -129,6 +129,7 @@ namespace proj {
         ("estimate_root_age", boost::program_options::value(&G::_est_root_age)->default_value(false), "estimate root age")
         ("ngroups", boost::program_options::value(&G::_ngroups)->default_value(1.0), "number of subgroups")
         ("save_every", boost::program_options::value(&G::_save_every)->default_value(1.0), "save one out of this number of trees in params and tree files")
+        ("run_on_empty", boost::program_options::value(&G::_run_on_empty)->default_value(false), "run without likelihood")
 #if defined(FOSSILS)
         ("fossil",  value(&fossils), "a string defining a fossil, e.g. 'Ursus_abstrusus         1.8–5.3 4.3' (4.3 is time, 1.8-5.3 is prior range)")
         ("taxset",  value(&taxsets), "a string defining a taxon set, e.g. 'Ursinae: Helarctos_malayanus Melursus_ursinus Ursus_abstrusus Ursus_americanus Ursus_arctos Ursus_maritimus Ursus_spelaeus Ursus_thibetanus'")
@@ -459,7 +460,30 @@ namespace proj {
         assert(G::_sim_ntaxa > 0);
         
         // Simulate the tree
-        simulateTree();
+//        simulateTree();
+        
+        // create vector of particles
+        G::_nparticles = 1;
+        G::_ngroups = 1;
+        G::_est_lambda = false;
+        G::_est_root_age = false;
+        G::_est_mu = false;
+        unsigned nleaves = G::_sim_ntaxa;
+        G::_ntaxa = nleaves;
+        
+        // make up taxon names
+        G::_taxon_names.resize(nleaves);
+        for (unsigned i = 0; i < nleaves; i++) {
+            G::_taxon_names[i] = G::inventName(i, /*lower_case*/false);
+        }
+        
+        _particle_vec.resize(1);
+        initializeParticles();
+        
+        unsigned nsteps = (G::_ntaxa-1);
+        for (unsigned n=0; n<nsteps; n++) {
+            proposeParticles(n);
+        }
         // Interrogate _partition to determine number of genes, gene names, and
         // number of sites in each gene
         G::_nloci = _partition->getNumSubsets();
@@ -483,7 +507,7 @@ namespace proj {
         // Simulate data for each locus given the tree
         unsigned starting_site = 0;
         for (unsigned g = 0; g < G::_nloci; ++g) {
-            _sim_tree->simulateData(::rng, _data, starting_site, G::_nsites_per_locus[g]);
+            _particle_vec[0].simulateData(::rng, _data, starting_site, G::_nsites_per_locus[g]);
             starting_site += G::_nsites_per_locus[g];
         }
         
@@ -527,7 +551,7 @@ namespace proj {
         ofstream treef(tree_file_name);
         treef << "#nexus\n\n";
         treef << "begin trees;\n";
-        treef << "  tree true = [&R] " << _sim_tree->makeNewick(/*precision*/9, /*use_names*/true) << ";\n";
+        treef << "  tree true = [&R] " << _particle_vec[0].makeNewick(/*precision*/9, /*use_names*/true) << ";\n";
         treef << "end;\n\n";
         treef.close();
 
@@ -1199,11 +1223,17 @@ namespace proj {
          bool partials = true;
 
          for (auto & p:_particle_vec ) {
-             p.setParticleData(_data, partials);
-             partials = false;
+             if (G::_start_mode != "sim") {
+                 p.setParticleData(_data, partials);
+                 partials = false;
+             }
+             else {
+                 p.createTrivialForest();
+             }
              
              // set particle seed for drawing new values
              p.setSeed(rng->randint(1,9999) + psuffix);
+             p.drawClockRate();
              psuffix += 2;
              
              if (G::_est_lambda) {
@@ -1218,10 +1248,6 @@ namespace proj {
                      p.drawLambda();
                  }
              }
-             
-             if (G::_est_root_age) {
-                 p.drawRootAge();
-             }
          }
         
 #if defined (FOSSILS)
@@ -1232,6 +1258,12 @@ namespace proj {
             p.setOverlappingTaxSets();
         }
 #endif
+        
+        for (auto &p:_particle_vec) {
+            if (G::_est_root_age) {
+                p.drawRootAge();
+            }
+        }
     }
 
     inline void Proj::writePartialCount() {
@@ -1308,7 +1340,7 @@ namespace proj {
             vector<double> tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
             double height = p.getTreeHeight();
             double length = p.getTreeLength();
-            double clock_rate = 1.0;
+            double clock_rate = p.getClockRate();
             double FBD = p.getFBDModel();
             double sampling_proportion = 1.0;
             
@@ -1330,13 +1362,6 @@ namespace proj {
             logf << "\t" << length;
             logf << "\t" << clock_rate;
             logf << "\t" << FBD;
-            
-//            if (G::_mu > 0.0) {
-//                logf << "\t" << birth_death;
-//            }
-//            else {
-//                logf << "\t" << yule;
-//            }
             
             double lambda = 0.0;
             double mu = 0.0;

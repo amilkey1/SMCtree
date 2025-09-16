@@ -69,7 +69,7 @@ class Forest {
         int selectPair(vector<double> weight_vec, Lot::SharedPtr lot);
         void drawBirthDiff(Lot::SharedPtr lot);
         void drawTurnover(Lot::SharedPtr lot);
-        void drawRootAge(Lot::SharedPtr lot);
+        void drawRootAge(Lot::SharedPtr lot, double max_fossil_age);
         void calculateLambdaAndMu();
         void drawLambda(Lot::SharedPtr lot);
 
@@ -108,6 +108,7 @@ class Forest {
         double                      _turnover;
         double                      _partial_count;
         map<string, double>         _taxset_ages;
+        double                      _clock_rate;
     
 #if defined (FOSSILS)
         double _tree_height;
@@ -195,6 +196,8 @@ class Forest {
             _nodes[i]._split.resize(G::_ntaxa);
             _nodes[i]._split.setBitAt(i);
             _lineages.push_back(&_nodes[i]);
+            _nodes[i]._position_in_lineages = i;
+            _nodes[i]._set_partials = true;
         }
         refreshPreorder();
         _partial_count = 0;
@@ -371,7 +374,7 @@ class Forest {
         rate = getNumLineages() * birth_rate;
         double increment_prior = (log(rate)-t*rate);
         
-        _increments.push_back(increment_prior);
+//        _increments.push_back(increment_prior);
     }
 
 #if defined (INCREMENT_COMPARISON_TEST)
@@ -498,11 +501,13 @@ class Forest {
             assert (t > 0.0);
                     
             if ((t + _tree_height < age) || (age == -1)) { // don't add fossil because next fossil placement is deeper than current tree
+                // TODO: if age == -1?
                 for (auto &nd:_lineages) {
                     nd->_edge_length += t;
                     nd->_accumulated_height += t;
                 }
                 _tree_height += t;
+                
                 _increments.push_back(t);
             }
             
@@ -510,12 +515,13 @@ class Forest {
                 // add fossil
                 double edge_len = age - _tree_height;
                 _tree_height += edge_len;
-                _increments.push_back(edge_len);
                 
                 for (auto &nd:_lineages) {
                     nd->_edge_length += edge_len;
                     nd->_accumulated_height += edge_len;
                 }
+                
+                _increments.push_back(edge_len);
 
                 //new node is always needed
                 Node* new_nd = pullNode();
@@ -966,11 +972,13 @@ class Forest {
         if (new_nd->_set_partials) {
             // calculate new partials
             assert (new_nd->_partials == nullptr);
-            double npatterns_total = _data->getNumPatterns();
-            new_nd->_partials = ps.getPartial(G::_nstates*npatterns_total);
+            if (G::_start_mode != "sim") {
+                double npatterns_total = _data->getNumPatterns();
+                new_nd->_partials = ps.getPartial(G::_nstates*npatterns_total);
+            }
             assert(new_nd->_left_child->_right_sib);
 
-            if (G::_save_memory) {
+            if (G::_save_memory && G::_start_mode != "sim") {
                 double npatterns_total = _data->getNumPatterns();
                 new_nd->_partials = ps.getPartial(npatterns_total*G::_nstates);
                 
@@ -981,7 +989,10 @@ class Forest {
                     }
                 }
             }
-            calcPartialArray(new_nd);
+            
+            if (G::_start_mode != "sim") {
+                calcPartialArray(new_nd);
+            }
             
             filter = true; // must filter if a real node has been added
             
@@ -1003,7 +1014,7 @@ class Forest {
         // if new_nd is a real node, none of its children should be used in the likelihood calculation
         // TODO: faster way to do this?
         
-        if (new_nd->_set_partials) {
+        if (new_nd->_set_partials && G::_start_mode != "sim") {
             for (auto nd:_nodes){
                 unsigned node_number = nd._number;
                 bool done = false;
@@ -1319,7 +1330,12 @@ class Forest {
         double t = 0.0;
         unsigned count = (unsigned) _increments.size() - 1;
         
-        for (unsigned i=1; i<G::_fossils.size() + G::_ntaxa + 1; i++) {
+        unsigned ntips = G::_ntaxa;
+        unsigned nbranches = (unsigned) _increments.size();
+//        unsigned nbranches = ntips - 1 + (unsigned) G::_fossils.size() * 2; // TODO: not sure - but I think each fossil is associated with an extra branch length - or should it be combined with existing branch length?
+        
+        for (unsigned i = 1; i < nbranches; i++) {
+//        for (unsigned i=1; i<G::_fossils.size() + G::_ntaxa + 1; i++) {
             // i is number of species in existence
             // density increment is the probability of having exactly i species at time t
             // TODO: is t the increment or the accumulated height?
@@ -1549,7 +1565,7 @@ class Forest {
         double child_transition_prob = 0.0;
 
         if (G::_model == "JC" ) {
-            double expterm = exp(-4.0*(child->_edge_length * relative_rate)/3.0);
+            double expterm = exp(-4.0*(child->_edge_length * _clock_rate * relative_rate)/3.0);
             double prsame = 0.25+0.75*expterm;
             double prdif = 0.25 - 0.25*expterm;
 
@@ -1568,7 +1584,7 @@ class Forest {
             double PI_J = 0.0;
 
             double phi = (pi_A+pi_G)*(pi_C+pi_T)+G::_kappa*(pi_A*pi_G+pi_C*pi_T);
-            double beta_t = 0.5*(child->_edge_length * relative_rate)/phi;
+            double beta_t = 0.5*(child->_edge_length * _clock_rate * relative_rate)/phi;
 
             // transition prob depends only on ending state
             if (s_child == 0) {
@@ -1704,7 +1720,7 @@ class Forest {
 
         if (G::_model == "JC" ) {
     //            double expterm = exp(-4.0*(child->_edge_length * relative_rate)/3.0);
-            double expterm = exp(-4.0*(child->_accumulated_height * relative_rate)/3.0);
+            double expterm = exp(-4.0*(child->_accumulated_height * _clock_rate * relative_rate)/3.0);
             double prsame = 0.25+0.75*expterm;
             double prdif = 0.25 - 0.25*expterm;
 
@@ -1724,7 +1740,7 @@ class Forest {
 
             double phi = (pi_A+pi_G)*(pi_C+pi_T)+G::_kappa*(pi_A*pi_G+pi_C*pi_T);
     //            double beta_t = 0.5*(child->_edge_length * relative_rate)/phi;
-            double beta_t = 0.5*(child->_accumulated_height * relative_rate)/phi;
+            double beta_t = 0.5*(child->_accumulated_height * _clock_rate * relative_rate)/phi;
 
 
             // transition prob depends only on ending state
@@ -1953,6 +1969,7 @@ class Forest {
         _turnover = other._turnover;
         _partial_count = other._partial_count;
         _taxset_ages = other._taxset_ages;
+        _clock_rate = other._clock_rate;
 #if defined (FOSSILS)
         _tree_height = other._tree_height;
         _valid_taxsets = other._valid_taxsets;
@@ -2790,14 +2807,21 @@ class Forest {
         _estimated_lambda = lot->gamma(1, G::_lambda);
     }
 
-    inline void Forest::drawRootAge(Lot::SharedPtr lot) {
-        // Gamma(1, n) = Exp(1/n)
-        // mean = n
-        // for now, n = G::_root_age set by user
-        _estimated_root_age = lot->gamma(1, G::_root_age);
+    inline void Forest::drawRootAge(Lot::SharedPtr lot, double max_fossil_age) {
+        bool done = false;
+        while (!done) {
+            // Gamma(1, n) = Exp(1/n)
+            // mean = n
+            // for now, n = G::_root_age set by user
+            _estimated_root_age = lot->gamma(1, G::_root_age);
 #if defined (FOSSILS)
-        _estimated_root_age = G::_root_age;
+            if (_estimated_root_age > max_fossil_age ) {
+                done = true;
+            }
+#else
+            done = true;
 #endif
+        }
     }
 
     inline double Forest::getLogLikelihood() {
