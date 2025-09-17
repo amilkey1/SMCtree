@@ -109,7 +109,6 @@ bool G::_ruv = false;
 #if defined (FOSSILS)
 vector<Fossil> G::_fossils;
 vector<TaxSet> G::_taxsets;
-vector<Fossil> G::_sim_fossils;
 #endif
 
 double   G::_small_enough      = 0.00001;

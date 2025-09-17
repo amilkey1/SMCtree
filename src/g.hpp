@@ -62,7 +62,6 @@ namespace proj {
 #if defined(FOSSILS)
         static vector<Fossil>           _fossils;
         static vector<TaxSet>           _taxsets;
-        static vector<Fossil>           _sim_fossils;
 #endif
         
         // validation

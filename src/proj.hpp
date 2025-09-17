@@ -223,9 +223,9 @@ namespace proj {
         // If user specified --simfossil on command line, break specified
         // fossil definition into species name, taxset name, and age
         if (vm.count("simfossil") > 0) {
-            G::_sim_fossils.clear();
+            G::_fossils.clear();
             for (auto fdef : sim_fossils) {
-                G::_sim_fossils.push_back(parseFossilDefinition(fdef));
+                G::_fossils.push_back(parseFossilDefinition(fdef));
             }
         }
         
@@ -479,6 +479,25 @@ namespace proj {
             G::_taxon_names[i] = G::inventName(i, /*lower_case*/false);
         }
         
+#if defined (FOSSILS)
+            // check that no fossil is older than the mean root age
+            for (auto &f:G::_fossils) {
+                if (f._upper >= G::_root_age) {
+                    throw XProj("fossil range cannot exceed or equal root age");
+                }
+            }
+            
+            // sort fossils from youngest to oldest for use in later proposal
+            sort(G::_fossils.begin(), G::_fossils.end(), [](Fossil & left, Fossil & right) {
+                return left._age < right._age;
+            });
+            
+            for (auto &f:G::_fossils) {
+                if (G::_root_age < f._age) {
+                    throw XProj(format("Root age set to %d but oldest fossil has age %d; root age must be older than fossils")% G::_root_age % f._age);
+                }
+            }
+#endif
         _particle_vec.resize(1);
         initializeParticles();
         

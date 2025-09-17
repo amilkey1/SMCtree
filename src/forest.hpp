@@ -182,7 +182,7 @@ class Forest {
         clear();
         unsigned nnodes = 2*G::_ntaxa - 1;
 #if defined (FOSSILS)
-        nnodes = (unsigned) 2*(G::_ntaxa + G::_sim_fossils.size()) - 1;
+        nnodes = (unsigned) 2*(G::_ntaxa + G::_fossils.size()) - 1;
 #endif
         _nodes.reserve(nnodes);
         _nodes.resize(G::_ntaxa);
@@ -2428,9 +2428,8 @@ class Forest {
     inline void Forest::buildBirthDeathTree() {
         int fossil_number = 0;
     # if defined (FOSSILS)
-    //    fossil_number = (unsigned) G::_sim_fossils.size() - 1;
         // sort fossils from youngest to oldest for use in later proposal
-        sort(G::_sim_fossils.begin(), G::_sim_fossils.end(), [](Fossil & left, Fossil & right) {
+        sort(G::_fossils.begin(), G::_fossils.end(), [](Fossil & left, Fossil & right) {
             return left._age < right._age;
         });
     #endif
@@ -2440,7 +2439,7 @@ class Forest {
     #if 1
         unsigned nsteps = G::_ntaxa - 1;
     # if defined (FOSSILS)
-        nsteps += G::_sim_fossils.size();
+        nsteps += G::_fossils.size();
     #endif
         double cum_height = 0.0;
         for (unsigned i = 0; i < nsteps; i++) {
@@ -2477,10 +2476,10 @@ class Forest {
             double t = heights[0]*(1.0 - cum_height);
             
     # if defined (FOSSILS)
-            if (fossil_number < G::_sim_fossils.size()) {
-                if (cum_height + t > G::_sim_fossils[fossil_number]._age) {
+            if (fossil_number < G::_fossils.size()) {
+                if (cum_height + t > G::_fossils[fossil_number]._age) {
                     // add fossil
-                    t = G::_sim_fossils[fossil_number]._age - cum_height;
+                    t = G::_fossils[fossil_number]._age - cum_height;
                     
                     for (auto &nd:_lineages) {
                         nd->_edge_length += t;
@@ -2492,7 +2491,7 @@ class Forest {
                     //new node is always needed
                     Node* new_nd = pullNode();
 
-                    new_nd->_name = G::_sim_fossils[fossil_number]._name + "_FOSSIL";
+                    new_nd->_name = G::_fossils[fossil_number]._name + "_FOSSIL";
                     new_nd->_set_partials = false; // do not include this node in likelihood calculation
                     new_nd->_position_in_lineages = (unsigned) _lineages.size();
                     new_nd->_use_in_likelihood = false;
