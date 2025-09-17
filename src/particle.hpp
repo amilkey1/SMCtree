@@ -56,6 +56,7 @@ class Particle {
     
         // validation stuff
         double getLowestFossilAge();
+        double getRootAge();
     
     private:
         mutable                                 Lot::SharedPtr _lot;
@@ -386,6 +387,10 @@ class Particle {
 
     inline double Particle::getLowestFossilAge() {
         return _particle_fossils[0]._age;
+    }
+
+    inline double Particle::getRootAge() {
+        return _forest._estimated_root_age;
     }
 
     inline void Particle::operator=(const Particle & other) {

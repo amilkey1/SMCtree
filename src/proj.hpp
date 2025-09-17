@@ -770,25 +770,37 @@ namespace proj {
             writeLogMarginalLikelihoodFile();
             
             if (G::_ruv) {
-                vector<pair<double, bool>> fossil_ages;
+//                vector<pair<double, bool>> fossil_ages;
+                vector<pair<double, bool>> root_ages;
                 for (auto &p:_particle_vec) {
-                    double fossil_age = p.getLowestFossilAge();
-                    fossil_ages.push_back(make_pair(fossil_age, false));
-                    ofstream agef;
-                    string filename = "fossil_ages.txt";
-                    agef.open(filename, std::ios::app);
-                    agef << fossil_age << endl;
+//                    double fossil_age = p.getLowestFossilAge();
+                    double root_age = p.getRootAge();
+//                    fossil_ages.push_back(make_pair(fossil_age, false));
+                    root_ages.push_back(make_pair(root_age, false));
+//                    ofstream agef;
+//                    string filename = "fossil_ages.txt";
+//                    agef.open(filename, std::ios::app);
+//                    agef << fossil_age << endl;
                 }
-                fossil_ages.push_back(make_pair(G::_fossils[0]._age, true)); // true fossil age
+//                fossil_ages.push_back(make_pair(G::_fossils[0]._age, true)); // true fossil age
+                root_ages.push_back(make_pair(G::_root_age, true)); // true root age
                 
                 // sort fossil ages
-                sort(fossil_ages.begin(), fossil_ages.end());
+//                sort(fossil_ages.begin(), fossil_ages.end());
+                sort(root_ages.begin(), root_ages.end());
+
                 // find rank of truth
-                auto it = std::find_if(fossil_ages.begin(), fossil_ages.end(), [&](const pair<double, bool>& p) { return p.second == true;});
-                unsigned index_value = (unsigned) std::distance(fossil_ages.begin(), it);
+//                auto it = std::find_if(fossil_ages.begin(), fossil_ages.end(), [&](const pair<double, bool>& p) { return p.second == true;});
+//                unsigned index_value = (unsigned) std::distance(fossil_ages.begin(), it);
+                
+                auto it = std::find_if(root_ages.begin(), root_ages.end(), [&](const pair<double, bool>& p) { return p.second == true;});
+                unsigned index_value = (unsigned) std::distance(root_ages.begin(), it);
                 
                 // write rank value to file
-                ofstream rankf("rank_lowest_fossil_age.txt");
+//                ofstream rankf("rank_lowest_fossil_age.txt");
+//                rankf << "rank: " << index_value << endl;
+                
+                ofstream rankf("rank_origin.txt");
                 rankf << "rank: " << index_value << endl;
             }
             
