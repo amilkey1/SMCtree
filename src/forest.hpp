@@ -473,32 +473,50 @@ class Forest {
         assert (birth_rate >= death_rate);
         
         if (n > 1) {
-            // Draw n-1 internal node heights and store in vector heights
-            vector<double> heights(n - 1, 0.0);
+            // draw a time
+            assert (_estimated_lambda == G::_lambda);
+            assert (_estimated_mu == G::_mu);
+            double rate = 1 / (_estimated_lambda + _estimated_mu);
+            double t = lot->gamma(1, rate);
             
-            double rho = 1.0; // TODO: for now, assume rho = 1.0
+            // choose if speciation event or extinction event
+            double prob_speciation = _estimated_lambda / (_estimated_lambda + _estimated_mu);
+            double prob_extinction = _estimated_mu / (_estimated_lambda + _estimated_mu);
             
-            double exp_death_minus_birth = exp(death_rate - birth_rate);
-            double phi = 0.0;
-            phi += rho*birth_rate*(exp_death_minus_birth - 1.0);
-            phi += (death_rate - birth_rate)*exp_death_minus_birth;
-            phi /= (exp_death_minus_birth - 1.0);
-            for (unsigned i = 0; i < n - 2; i++) {
-                double u = lot->uniform();
-                double y = u/(1.0 + birth_rate*rho*(1.0 - u));
-                if (birth_rate > death_rate) {
-                    y = log(phi - u*rho*birth_rate);
-                    y -= log(phi - u*rho*birth_rate + u*(birth_rate - death_rate));
-                    y /= (death_rate - birth_rate);
-                }
-                heights[i] = y;
+            double u = lot->uniform();
+            bool speciation_event = true;
+            if (u > prob_speciation) {
+                speciation_event = false;
             }
-            heights[n-2] = 1.0;
-            sort(heights.begin(), heights.end());
             
-            // Waiting time to next speciation event is first height
-            // scaled so that max height is mu - cum_height
-            double t = heights[0]*(_estimated_root_age - cum_height); // TODO: not sure this is right
+//            // Draw n-1 internal node heights and store in vector heights
+//            vector<double> heights(n - 1, 0.0);
+//
+//            double rho = 1.0; // TODO: for now, assume rho = 1.0
+//
+//            double exp_death_minus_birth = exp(death_rate - birth_rate);
+//            double phi = 0.0;
+//            phi += rho*birth_rate*(exp_death_minus_birth - 1.0);
+//            phi += (death_rate - birth_rate)*exp_death_minus_birth;
+//            phi /= (exp_death_minus_birth - 1.0);
+//            for (unsigned i = 0; i < n - 2; i++) {
+//                double u = lot->uniform();
+//                double y = u/(1.0 + birth_rate*rho*(1.0 - u));
+//                if (birth_rate > death_rate) {
+//                    y = log(phi - u*rho*birth_rate);
+//                    y -= log(phi - u*rho*birth_rate + u*(birth_rate - death_rate));
+//                    y /= (death_rate - birth_rate);
+//                }
+//                heights[i] = y;
+//            }
+//            heights[n-2] = 1.0;
+//            sort(heights.begin(), heights.end());
+//
+//            // Waiting time to next speciation event is first height
+//            // scaled so that max height is mu - cum_height
+//            double t = heights[0]*(_estimated_root_age - cum_height); // TODO: not sure this is right
+            
+            t = t * (_estimated_root_age - cum_height);
             
             assert (t > 0.0);
                     
