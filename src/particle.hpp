@@ -173,6 +173,9 @@ class Particle {
 #else
             _forest.addIncrement(_lot);
 #endif
+#if defined (INCREMENT_COMPARISON_TEST)
+            _forest.addIncrement(_lot);
+#endif
             pair<double, bool> output = _forest.joinTaxa(prev_log_likelihood, _lot, _particle_taxsets, _unused_particle_taxsets);
 
             _log_weight = output.first; // TODO: how to decide when the step is done if there is no data and no likelihood change?

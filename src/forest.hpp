@@ -381,12 +381,12 @@ class Forest {
     inline void Forest::addBirthDeathTreeIncrementTest(Lot::SharedPtr lot) {
         // birth death
         
-            ofstream logf("smc5.log");
+            ofstream logf("smc3.log");
         logf << "sample" << "\t" << "increment" << endl;
         double cum_height = 0.0;
         unsigned n = getNumLineages();
-        for (unsigned a = 0; a < 1000000; a++) {
-            for (unsigned b = 0; b < 5; b++) {
+        for (unsigned a = 0; a < 100000; a++) {
+            for (unsigned b = 0; b < 3; b++) {
 //        double cum_height = getLineageHeight(_lineages.back());
         // Determine number of lineages remaining
 //        unsigned n = getNumLineages();
@@ -433,7 +433,7 @@ class Forest {
         
         assert (t > 0.0);
             
-                if (b < 4) {
+                if (b < 2) {
                     cum_height += t;
                     n -= 1;
                 }
@@ -469,6 +469,8 @@ class Forest {
         double birth_rate = _estimated_lambda;
         
         double death_rate = _estimated_mu;
+        
+        assert (birth_rate >= death_rate);
         
         if (n > 1) {
             // Draw n-1 internal node heights and store in vector heights
@@ -2583,7 +2585,7 @@ class Forest {
         // Algorithm from Yang and Rannala. 1997. MBE 14(7):717-724.
         createTrivialForest();
 #if 0
-        ofstream logf("sim8.log");
+        ofstream logf("sim3.log");
         for (unsigned a = 0; a < 100000; a++) {
         
         unsigned nsteps = G::_ntaxa - 1;
@@ -2628,15 +2630,15 @@ class Forest {
             
             if (i == 1) {
             logf << a;
-            logf << "\t" << heights[7] - heights[6] << endl;
+            logf << "\t" << heights[2] - heights[1] << endl;
             }
         }
         }
 #else
-        ofstream logf("sim5.log");
+        ofstream logf("sim3.log");
         logf << "sample" << "\t" << "increment" << endl;
         // Draw n-1 internal node heights and store in vector heights
-        for (unsigned a =0; a < 10; a++) {
+        for (unsigned a =0; a < 100000; a++) {
         unsigned n = getNumLineages();
         vector<double> heights(n - 1, 0.0);
         
@@ -2661,7 +2663,7 @@ class Forest {
         heights[n-2] = 1.0;
         sort(heights.begin(), heights.end());
             
-            logf << a << "\t" << heights[4] - heights[3] << endl;
+            logf << a << "\t" << heights[2] - heights[1] << endl;
         
         // Now that we have the increments, perform the joins
         //

@@ -462,7 +462,9 @@ namespace proj {
         assert(G::_sim_ntaxa > 0);
         
         // Simulate the tree
-//        simulateTree();
+#if defined (INCREMENT_COMPARISON_TEST)
+        simulateTree();
+#endif
         
         // create vector of particles
         G::_nparticles = 1;
