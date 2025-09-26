@@ -130,6 +130,7 @@ namespace proj {
         ("ngroups", boost::program_options::value(&G::_ngroups)->default_value(1.0), "number of subgroups")
         ("save_every", boost::program_options::value(&G::_save_every)->default_value(1.0), "save one out of this number of trees in params and tree files")
         ("run_on_empty", boost::program_options::value(&G::_run_on_empty)->default_value(false), "run without likelihood")
+        ("sim_dir", boost::program_options::value(&G::_sim_dir)->default_value("."), "run without likelihood")
 #if defined(FOSSILS)
         ("fossil",  value(&fossils), "a string defining a fossil, e.g. 'Ursus_abstrusus         1.8–5.3 4.3' (4.3 is time, 1.8-5.3 is prior range)")
         ("taxset",  value(&taxsets), "a string defining a taxon set, e.g. 'Ursinae: Helarctos_malayanus Melursus_ursinus Ursus_abstrusus Ursus_americanus Ursus_arctos Ursus_maritimus Ursus_spelaeus Ursus_thibetanus'")
@@ -583,6 +584,11 @@ namespace proj {
         _data->compressPatterns();
         _data->writeDataToFile(data_file_name);
         output(format("  Sequence data saved in file \"%s\"\n") % data_file_name, 0);
+        
+        string height_first_splitf = "height_of_first_split.txt";
+        ofstream splitf(height_first_splitf);
+        double first_split_height = _particle_vec[0].getHeightFirstSplit();
+        splitf << first_split_height << endl;
 
         // Output a PAUP* command file for estimating the species tree using
         // svd quartets and qage
@@ -772,37 +778,64 @@ namespace proj {
             writeLogMarginalLikelihoodFile();
             
             if (G::_ruv) {
+                // TODO: get height of first split from sim directory (read in as command line option)
+                string splitfname;
+                if (G::_sim_dir != ".") {
+                    splitfname = G::_sim_dir + "height_of_first_split.txt";
+                }
+                else {
+                    splitfname = "height_of_first_split.txt";
+                }
+                ifstream inputf(splitfname);
+                double true_split_height = 0.0;
+                string line;
+                while (getline(inputf, line)) {
+                    true_split_height = stod(line);
+                    break;
+                }
+                
 //                vector<pair<double, bool>> fossil_ages;
-                vector<pair<double, bool>> root_ages;
+//                vector<pair<double, bool>> root_ages;
+                vector<pair<double, bool>> first_split_heights;
                 for (auto &p:_particle_vec) {
 //                    double fossil_age = p.getLowestFossilAge();
-                    double root_age = p.getRootAge();
+//                    double root_age = p.getRootAge();
+                    double first_split_height = p.getHeightFirstSplit();
 //                    fossil_ages.push_back(make_pair(fossil_age, false));
-                    root_ages.push_back(make_pair(root_age, false));
+//                    root_ages.push_back(make_pair(root_age, false));
+                    first_split_heights.push_back(make_pair(first_split_height, false));
 //                    ofstream agef;
 //                    string filename = "fossil_ages.txt";
 //                    agef.open(filename, std::ios::app);
 //                    agef << fossil_age << endl;
                 }
 //                fossil_ages.push_back(make_pair(G::_fossils[0]._age, true)); // true fossil age
-                root_ages.push_back(make_pair(G::_root_age, true)); // true root age
+//                root_ages.push_back(make_pair(G::_root_age, true)); // true root age
+                first_split_heights.push_back(make_pair(true_split_height, true)); // true root age
                 
                 // sort fossil ages
 //                sort(fossil_ages.begin(), fossil_ages.end());
-                sort(root_ages.begin(), root_ages.end());
+//                sort(root_ages.begin(), root_ages.end());
+                sort(first_split_heights.begin(), first_split_heights.end());
 
                 // find rank of truth
 //                auto it = std::find_if(fossil_ages.begin(), fossil_ages.end(), [&](const pair<double, bool>& p) { return p.second == true;});
 //                unsigned index_value = (unsigned) std::distance(fossil_ages.begin(), it);
                 
-                auto it = std::find_if(root_ages.begin(), root_ages.end(), [&](const pair<double, bool>& p) { return p.second == true;});
-                unsigned index_value = (unsigned) std::distance(root_ages.begin(), it);
+//                auto it = std::find_if(root_ages.begin(), root_ages.end(), [&](const pair<double, bool>& p) { return p.second == true;});
+//                unsigned index_value = (unsigned) std::distance(root_ages.begin(), it);
+                
+                auto it = std::find_if(first_split_heights.begin(), first_split_heights.end(), [&](const pair<double, bool>& p) { return p.second == true;});
+                unsigned index_value = (unsigned) std::distance(first_split_heights.begin(), it);
                 
                 // write rank value to file
 //                ofstream rankf("rank_lowest_fossil_age.txt");
 //                rankf << "rank: " << index_value << endl;
                 
-                ofstream rankf("rank_origin.txt");
+//                ofstream rankf("rank_origin.txt");
+//                rankf << "rank: " << index_value << endl;
+                
+                ofstream rankf("rank_first_split.txt");
                 rankf << "rank: " << index_value << endl;
             }
             

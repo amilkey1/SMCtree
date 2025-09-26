@@ -21,6 +21,7 @@ class Forest {
         void buildYuleTree();
         void buildBirthDeathTree();
         double getLogLikelihood();
+        double getHeightFirstSplit();
     
 #if defined (INCREMENT_COMPARISON_TEST)
     void buildBirthDeathTreeTest();
@@ -110,6 +111,7 @@ class Forest {
         map<string, double>         _taxset_ages;
         double                      _clock_rate;
         double                      _weight_correction; // correct for taxon set constraints
+        double                      _first_split_height;
     
 #if defined (FOSSILS)
         double _tree_height;
@@ -167,6 +169,7 @@ class Forest {
         _turnover = 0.0;
         _partial_count = 0;
         _weight_correction = 0.0;
+        _first_split_height = 0.0;
 #if defined (FOSSILS)
         _tree_height = 0.0;
         _valid_taxsets.clear();
@@ -775,6 +778,10 @@ class Forest {
     inline pair<double, bool> Forest::joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset) {
         _weight_correction = 0.0;
         bool filter = false;
+        
+        if (_lineages.size() == G::_ntaxa) {
+            _first_split_height = _lineages[0]->_edge_length;
+        }
         // find the new_nd from the previous step and accumulate height if needed
         
         // if lineages.back() is a fossil, go to the previous node
@@ -1990,6 +1997,7 @@ class Forest {
         _taxset_ages = other._taxset_ages;
         _clock_rate = other._clock_rate;
         _weight_correction = other._weight_correction;
+        _first_split_height = other._first_split_height;
 #if defined (FOSSILS)
         _tree_height = other._tree_height;
         _valid_taxsets = other._valid_taxsets;
@@ -2779,6 +2787,10 @@ class Forest {
             const vector<double> & _diff;
             double _v0;
     };
+
+    inline double Forest::getHeightFirstSplit() {
+        return _first_split_height;
+    }
 
     inline double Forest::getLineageHeight(Node* nd) {
         if (nd != nullptr) {

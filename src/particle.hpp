@@ -46,6 +46,7 @@ class Particle {
         void drawRootAge();
         void calculateLambdaAndMu();
         void drawLambda();
+        double getHeightFirstSplit(){return _forest.getHeightFirstSplit();}
 
 #if defined (FOSSILS)
         void setFossils() {_particle_fossils = G::_fossils;}

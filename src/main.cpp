@@ -102,6 +102,7 @@ bool G::_est_root_age = false;
 unsigned G::_ngroups = 1.0;
 unsigned G::_save_every = 1.0;
 bool G::_run_on_empty = false;
+string G::_sim_dir = ".";
 
 // validation
 bool G::_ruv = false;

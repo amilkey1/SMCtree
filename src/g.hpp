@@ -31,6 +31,7 @@ namespace proj {
         static bool                     _est_root_age;
         static unsigned                 _ngroups;
         static bool                     _run_on_empty;
+        static string                   _sim_dir;
         
         // Candidates for setting status
         static double                   _asrv_shape;
