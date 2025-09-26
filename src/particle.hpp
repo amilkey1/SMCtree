@@ -52,6 +52,7 @@ class Particle {
         void drawFossilAges();
         void setParticleTaxSets();
         void setOverlappingTaxSets();
+        void updateFossilTaxsets(string fossil_name);
 #endif
     
         // validation stuff
@@ -148,6 +149,8 @@ class Particle {
                     fossil_added = _forest.addIncrementFossil(_lot, _particle_fossils[_fossil_number]._age, _particle_fossils[_fossil_number]._name);
                     if (fossil_added) {
                         _fossil_number++;
+                        string fossil_name = G::_fossils[_fossil_number-1]._name;
+                        updateFossilTaxsets(fossil_name);
                         done_adding_increment = false;
                     }
                     else {
@@ -295,7 +298,9 @@ class Particle {
         assert (G::_est_root_age > 0.0);
         double max_fossil_age = -1;
 #if defined (FOSSILS)
-        max_fossil_age = _particle_fossils.back()._age;
+        if (_particle_fossils.size() > 0) {
+            max_fossil_age = _particle_fossils.back()._age;
+        }
 #endif
         _forest.drawRootAge(_lot, max_fossil_age);
     }
@@ -363,6 +368,102 @@ class Particle {
             }
             for (int i = (int) unused_taxsets_index.size() - 1; i>=0; i--) {
                 _particle_taxsets.erase(_particle_taxsets.begin() + unused_taxsets_index[i]);
+            }
+        }
+    }
+
+    inline void Particle::updateFossilTaxsets(string fossil_name) {
+        // go through all taxsets and remove anything with fossil_name because it has been dealt with already
+        fossil_name += "_FOSSIL";
+        vector<bool> update_these_taxsets;
+        vector<bool> update_these_unused_taxsets;
+        
+        for (auto &p:_particle_taxsets) {
+            // remove fossil_name if it's there
+            unsigned count_before = (unsigned) p._species_included.size();
+            p._species_included.erase(remove(p._species_included.begin(), p._species_included.end(), fossil_name), p._species_included.end());
+            unsigned count_after = (unsigned) p._species_included.size();
+            if (count_before != count_after) {
+                update_these_taxsets.push_back(true);
+            }
+            else {
+                update_these_taxsets.push_back(false);
+            }
+        }
+        
+        for (auto &p:_unused_particle_taxsets) {
+            // remove fossil_name if it's there
+            unsigned count_before = (unsigned) p._species_included.size();
+            p._species_included.erase(remove(p._species_included.begin(), p._species_included.end(), fossil_name), p._species_included.end());
+            unsigned count_after = (unsigned) p._species_included.size();
+            if (count_before != count_after) {
+                update_these_unused_taxsets.push_back(true);
+            }
+            else {
+                update_these_unused_taxsets.push_back(false);
+            }
+        }
+        
+        // remove any unused taxsets that are down to one constraint
+        
+        vector<bool> erase_these_unused;
+        // if any taxset has size 1, remove it and replace if necessary
+        for (auto &p:_unused_particle_taxsets) {
+            if (p._species_included.size() == 1) {
+                erase_these_unused.push_back(true);
+            }
+            else {
+                erase_these_unused.push_back(false);
+            }
+        }
+        
+        if (erase_these_unused.size() > 0) {
+            for (unsigned count = (unsigned) erase_these_unused.size(); count > 0; count--) {
+                if (erase_these_unused[count - 1]) {
+                    _unused_particle_taxsets.erase(_unused_particle_taxsets.begin() + count - 1);
+                }
+            }
+        }
+        
+        vector<bool> erase_these;
+        vector<bool> allowable_unused;
+        vector<unsigned> allowable_unused_sizes;
+        // if any existing particle taxsets are down to 1 lineage, erase them and replace if necessary
+        for (auto &p:_particle_taxsets) {
+            if (p._species_included.size() == 1) {
+                allowable_unused.clear();
+                allowable_unused_sizes.clear();
+                for (auto &u:_unused_particle_taxsets) {
+                    vector<string> common_elements;
+                    set_intersection(p._species_included.begin(), p._species_included.end(), u._species_included.begin(), u._species_included.end(), back_inserter(common_elements));
+                    if (common_elements.size() > 0) {
+                        allowable_unused.push_back(true);
+                        allowable_unused_sizes.push_back((unsigned) u._species_included.size());
+                    }
+                    else {
+                        allowable_unused.push_back(false);
+                        allowable_unused_sizes.push_back(G::_ntaxa + 100); // placeholder to ensure this is not the minimum
+                    }
+                }
+                if (allowable_unused.size() > 0) {
+                    auto min_it = min_element(allowable_unused_sizes.begin(), allowable_unused_sizes.end());
+                    unsigned min_index = (unsigned) std::distance(allowable_unused_sizes.begin(), min_it);
+                    
+                    p = _unused_particle_taxsets[min_index];
+                    _unused_particle_taxsets.erase(_unused_particle_taxsets.begin() + min_index);
+                    erase_these.push_back(false);
+                }
+                else {
+                    erase_these.push_back(true);
+                }
+            }
+        }
+        
+        if (erase_these.size() > 0) {
+            for (unsigned count = (unsigned) erase_these.size(); count > 0; count--) {
+                if (erase_these[count - 1]) {
+                    _particle_taxsets.erase(_particle_taxsets.begin() + count - 1);
+                }
             }
         }
     }

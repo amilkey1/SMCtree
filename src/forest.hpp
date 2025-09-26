@@ -109,6 +109,7 @@ class Forest {
         double                      _partial_count;
         map<string, double>         _taxset_ages;
         double                      _clock_rate;
+        double                      _weight_correction; // correct for taxon set constraints
     
 #if defined (FOSSILS)
         double _tree_height;
@@ -165,6 +166,7 @@ class Forest {
         _estimated_birth_difference = 0.0;
         _turnover = 0.0;
         _partial_count = 0;
+        _weight_correction = 0.0;
 #if defined (FOSSILS)
         _tree_height = 0.0;
         _valid_taxsets.clear();
@@ -472,53 +474,35 @@ class Forest {
         
         assert (birth_rate >= death_rate);
         
-        if (n > 1) {
-            // draw a time
-            assert (_estimated_lambda == G::_lambda);
-            assert (_estimated_mu == G::_mu);
-            double rate = 1 / (_estimated_lambda + _estimated_mu);
-            double t = lot->gamma(1, rate);
+        double t = 0.0;
+        
+        if (n > 1) { // need to fix how increments are drawn
+                
+                // Draw n-1 internal node heights and store in vector heights
+                vector<double> heights(n - 1, 0.0);
+                
+                for (unsigned i = 0; i < n - 2; i++) {
+                    double phi = 0.0;
+                    
+                    double u = lot->uniform();
+                                    
+                    phi += birth_rate - death_rate * exp((death_rate - birth_rate) * _estimated_root_age);
+                    phi /= (1 - exp((death_rate - birth_rate) * _estimated_root_age));
+                    
+
+                    double s = 0.0;
+                    double inner_term = (u * birth_rate - phi) / (u * death_rate - phi);
+                    s = -1 * log(inner_term) / (birth_rate - death_rate);
+                    
+                    assert (s > 0);
+                    heights[i] = s;
+                }
             
-            // choose if speciation event or extinction event
-            double prob_speciation = _estimated_lambda / (_estimated_lambda + _estimated_mu);
-            double prob_extinction = _estimated_mu / (_estimated_lambda + _estimated_mu);
-            
-            double u = lot->uniform();
-            bool speciation_event = true;
-            if (u > prob_speciation) {
-                speciation_event = false;
-            }
-            
-//            // Draw n-1 internal node heights and store in vector heights
-//            vector<double> heights(n - 1, 0.0);
-//
-//            double rho = 1.0; // TODO: for now, assume rho = 1.0
-//
-//            double exp_death_minus_birth = exp(death_rate - birth_rate);
-//            double phi = 0.0;
-//            phi += rho*birth_rate*(exp_death_minus_birth - 1.0);
-//            phi += (death_rate - birth_rate)*exp_death_minus_birth;
-//            phi /= (exp_death_minus_birth - 1.0);
-//            for (unsigned i = 0; i < n - 2; i++) {
-//                double u = lot->uniform();
-//                double y = u/(1.0 + birth_rate*rho*(1.0 - u));
-//                if (birth_rate > death_rate) {
-//                    y = log(phi - u*rho*birth_rate);
-//                    y -= log(phi - u*rho*birth_rate + u*(birth_rate - death_rate));
-//                    y /= (death_rate - birth_rate);
-//                }
-//                heights[i] = y;
+                heights[n-2] = 1.0;
+                sort(heights.begin(), heights.end());
+
+            double t = heights[0]*(_estimated_root_age - cum_height); // TODO: already conditioned on root age?
 //            }
-//            heights[n-2] = 1.0;
-//            sort(heights.begin(), heights.end());
-//
-//            // Waiting time to next speciation event is first height
-//            // scaled so that max height is mu - cum_height
-//            double t = heights[0]*(_estimated_root_age - cum_height); // TODO: not sure this is right
-            
-            t = t * (_estimated_root_age - cum_height);
-            
-            assert (t > 0.0);
                     
             if ((t + _tree_height < age) || (age == -1)) { // don't add fossil because next fossil placement is deeper than current tree
                 // TODO: if age == -1?
@@ -532,27 +516,28 @@ class Forest {
             }
             
             else {
+                // fossil is now part of the model, so update taxsets but don't add a new lineage
                 // add fossil
-                double edge_len = age - _tree_height;
-                _tree_height += edge_len;
-                
-                for (auto &nd:_lineages) {
-                    nd->_edge_length += edge_len;
-                    nd->_accumulated_height += edge_len;
-                }
-                
-                _increments.push_back(edge_len);
-
-                //new node is always needed
-                Node* new_nd = pullNode();
-
-                new_nd->_name = fossil_name + "_FOSSIL";
-                new_nd->_set_partials = false; // do not include this node in likelihood calculation
-                // don't add anything to fossil edge length; go back and draw another increment
-                new_nd->_position_in_lineages = (unsigned) _lineages.size();
-                new_nd->_use_in_likelihood = false;
-                _lineages.push_back(new_nd);
-                
+//                double edge_len = age - _tree_height;
+//                _tree_height += edge_len;
+//
+//                for (auto &nd:_lineages) {
+//                    nd->_edge_length += edge_len;
+//                    nd->_accumulated_height += edge_len;
+//                }
+//
+//                _increments.push_back(edge_len);
+//
+//                //new node is always needed
+//                Node* new_nd = pullNode();
+//
+//                new_nd->_name = fossil_name + "_FOSSIL";
+//                new_nd->_set_partials = false; // do not include this node in likelihood calculation
+//                // don't add anything to fossil edge length; go back and draw another increment
+//                new_nd->_position_in_lineages = (unsigned) _lineages.size();
+//                new_nd->_use_in_likelihood = false;
+//                _lineages.push_back(new_nd);
+//
                 fossil_added = true;
             }
         }
@@ -784,6 +769,7 @@ class Forest {
      }
 
     inline pair<double, bool> Forest::joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset) {
+        _weight_correction = 0.0;
         bool filter = false;
         // find the new_nd from the previous step and accumulate height if needed
         
@@ -848,7 +834,7 @@ class Forest {
                 }
             }
             
-            // TODO: reset unused taxsets
+            // reset unused taxsets
             vector<vector<unsigned>> node_choices;
             
             // figure out which taxon set choices are valid (exist in _lineages)
@@ -913,9 +899,18 @@ class Forest {
                 total_choices += num_choices;
             }
             
+            double weight_posterior = 0;
+            
             for (auto &s:set_probabilities) {
+                weight_posterior += (s * s / total_choices);
                 s /= total_choices;
             }
+            
+            double nlineages = (double) _lineages.size();
+            double weight_prior = 1 / ((nlineages * (nlineages - 1)) / 2);
+            weight_posterior = 1 / weight_posterior;
+            
+            _weight_correction = weight_prior / weight_posterior;
             
             assert (set_probabilities.size() > 0);
             
@@ -1065,8 +1060,8 @@ class Forest {
         
         bool update_unused = false;
         // update taxset if needed
-        // TODO: go through all taxsets in existence and look for chosen taxa, then update all of them
-        // TODO: because there might be multiple taxsets with the same taxon names
+        // go through all taxsets in existence and look for chosen taxa, then update all of them
+        // because there might be multiple taxsets with the same taxon names
         
         string name1 = subtree1->_name;
         string name2 = subtree2->_name;
@@ -1202,7 +1197,7 @@ class Forest {
             new_log_likelihood += g;
         }
         
-        double log_weight = new_log_likelihood - prev_log_likelihood;
+        double log_weight = new_log_likelihood - prev_log_likelihood + _weight_correction;
                
        if (G::_save_memory) {
            for (auto &nd:_nodes) {
@@ -1990,6 +1985,7 @@ class Forest {
         _partial_count = other._partial_count;
         _taxset_ages = other._taxset_ages;
         _clock_rate = other._clock_rate;
+        _weight_correction = other._weight_correction;
 #if defined (FOSSILS)
         _tree_height = other._tree_height;
         _valid_taxsets = other._valid_taxsets;
