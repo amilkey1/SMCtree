@@ -486,13 +486,14 @@ class Forest {
                     
                     double u = lot->uniform();
                                     
-                    phi += birth_rate - death_rate * exp((death_rate - birth_rate) * _estimated_root_age);
-                    phi /= (1 - exp((death_rate - birth_rate) * _estimated_root_age));
+                    phi += birth_rate - death_rate * exp((death_rate - birth_rate) * (_estimated_root_age - cum_height));
+                    phi /= (1 - exp((death_rate - birth_rate) * (_estimated_root_age - cum_height)));
                     
 
                     double s = 0.0;
                     double inner_term = (u * birth_rate - phi) / (u * death_rate - phi);
                     s = -1 * log(inner_term) / (birth_rate - death_rate);
+                    s += cum_height;
                     
                     assert (s > 0);
                     heights[i] = s;
@@ -501,7 +502,7 @@ class Forest {
                 heights[n-2] = _estimated_root_age;
                 sort(heights.begin(), heights.end());
 
-            double t = heights[0] - - cum_height; // TODO: already conditioned on root age?
+            double t = heights[0] - cum_height; // TODO: already conditioned on root age?
             assert (t > 0.0);
 
 //            double t = heights[0]*(_estimated_root_age - cum_height); // TODO: already conditioned on root age?
