@@ -498,10 +498,13 @@ class Forest {
                     heights[i] = s;
                 }
             
-                heights[n-2] = 1.0;
+                heights[n-2] = _estimated_root_age;
                 sort(heights.begin(), heights.end());
 
-            double t = heights[0]*(_estimated_root_age - cum_height); // TODO: already conditioned on root age?
+            double t = heights[0] - - cum_height; // TODO: already conditioned on root age?
+            assert (t > 0.0);
+
+//            double t = heights[0]*(_estimated_root_age - cum_height); // TODO: already conditioned on root age?
 //            }
                     
             if ((t + _tree_height < age) || (age == -1)) { // don't add fossil because next fossil placement is deeper than current tree
