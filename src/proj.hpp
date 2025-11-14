@@ -47,6 +47,7 @@ namespace proj {
             void smc();
             void summarizeData(Data::SharedPtr);
             void proposeParticles(unsigned step_number);
+            void simProposeParticles(unsigned step_number);
             void proposeParticleRange(unsigned first, unsigned last, unsigned step_number);
             double filterParticles(unsigned step, unsigned group_number);
             double filterParticleGroup(unsigned step, unsigned start, unsigned end);
@@ -506,7 +507,8 @@ namespace proj {
         
         unsigned nsteps = (G::_ntaxa-1);
         for (unsigned n=0; n<nsteps; n++) {
-            proposeParticles(n);
+//            proposeParticles(n);
+            simProposeParticles(n);
         }
         // Interrogate _partition to determine number of genes, gene names, and
         // number of sites in each gene
@@ -860,6 +862,11 @@ namespace proj {
         
         // Normalize log_weights to create discrete probability distribution
         double log_sum_weights = G::calcLogSum(probs);
+        
+        // if all weights are -inf, exit
+        if (log_sum_weights != log_sum_weights) {
+            throw XProj("All particles have violated fossil constraints; try again with more particles");
+        }
         transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
         
         // Compute component of the log marginal likelihood due to this step
@@ -1242,6 +1249,15 @@ namespace proj {
         return ess;
     }
 
+    inline void Proj::simProposeParticles(unsigned step_number) {
+        assert(G::_nthreads > 0);
+        if (G::_nthreads == 1) {
+            for (auto & p : _particle_vec) {
+                p.simProposal(step_number);
+            }
+        }
+    }
+
     inline void Proj::proposeParticles(unsigned step_number) {
         assert(G::_nthreads > 0);
         if (G::_nthreads == 1) {
@@ -1348,6 +1364,7 @@ namespace proj {
             p.drawFossilAges(); // draw a separate fossil age for each particle
             p.setParticleTaxSets();
             p.setOverlappingTaxSets();
+            p.setTaxSetsNoFossils();
         }
 #endif
         
