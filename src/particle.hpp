@@ -164,10 +164,11 @@ class Particle {
     }
 
     inline void Particle::simProposal(unsigned step_number) {
-        bool last_step = false;
-        if (step_number == G::_ntaxa - 2) {
-            last_step = true;
-        }
+        proposal(step_number);
+//        bool last_step = false;
+//        if (step_number == G::_ntaxa - 2) {
+//            last_step = true;
+//        }
 //        double prev_log_likelihood = _forest.getLogLikelihood();
 //
 //        bool done = false;
