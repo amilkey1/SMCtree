@@ -59,6 +59,7 @@ namespace proj {
         static vector<double>           _base_frequencies;
         static vector<double>           _double_relative_rates;
         static unsigned                 _save_every;
+        static unsigned                 _step;
         
 #if defined(FOSSILS)
         static vector<Fossil>           _fossils;

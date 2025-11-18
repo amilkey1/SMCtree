@@ -713,7 +713,7 @@ namespace proj {
                 }
             }
 #endif
-            
+            G::_step = 0;
             initializeParticles(); // initialize in parallel with multithreading
             
             //debugSaveParticleVectorInfo("debug-initialized.txt", 0);
@@ -745,6 +745,7 @@ namespace proj {
             unsigned nsteps = (G::_ntaxa-1);
             
             for (unsigned g=0; g<nsteps; g++){
+                G::_step = g;
                 
                 // set random number seeds
                 unsigned psuffix = 1;

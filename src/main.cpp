@@ -145,6 +145,7 @@ bool                   G::_save_memory;
 string                  G::_start_mode = "smc";
 string                  G::_filename = "data.nex";
 unsigned                G::_nparticles = 500;
+unsigned                G::_step = 0;
 
 const double Node::_smallest_edge_length=1.0e-12;
 

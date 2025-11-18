@@ -601,7 +601,8 @@ class Forest {
         // birth death
         double cum_height = _tree_height;
         // Determine number of lineages remaining
-        unsigned n = getNumLineages();
+//        unsigned n = getNumLineages();
+        unsigned n = G::_ntaxa;
         
         double birth_rate = _estimated_lambda;
         
@@ -613,48 +614,71 @@ class Forest {
         
         assert (n > 1);
         
-        if (n > 1) {
+        double troot = _estimated_root_age;
                 
-                // Draw n-1 internal node heights and store in vector heights
-                vector<double> heights(n - 1, 0.0);
-                
-                for (unsigned i = 0; i < n - 2; i++) {
-                    double phi = 0.0;
-                    
-                    double u = lot->uniform();
-                                    
-                    phi += birth_rate - death_rate * exp((death_rate - birth_rate) * (_estimated_root_age - cum_height));
-                    phi /= (1 - exp((death_rate - birth_rate) * (_estimated_root_age - cum_height)));
-                    
-
-                    double s = 0.0;
-                    double inner_term = (u * birth_rate - phi) / (u * death_rate - phi);
-                    s = -1 * log(inner_term) / (birth_rate - death_rate);
-                    s += cum_height;
-                    
-                    assert (s > 0);
-                    heights[i] = s;
-                }
+        // Draw n-1 internal node heights and store in vector heights
+//        vector<double> heights(n - 1, 0.0);
+        
+//        for (unsigned i = 0; i < n - 2; i++) {
+        
+        if (n > 2) {
+            double u = lot->uniform();
             
-                heights[n-2] = _estimated_root_age;
-                sort(heights.begin(), heights.end());
+            double lambda_minus_mu = G::_lambda - G::_mu;
+            
+            double b = G::_step;
+//            double b = i; // TODO: double check
+            double k = b + 1;
+            
+            double x = exp(-1*lambda_minus_mu*cum_height);
+            double z = exp(-1*lambda_minus_mu*troot);
+            
+            double C = pow(u, (1/(n-k-1))) * (x - z) / (G::_lambda - G::_mu * x);
 
-            double t = heights[0] - cum_height;
-            if (_lineages.size() > 2) { // TODO: I think if we are on the last step, we just have to join the remaining two lineages?
-                assert (t > 0.0);
-            }
-                    
-            if ((t + _tree_height < age) || (age == -1)) { // don't add fossil because next fossil placement is deeper than current tree
-                // TODO: if age == -1?
-                for (auto &nd:_lineages) {
-                    nd->_edge_length += t;
-                    nd->_accumulated_height += t;
-                }
-                _tree_height += t;
-                
-                _increments.push_back(t);
-            }
+            double numerator = C * G::_lambda + z;
+            double denominator = C * G::_mu + 1;
+
+            double new_height = log(numerator / denominator);
+            new_height /= (G::_mu - G::_lambda);
+            
+            assert (new_height > 0);
+            assert (new_height <= troot);
+            
+            t = new_height - cum_height;
+//            heights[i] = new_height; // TODO: this is wrong - fix so it's the same as the simulations - only need to do this up to the increment number (i.e. only once for first increment)
         }
+        
+        else {
+            t = troot - cum_height;
+        }
+        
+        for (auto &nd:_lineages) {
+            nd->_edge_length += t;
+            nd->_accumulated_height += t;
+        }
+        
+        _tree_height += t;
+        
+        _increments.push_back(t);
+    
+//        heights[n-2] = _estimated_root_age;
+//        sort(heights.begin(), heights.end());
+
+//        t = heights[0] - cum_height;
+//        if (_lineages.size() > 2) { // TODO: I think if we are on the last step, we just have to join the remaining two lineages?
+//            assert (t > 0.0);
+//        }
+                
+//        if ((t + _tree_height < age) || (age == -1)) { // don't add fossil because next fossil placement is deeper than current tree
+//            // TODO: if age == -1?
+//            for (auto &nd:_lineages) {
+//                nd->_edge_length += t;
+//                nd->_accumulated_height += t;
+//            }
+//            _tree_height += t;
+//
+//            _increments.push_back(t);
+//        }
             
         // lorad only works if all topologies the same - then don't include the prior on joins because it is fixed
 //        double rate = 0.0; // TODO: need to modify this for birth-death
