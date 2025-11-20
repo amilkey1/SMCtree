@@ -886,7 +886,7 @@ class Forest {
         _weight_correction = 0.0;
         bool filter = false;
         
-        if (G::_ruv) {
+        if (G::_ruv || G::_start_mode == "sim") {
             if (_lineages.size() == G::_ntaxa) {
                 _first_split_height = _lineages[0]->_edge_length;
             }
