@@ -621,7 +621,7 @@ class Forest {
         
 //        for (unsigned i = 0; i < n - 2; i++) {
         
-        if (n > 2) {
+//        if (n > 2) {
             double u = lot->uniform();
             
             double lambda_minus_mu = G::_lambda - G::_mu;
@@ -646,11 +646,11 @@ class Forest {
             
             t = new_height - cum_height;
 //            heights[i] = new_height; // TODO: this is wrong - fix so it's the same as the simulations - only need to do this up to the increment number (i.e. only once for first increment)
-        }
+//        }
         
-        else {
-            t = troot - cum_height;
-        }
+//        else {
+//            t = troot - cum_height;
+//        }
         
         for (auto &nd:_lineages) {
             nd->_edge_length += t;

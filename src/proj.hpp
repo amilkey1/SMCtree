@@ -476,6 +476,7 @@ namespace proj {
         G::_est_mu = false;
         unsigned nleaves = G::_sim_ntaxa;
         G::_ntaxa = nleaves;
+        G::_root_age = G::_sim_root_age;
         
         // make up taxon names
         G::_taxon_names.resize(nleaves);
@@ -509,6 +510,7 @@ namespace proj {
         for (unsigned n=0; n<nsteps; n++) {
 //            proposeParticles(n);
             simProposeParticles(n);
+            G::_step++;
         }
         // Interrogate _partition to determine number of genes, gene names, and
         // number of sites in each gene
