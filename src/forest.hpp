@@ -113,6 +113,7 @@ class Forest {
         double                      _clock_rate;
         double                      _weight_correction; // correct for taxon set constraints
         double                      _first_split_height;
+        double                      _first_split_prior;
     
 #if defined (FOSSILS)
         double _tree_height;
@@ -1630,7 +1631,8 @@ class Forest {
         unsigned nbranches = (unsigned) _increments.size();
 //        unsigned nbranches = ntips - 1 + (unsigned) G::_fossils.size() * 2; // TODO: not sure - but I think each fossil is associated with an extra branch length - or should it be combined with existing branch length?
         
-        for (unsigned i = 1; i < nbranches; i++) {
+        for (unsigned i = 0; i < nbranches; i++) {
+            // TODO: I had i=1 before, not sure why, double check this
 //        for (unsigned i=1; i<G::_fossils.size() + G::_ntaxa + 1; i++) {
             // i is number of species in existence
             // density increment is the probability of having exactly i species at time t
@@ -1641,18 +1643,22 @@ class Forest {
 //            double B = (exp(r)*t - 1) / (exp(r)*t - E);
             double B = a / E;
             
+            double density_increment = 0.0;
             if (birth_death_prior == 0) {
-                double density_increment = a; // starting with a single lineage
+                density_increment = a; // starting with a single lineage
                 birth_death_prior += density_increment;
             }
             else {
-                double density_increment = (1-a)*(1-B)*pow(B, i-1);
+                density_increment = (1-a)*(1-B)*pow(B, i-1);
                 birth_death_prior += density_increment;
             }
             
 //            double log_prob_density_increment = log((1-a)*(1-B)*pow(B, i-1));
             
 //            birth_death_prior += log_prob_density_increment;
+            if (count == 0) {
+                _first_split_prior = density_increment;
+            }
             count--;
         }
         
@@ -2268,6 +2274,7 @@ class Forest {
         _clock_rate = other._clock_rate;
         _weight_correction = other._weight_correction;
         _first_split_height = other._first_split_height;
+        _first_split_prior = other._first_split_prior;
 #if defined (FOSSILS)
         _tree_height = other._tree_height;
         _valid_taxsets = other._valid_taxsets;

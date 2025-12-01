@@ -106,6 +106,7 @@ string G::_sim_dir = ".";
 
 // validation
 bool G::_ruv = false;
+bool G::_coverage = false;
 
 #if defined (FOSSILS)
 vector<Fossil> G::_fossils;

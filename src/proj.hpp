@@ -74,6 +74,7 @@ namespace proj {
             double                      _log_marginal_likelihood;
             vector<Lot::SharedPtr>      _group_rng;
             vector<unsigned>            _indices_to_keep; // indices of particles to write to output files
+            vector<pair<double, double>> _hpd_values;
     };
 
     inline Proj::Proj() {
@@ -138,7 +139,8 @@ namespace proj {
         ("simfossil",  value(&sim_fossils), "a string defining a fossil, e.g. 'Ursus_abstrusus         1.8–5.3 4.3' (4.3 is time, 1.8-5.3 is prior range)")
 #endif
         // the following variables relate to validation analyses
-        ("ruv", boost::program_options::value(&G::_ruv)->default_value(false), "run without likelihood")
+        ("ruv", boost::program_options::value(&G::_ruv)->default_value(false), "run ruv analysis")
+        ("coverage", boost::program_options::value(&G::_coverage)->default_value(false), "run coverage analysis")
         ;
         
         store(parse_command_line(argc, argv, desc), vm);
@@ -783,7 +785,7 @@ namespace proj {
             writeLogMarginalLikelihoodFile();
             
             if (G::_ruv) {
-                // TODO: get height of first split from sim directory (read in as command line option)
+                // get height of first split from sim directory (read in as command line option)
                 string splitfname;
                 if (G::_sim_dir != ".") {
                     splitfname = G::_sim_dir + "height_of_first_split.txt";
@@ -799,49 +801,57 @@ namespace proj {
                     break;
                 }
                 
-//                vector<pair<double, bool>> fossil_ages;
-//                vector<pair<double, bool>> root_ages;
                 vector<pair<double, bool>> first_split_heights;
                 for (auto &p:_particle_vec) {
-//                    double fossil_age = p.getLowestFossilAge();
-//                    double root_age = p.getRootAge();
                     double first_split_height = p.getHeightFirstSplit();
-//                    fossil_ages.push_back(make_pair(fossil_age, false));
-//                    root_ages.push_back(make_pair(root_age, false));
                     first_split_heights.push_back(make_pair(first_split_height, false));
-//                    ofstream agef;
-//                    string filename = "fossil_ages.txt";
-//                    agef.open(filename, std::ios::app);
-//                    agef << fossil_age << endl;
                 }
-//                fossil_ages.push_back(make_pair(G::_fossils[0]._age, true)); // true fossil age
-//                root_ages.push_back(make_pair(G::_root_age, true)); // true root age
-                first_split_heights.push_back(make_pair(true_split_height, true)); // true root age
                 
-                // sort fossil ages
-//                sort(fossil_ages.begin(), fossil_ages.end());
-//                sort(root_ages.begin(), root_ages.end());
+                first_split_heights.push_back(make_pair(true_split_height, true)); // true first split height
+                
+                // sort split heights
                 sort(first_split_heights.begin(), first_split_heights.end());
 
                 // find rank of truth
-//                auto it = std::find_if(fossil_ages.begin(), fossil_ages.end(), [&](const pair<double, bool>& p) { return p.second == true;});
-//                unsigned index_value = (unsigned) std::distance(fossil_ages.begin(), it);
-                
-//                auto it = std::find_if(root_ages.begin(), root_ages.end(), [&](const pair<double, bool>& p) { return p.second == true;});
-//                unsigned index_value = (unsigned) std::distance(root_ages.begin(), it);
-                
                 auto it = std::find_if(first_split_heights.begin(), first_split_heights.end(), [&](const pair<double, bool>& p) { return p.second == true;});
                 unsigned index_value = (unsigned) std::distance(first_split_heights.begin(), it);
                 
                 // write rank value to file
-//                ofstream rankf("rank_lowest_fossil_age.txt");
-//                rankf << "rank: " << index_value << endl;
-                
-//                ofstream rankf("rank_origin.txt");
-//                rankf << "rank: " << index_value << endl;
                 
                 ofstream rankf("rank_first_split.txt");
                 rankf << "rank: " << index_value << endl;
+            }
+            
+            if (G::_coverage) {
+                assert (_hpd_values.size() > 0);
+                ofstream hpdf("hpd.txt");
+                hpdf << "min    " << "max " << endl;
+
+                // sort hpd values largest to smallest
+                std::sort(_hpd_values.begin(), _hpd_values.end());
+                std::reverse(_hpd_values.begin(), _hpd_values.end());
+
+                // take first 95% of values (round down to nearest integer)
+                double total = boost::size(_hpd_values);
+                double ninety_five_index = floor(0.95*total);
+
+                if (ninety_five_index == 0) {
+                    ninety_five_index = 1;
+                }
+
+                vector<double> hpd_values_in_range;
+
+                for (unsigned h=0; h<ninety_five_index; h++) {
+                    hpd_values_in_range.push_back(_hpd_values[h].first);
+                }
+
+                auto max = *std::max_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
+                auto min = *std::min_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
+                assert (min < max || min == max);
+
+                // write min and max to file
+                hpdf << min << "\t" << max << endl;
+                cout << "x";
             }
             
         }
@@ -1449,6 +1459,11 @@ namespace proj {
             double total_log_prior = p.getAllPriors();
             
             double log_posterior = total_log_prior + log_likelihood;
+            
+            if (G::_coverage) {
+                _hpd_values.push_back(make_pair(p.getHeightFirstSplit(), log_posterior));
+            }
+            
             vector<double> tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
             double height = p.getTreeHeight();
             double length = p.getTreeLength();
