@@ -840,10 +840,17 @@ namespace proj {
                     true_split_height = stod(line);
                     break;
                 }
+                
+                // get average first split height
+                double total_first_split_heights = 0.0;
+                for (auto &p:_particle_vec) {
+                    total_first_split_heights += p.getHeightFirstSplit();
+                }
 
+                double observed_mean = total_first_split_heights /= G::_nparticles;
                 
                 ofstream hpdf("hpd.txt");
-                hpdf << "min    " << "max   " << "true    " << endl;
+                hpdf << "min    " << "max   " << "true    " << "observed mean   " << endl;
 
                 // sort hpd values largest to smallest
                 std::sort(_hpd_values.begin(), _hpd_values.end());
@@ -868,7 +875,7 @@ namespace proj {
                 assert (min < max || min == max);
 
                 // write min and max to file
-                hpdf << min << "\t" << max << "\t" << true_split_height << endl;
+                hpdf << min << "\t" << max << "\t" << true_split_height << "\t" << observed_mean << endl;
             }
             
         }
