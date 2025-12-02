@@ -824,8 +824,26 @@ namespace proj {
             
             if (G::_coverage) {
                 assert (_hpd_values.size() > 0);
+                
+                // get height of first split from sim directory (read in as command line option)
+                string splitfname;
+                if (G::_sim_dir != ".") {
+                    splitfname = G::_sim_dir + "height_of_first_split.txt";
+                }
+                else {
+                    splitfname = "height_of_first_split.txt";
+                }
+                ifstream inputf(splitfname);
+                double true_split_height = 0.0;
+                string line;
+                while (getline(inputf, line)) {
+                    true_split_height = stod(line);
+                    break;
+                }
+
+                
                 ofstream hpdf("hpd.txt");
-                hpdf << "min    " << "max " << endl;
+                hpdf << "min    " << "max   " << "true    " << endl;
 
                 // sort hpd values largest to smallest
                 std::sort(_hpd_values.begin(), _hpd_values.end());
@@ -850,8 +868,7 @@ namespace proj {
                 assert (min < max || min == max);
 
                 // write min and max to file
-                hpdf << min << "\t" << max << endl;
-                cout << "x";
+                hpdf << min << "\t" << max << "\t" << true_split_height << endl;
             }
             
         }
