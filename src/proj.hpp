@@ -847,7 +847,7 @@ namespace proj {
                     total_first_split_heights += p.getHeightFirstSplit();
                 }
 
-                double observed_mean = total_first_split_heights /= G::_nparticles;
+                double observed_mean = total_first_split_heights /= _particle_vec.size();
                 
                 ofstream hpdf("hpd.txt");
                 hpdf << "min    " << "max   " << "true    " << "observed mean   " << endl;
