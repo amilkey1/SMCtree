@@ -1579,37 +1579,45 @@ class Forest {
         // Raup 1985
         
         // starting from the root, go increment by increment and calculate the following parameters:
-        // TODO: do fossil increments count?
+        // TODO: do fossil increments count? - no fossils for now
         
         double E = _estimated_mu / _estimated_lambda;
         double r = _estimated_lambda - _estimated_mu;
         double t = 0.0;
         unsigned count = (unsigned) _increments.size() - 1;
         
-        unsigned ntips = G::_ntaxa;
         unsigned nbranches = (unsigned) _increments.size();
 //        unsigned nbranches = ntips - 1 + (unsigned) G::_fossils.size() * 2; // TODO: not sure - but I think each fossil is associated with an extra branch length - or should it be combined with existing branch length?
         
-        for (unsigned i = 0; i < nbranches; i++) {
-            // TODO: I had i=1 before, not sure why, double check this
+        for (unsigned i = 1; i < nbranches + 1; i++) {
+            // i is number of species in existence
+            // i = 1, 2, 3, ... nbranches
 //        for (unsigned i=1; i<G::_fossils.size() + G::_ntaxa + 1; i++) {
             // i is number of species in existence
             // density increment is the probability of having exactly i species at time t
-            // TODO: is t the increment or the accumulated height?
             
-            t = _increments[count]; // TODO: = or += ?
+            // TODO: is it okay to calculate the prior root forwards when the tree was drawn tips backwards?
+            
+            // if starting at lineage at the root, prob of 1 lineage at time 0 = 1, so no need to include this
+            
+//            if (count == (unsigned) _increments.size()) {
+//                t = 0;
+//                // start by calculating the prob of 1 lineage at time 0
+//            }
+//            else {
+                t += _increments[count]; // TODO: = or += ? - I think t is height not increment, so +=
+//            }
             double a = (E*(exp(r)*t - 1)) / (exp(r)*t - E);
-//            double B = (exp(r)*t - 1) / (exp(r)*t - E);
             double B = a / E;
             
             double density_increment = 0.0;
             if (birth_death_prior == 0) {
                 density_increment = a; // starting with a single lineage
-                birth_death_prior += density_increment;
+                birth_death_prior = log(density_increment);
             }
             else {
                 density_increment = (1-a)*(1-B)*pow(B, i-1);
-                birth_death_prior += density_increment;
+                birth_death_prior += log(density_increment);
             }
             
 //            double log_prob_density_increment = log((1-a)*(1-B)*pow(B, i-1));
@@ -1621,9 +1629,9 @@ class Forest {
             count--;
         }
         
-        birth_death_prior = log(birth_death_prior);
+//        birth_death_prior = log(birth_death_prior);
         
-//        assert(birth_death_prior == birth_death_prior); // TODO: why does this turn into Nan?
+        assert(birth_death_prior == birth_death_prior); // TODO: why does this turn into Nan?
         // check for NaN
         return birth_death_prior;
     }
