@@ -699,26 +699,28 @@ namespace proj {
             }
             
 #if defined (FOSSILS)
-            // check that no fossil is older than the mean root age
-            for (auto &f:G::_fossils) {
-                if (f._upper >= G::_root_age) {
-                    throw XProj("fossil range cannot exceed or equal root age");
+            if (G::_fossils.size() > 0) {
+                // check that no fossil is older than the mean root age
+                for (auto &f:G::_fossils) {
+                    if (f._upper >= G::_root_age) {
+                        throw XProj("fossil range cannot exceed or equal root age");
+                    }
                 }
-            }
-            
-            // sort fossils from youngest to oldest for use in later proposal
-            sort(G::_fossils.begin(), G::_fossils.end(), [](Fossil & left, Fossil & right) {
-                return left._age < right._age;
-            });
-            
-            for (auto &f:G::_fossils) {
-                if (G::_root_age < f._age) {
-                    throw XProj(format("Root age set to %d but oldest fossil has age %d; root age must be older than fossils")% G::_root_age % f._age);
+                
+                // sort fossils from youngest to oldest for use in later proposal
+                sort(G::_fossils.begin(), G::_fossils.end(), [](Fossil & left, Fossil & right) {
+                    return left._age < right._age;
+                });
+                
+                for (auto &f:G::_fossils) {
+                    if (G::_root_age < f._age) {
+                        throw XProj(format("Root age set to %d but oldest fossil has age %d; root age must be older than fossils")% G::_root_age % f._age);
+                    }
                 }
             }
 #endif
             G::_step = 0;
-            initializeParticles(); // initialize in parallel with multithreading
+            initializeParticles(); // TODO: make one template particle and copy it
             
             //debugSaveParticleVectorInfo("debug-initialized.txt", 0);
 
@@ -762,6 +764,22 @@ namespace proj {
                 output(format("Step %d of %d.\n") % step_plus_one % nsteps, 1);
                 
                 proposeParticles(g);
+                
+# if defined (INCREMENT_COMPARISON_TEST)
+                
+                if (G::_step == 2) {
+                    ofstream outFile("test3.log", std::ios::app);
+                    unsigned count = 0;
+                    outFile << "sample" << "\t" << "increment";
+                    outFile << endl;
+                    for (auto &p:_particle_vec) {
+//                        outFile << count << "\t" << p.getHeightFirstSplit() << endl;
+//                        outFile << count << "\t" << p.getHeightSecondIncr() << endl;
+                        outFile << count << "\t" << p.getHeightThirdIncr() << endl;
+                        count++;
+                    }
+                }
+#endif
                 
 //                debugSaveParticleVectorInfo("debug-proposed.txt", g+1);
                 
@@ -1359,7 +1377,7 @@ namespace proj {
         }
     }
 
-    inline void Proj::initializeParticles() { // TODO: can thread this - or make one template particle and copy it?
+    inline void Proj::initializeParticles() { // TODO: make one template particle and copy it
         // set partials for first particle under save_memory setting for initial marginal likelihood calculation
          assert (G::_nthreads > 0);
 
@@ -1396,17 +1414,19 @@ namespace proj {
          }
         
 #if defined (FOSSILS)
-        for (auto &p:_particle_vec) {
-            p.setFossils();
-            p.drawFossilAges(); // draw a separate fossil age for each particle
-            p.setParticleTaxSets();
-            p.setOverlappingTaxSets();
-            p.setTaxSetsNoFossils();
+        if (G::_fossils.size() > 0) {
+            for (auto &p:_particle_vec) {
+                p.setFossils();
+                p.drawFossilAges(); // draw a separate fossil age for each particle
+                p.setParticleTaxSets();
+                p.setOverlappingTaxSets();
+                p.setTaxSetsNoFossils();
+            }
         }
 #endif
         
+    if (G::_est_root_age) {
         for (auto &p:_particle_vec) {
-            if (G::_est_root_age) {
                 p.drawRootAge();
             }
         }

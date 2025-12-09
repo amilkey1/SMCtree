@@ -48,6 +48,8 @@ class Particle {
         void calculateLambdaAndMu();
         void drawLambda();
         double getHeightFirstSplit(){return _forest.getHeightFirstSplit();}
+        double getHeightSecondIncr() {return _forest.getHeightSecondIncr();}
+        double getHeightThirdIncr() {return _forest.getHeightThirdIncr();}
 
 #if defined (FOSSILS)
         void setFossils() {_particle_fossils = G::_fossils;}
@@ -165,171 +167,20 @@ class Particle {
 
     inline void Particle::simProposal(unsigned step_number) {
         proposal(step_number);
-//        bool last_step = false;
-//        if (step_number == G::_ntaxa - 2) {
-//            last_step = true;
-//        }
-//        double prev_log_likelihood = _forest.getLogLikelihood();
-//
-//        bool done = false;
-//
-//        while (!done) {
-//#if defined (FOSSILS)
-//            bool fossil_added = false;
-//            bool done_adding_increment = false;
-//            bool valid = false;
-//
-//            while (!done_adding_increment || !valid) {
-//                _forest._valid_taxsets.clear();
-//                // loop through until you have ended on a non-fossil increment added or forest is finished
-//                if ((_fossil_number < G::_fossils.size()) || (_fossil_number == 0 && G::_fossils.size() == 1)) {
-//                    fossil_added = _forest.addIncrementFossil(_lot, _particle_fossils[_fossil_number]._age, _particle_fossils[_fossil_number]._name);
-//                    if (fossil_added) {
-//                        _fossil_number++;
-//                        string fossil_name = G::_fossils[_fossil_number-1]._name;
-//                        updateFossilTaxsets(fossil_name);
-//                        done_adding_increment = false;
-//                    }
-//                    else {
-//                        done_adding_increment = true;
-//                    }
-//                }
-//                else {
-//                    fossil_added = _forest.addIncrementFossil(_lot, -1, "placeholder");
-//                    assert (!fossil_added);
-//                    done_adding_increment = true;
-//                }
-//
-//                // check that at least one taxon set is valid
-//                // if there is no valid taxon set, keep adding increments until a valid set has been reached
-//
-//                valid = _forest.checkForValidTaxonSet(_particle_taxsets, _unused_particle_taxsets);
-//
-//                if (_forest._lineages.size() == 1 && _fossil_number == G::_fossils.size() - 1) { // if forest is finished, break out of step even if we have ended on a fossil
-//                    done_adding_increment = true;
-//                    assert (valid == true);
-//                }
-//            }
-//#else
-//            _forest.addIncrement(_lot);
-//#endif
-//#if defined (INCREMENT_COMPARISON_TEST)
-//            _forest.addIncrement(_lot);
-//#endif
-//            pair<double, bool> output = _forest.joinTaxa(prev_log_likelihood, _lot, _particle_taxsets, _unused_particle_taxsets);
-//
-//            _log_weight = output.first; // TODO: how to decide when the step is done if there is no data and no likelihood change?
-//            bool filter = output.second;
-//
-//            // step is done when log weight is not 0 or when all the lineages are joined and all the fossils have been added
-//#if defined (FOSSILS)
-//            // if the branch is really long, joining nodes will not change the likelihood
-//            if (filter || (_forest._lineages.size() == 1 && _fossil_number == (unsigned) (_particle_fossils.size()))) {
-//                done = true; // if the forest isn't finished and we're on the last step, keep going
-//                if (last_step && (_fossil_number != (unsigned) _particle_fossils.size() || _forest._lineages.size() != 1)) {
-//                    done = false;
-//                }
-//            }
-//
-//#else
-//            if (_log_weight != 0.0 || (_forest._lineages.size() == 1)) {
-//                done = true;
-//            }
-//#endif
-//        }
-//        if (step_number == G::_ntaxa - 2) {
-//            assert (_fossil_number == G::_fossils.size());
-//            assert (_forest._lineages.size() == 1);
-//        }
-//
-//        if (G::_run_on_empty) {
-//            _log_weight = 0.0;
-//        }
     }
 
     inline void Particle::proposal(unsigned step_number) {
-        bool last_step = false;
-        if (step_number == G::_ntaxa - 2) {
-            last_step = true;
-        }
         double prev_log_likelihood = _forest.getLogLikelihood();
         
-        bool done = false;
-        
-        while (!done) {
-#if defined (FOSSILS)
-            bool fossil_added = false;
-            bool done_adding_increment = false;
-            bool valid = false;
+        _forest.addIncrementFossil(_lot, -1, "placeholder");
             
-            while (!done_adding_increment || !valid) {
-//                _forest._valid_taxsets.clear();
-//                // loop through until you have ended on a non-fossil increment added or forest is finished
-//                if ((_fossil_number < G::_fossils.size()) || (_fossil_number == 0 && G::_fossils.size() == 1)) {
-//                    fossil_added = _forest.addIncrementFossil(_lot, _particle_fossils[_fossil_number]._age, _particle_fossils[_fossil_number]._name);
-//                    if (fossil_added) {
-//                        _fossil_number++;
-//                        string fossil_name = G::_fossils[_fossil_number-1]._name;
-//                        updateFossilTaxsets(fossil_name);
-//                        done_adding_increment = false;
-//                    }
-//                    else {
-//                        done_adding_increment = true;
-//                    }
-//                }
-//                else {
-//                showParticle();
-                    fossil_added = _forest.addIncrementFossil(_lot, -1, "placeholder");
-//                    _forest.addIncrementFossil(_lot, -1, "placeholder");
-                    assert (!fossil_added);
-                    done_adding_increment = true;
-//                }
-                
-                // check that at least one taxon set is valid
-                // if there is no valid taxon set, keep adding increments until a valid set has been reached
-                
-                valid = _forest.checkForValidTaxonSet(_particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils);
-                assert (valid); // TODO: when fossils aren't part of the tree, don't consider any of this because there should always be a valid taxon set
-                
-                if (_forest._lineages.size() == 1 && _fossil_number == G::_fossils.size() - 1) { // if forest is finished, break out of step even if we have ended on a fossil
-                    done_adding_increment = true;
-                    assert (valid == true);
-                }
-            }
-#else
-            _forest.addIncrement(_lot);
-#endif
 #if defined (INCREMENT_COMPARISON_TEST)
-            _forest.addIncrement(_lot);
+        _forest.addIncrement(_lot); // for comparison of sim.log vs smc.log
 #endif
-            pair<double, bool> output = _forest.joinTaxa(prev_log_likelihood, _lot, _particle_taxsets, _unused_particle_taxsets, _particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils, _particle_fossils);
-
-            // TODO: check if the tree violates the fossil constraints
-            
-            _log_weight = output.first;
-            bool filter = output.second;
-            
-            done = true;
-            
-            // step is done when log weight is not 0 or when all the lineages are joined and all the fossils have been added
-#if defined (FOSSILS)
-            // TODO: fix this so it doesn't matter - always the same number of steps
-            // if the branch is really long, joining nodes will not change the likelihood
-//            if (filter || (_forest._lineages.size() == 1 && _fossil_number == (unsigned) (_particle_fossils.size()))) {
-//                done = true; // if the forest isn't finished and we're on the last step, keep going
-//                if (last_step && (_fossil_number != (unsigned) _particle_fossils.size() || _forest._lineages.size() != 1)) {
-//                    done = false;
-//                }
-//            }
-
-#else
-            if (_log_weight != 0.0 || (_forest._lineages.size() == 1)) {
-                done = true;
-            }
-#endif
-        }
+       _log_weight = _forest.joinTaxa(prev_log_likelihood, _lot, _particle_taxsets, _unused_particle_taxsets, _particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils, _particle_fossils);
+        
         if (step_number == G::_ntaxa - 2) {
-//            assert (_fossil_number == G::_fossils.size());
+            // if we are on the last step, check that the forest is down to 1 lineage
             assert (_forest._lineages.size() == 1);
         }
         

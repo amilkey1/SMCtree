@@ -23,6 +23,8 @@ class Forest {
         void buildBirthDeathTree();
         double getLogLikelihood();
         double getHeightFirstSplit();
+        double getHeightSecondIncr();
+        double getHeightThirdIncr();
     
 #if defined (INCREMENT_COMPARISON_TEST)
     void buildBirthDeathTreeTest();
@@ -41,8 +43,8 @@ class Forest {
         void refreshPreorder();
         double calcSubsetLogLikelihood(unsigned i);
         void addIncrement(Lot::SharedPtr lot);
-        pair<double, bool> joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset, vector<TaxSet> &taxset_no_fossils, vector<TaxSet> &unused_taxset_no_fossils, vector<Fossil> &particle_fossils);
-        pair<double, bool> joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset, vector<TaxSet> &taxset_no_fossils, vector<TaxSet> &unused_taxset_no_fossils, vector<Fossil> &particle_fossils);
+        double joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset, vector<TaxSet> &taxset_no_fossils, vector<TaxSet> &unused_taxset_no_fossils, vector<Fossil> &particle_fossils);
+        double joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset, vector<TaxSet> &taxset_no_fossils, vector<TaxSet> &unused_taxset_no_fossils, vector<Fossil> &particle_fossils);
         double joinPriorPost(Lot::SharedPtr lot);
         pair<pair<Node*, Node*>, double> chooseAllPairs(Lot::SharedPtr lot);
         void calcPartialArray(Node* new_nd);
@@ -114,6 +116,8 @@ class Forest {
         double                      _weight_correction; // correct for taxon set constraints
         double                      _first_split_height;
         double                      _first_split_prior;
+        double                      _second_incr;
+        double                      _third_incr;
     
 #if defined (FOSSILS)
         double _tree_height;
@@ -172,6 +176,8 @@ class Forest {
         _partial_count = 0;
         _weight_correction = 0.0;
         _first_split_height = 0.0;
+        _second_incr = 0.0;
+        _third_incr = 0.0;
 #if defined (FOSSILS)
         _tree_height = 0.0;
         _valid_taxsets.clear();
@@ -532,7 +538,7 @@ class Forest {
             unsigned n = getNumLineages();
         
             double t = 0.0;
-            for (unsigned a = 0; a < 100000; a++) {
+            for (unsigned a = 0; a < 1; a++) {
             
                 for (unsigned b = 0; b < 3; b++) {
                         assert (n > 1);
@@ -550,6 +556,7 @@ class Forest {
                             double z = exp(-1*lambda_minus_mu*troot);
 
                             double u = lot->uniform();
+                            
                             double k = b + 1;
                             n = getNumLineages();
                             
@@ -595,14 +602,13 @@ class Forest {
 
 #if defined (FOSSILS)
     bool Forest::addBirthDeathIncrementFossil(Lot::SharedPtr lot, double age, string fossil_name) {
+        // TODO: NO FOSSILS YET
         bool fossil_added = false;
         
         // if there is only one lineage left, all extant taxa have been joined and remaining fossils must be added
         
         // birth death
         double cum_height = _tree_height;
-        // Determine number of lineages remaining
-//        unsigned n = getNumLineages();
         unsigned n = G::_ntaxa;
         
         double birth_rate = _estimated_lambda;
@@ -617,41 +623,37 @@ class Forest {
         
         double troot = _estimated_root_age;
                 
-        // Draw n-1 internal node heights and store in vector heights
-//        vector<double> heights(n - 1, 0.0);
+        double u = lot->uniform();
+            
+        double lambda_minus_mu = G::_lambda - G::_mu;
         
-//        for (unsigned i = 0; i < n - 2; i++) {
+        double b = G::_step;
+        double k = b + 1;
         
-//        if (n > 2) {
-            double u = lot->uniform();
-            
-            double lambda_minus_mu = G::_lambda - G::_mu;
-            
-            double b = G::_step;
-//            double b = i; // TODO: double check
-            double k = b + 1;
-            
-            double x = exp(-1*lambda_minus_mu*cum_height);
-            double z = exp(-1*lambda_minus_mu*troot);
-            
-            double C = pow(u, (1/(n-k-1))) * (x - z) / (G::_lambda - G::_mu * x);
+        double x = exp(-1*lambda_minus_mu*cum_height);
+        double z = exp(-1*lambda_minus_mu*troot);
+        
+        double C = pow(u, (1/(n-k-1))) * (x - z) / (G::_lambda - G::_mu * x);
 
-            double numerator = C * G::_lambda + z;
-            double denominator = C * G::_mu + 1;
+        double numerator = C * G::_lambda + z;
+        double denominator = C * G::_mu + 1;
 
-            double new_height = log(numerator / denominator);
-            new_height /= (G::_mu - G::_lambda);
-            
-            assert (new_height > 0);
-            assert (new_height <= troot);
-            
-            t = new_height - cum_height;
-//            heights[i] = new_height; // TODO: this is wrong - fix so it's the same as the simulations - only need to do this up to the increment number (i.e. only once for first increment)
-//        }
+        double new_height = log(numerator / denominator);
+        new_height /= (G::_mu - G::_lambda);
         
-//        else {
-//            t = troot - cum_height;
-//        }
+        assert (new_height > 0);
+        assert (new_height <= troot);
+        
+        t = new_height - cum_height;
+        
+# if defined (INCREMENT_COMPARISON_TEST)
+        if (b == 1) {
+            _second_incr = t;
+        }
+        else if (b == 2) {
+            _third_incr = t;
+        }
+#endif
         
         for (auto &nd:_lineages) {
             nd->_edge_length += t;
@@ -661,32 +663,6 @@ class Forest {
         _tree_height += t;
         
         _increments.push_back(t);
-    
-//        heights[n-2] = _estimated_root_age;
-//        sort(heights.begin(), heights.end());
-
-//        t = heights[0] - cum_height;
-//        if (_lineages.size() > 2) { // TODO: I think if we are on the last step, we just have to join the remaining two lineages?
-//            assert (t > 0.0);
-//        }
-                
-//        if ((t + _tree_height < age) || (age == -1)) { // don't add fossil because next fossil placement is deeper than current tree
-//            // TODO: if age == -1?
-//            for (auto &nd:_lineages) {
-//                nd->_edge_length += t;
-//                nd->_accumulated_height += t;
-//            }
-//            _tree_height += t;
-//
-//            _increments.push_back(t);
-//        }
-            
-        // lorad only works if all topologies the same - then don't include the prior on joins because it is fixed
-//        double rate = 0.0; // TODO: need to modify this for birth-death
-//        rate = getNumLineages() * birth_rate;
-//        double increment_prior = (log(rate)-t*rate);
-//
-//        _increments_and_priors.push_back(make_pair(t, increment_prior));
                 
         assert (!fossil_added);
         return fossil_added;
@@ -701,18 +677,18 @@ class Forest {
 #endif
     }
 
-    inline pair<double, bool> Forest::joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset, vector<TaxSet> &taxset_no_fossils, vector<TaxSet> &unused_taxset_no_fossils, vector<Fossil> &particle_fossils) {
+    inline double Forest::joinTaxa(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset, vector<TaxSet> &taxset_no_fossils, vector<TaxSet> &unused_taxset_no_fossils, vector<Fossil> &particle_fossils) {
         double log_weight = 0.0;
-        pair<double, bool> output;
         
-        if (G::_proposal == "prior-prior") {
-            output = joinPriorPrior(prev_log_likelihood, lot, taxset, unused_taxset, taxset_no_fossils, unused_taxset_no_fossils, particle_fossils);
-        }
-        else {
-            log_weight = joinPriorPost(lot);
-        }
+//        if (G::_proposal == "prior-prior") {
+            log_weight = joinPriorPrior(prev_log_likelihood, lot, taxset, unused_taxset, taxset_no_fossils, unused_taxset_no_fossils, particle_fossils);
+//        }
+//        else {
+//            log_weight = joinPriorPost(lot);
+        // do not use
+//        }
 
-        return output;
+        return log_weight;
     }
 
     inline double Forest::joinPriorPost(Lot::SharedPtr lot) {
@@ -883,7 +859,7 @@ class Forest {
          return make_tuple(subtree1, subtree2, new_nd);
      }
 
-    inline pair<double, bool> Forest::joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset, vector<TaxSet> &taxset_no_fossils, vector<TaxSet> &unused_taxset_no_fossils, vector<Fossil> &particle_fossils) {
+    inline double Forest::joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset, vector<TaxSet> &taxset_no_fossils, vector<TaxSet> &unused_taxset_no_fossils, vector<Fossil> &particle_fossils) {
         _weight_correction = 0.0;
         bool filter = false;
         
@@ -1090,16 +1066,6 @@ class Forest {
             subtree1 = _lineages[t.first];
             subtree2 = _lineages[t.second];
         }
-        
-//        if (fossil_constraint) {
-//            assert (fossil_age != -1);
-//            // figure out if associated branch length has violated the fossil constraint
-//            if (_lineages.back()->_accumulated_height > fossil_age) {
-//                fossil_age_is_violated = true;
-//            }
-//        }
-        
-//        if (!fossil_age_is_violated) {
         
             assert (subtree1 != subtree2);
 
@@ -1480,18 +1446,11 @@ class Forest {
         }
         
         if (fossil_age_is_violated) {
-            return make_pair(-1 * G::_infinity, true); // fossil constraint has been violated and particle weight is 0
+            return -1 * G::_infinity; // fossil constraint has been violated and particle weight is 0
         }
         else {
-            return make_pair(log_weight, filter);
+            return log_weight;
         }
-            
-//            return make_pair(log_weight, filter);
-//        }
-//        else {
-//            return make_pair(-1 * G::_infinity, true); // fossil constraint has been violated and particle weight is 0
-//        }
-        
     }
 
     inline void Forest::updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode) {
@@ -2275,6 +2234,8 @@ class Forest {
         _weight_correction = other._weight_correction;
         _first_split_height = other._first_split_height;
         _first_split_prior = other._first_split_prior;
+        _second_incr = other._second_incr;
+        _third_incr = other._third_incr;
 #if defined (FOSSILS)
         _tree_height = other._tree_height;
         _valid_taxsets = other._valid_taxsets;
@@ -3080,6 +3041,14 @@ class Forest {
 
     inline double Forest::getHeightFirstSplit() {
         return _first_split_height;
+    }
+
+    inline double Forest::getHeightSecondIncr() {
+        return _second_incr;
+    }
+
+    inline double Forest::getHeightThirdIncr() {
+        return _third_incr;
     }
 
     inline double Forest::getLineageHeight(Node* nd) {
