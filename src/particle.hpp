@@ -170,6 +170,11 @@ class Particle {
     }
 
     inline void Particle::proposal(unsigned step_number) {
+        if (step_number == 0) {
+            bool valid = _forest.checkForValidTaxonSet(_particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils);
+            assert (valid); // when fossils aren't part of the tree, don't consider any of this because there should always be a valid taxon set
+        }
+        
         double prev_log_likelihood = _forest.getLogLikelihood();
         
         _forest.addIncrementFossil(_lot, -1, "placeholder");
@@ -178,6 +183,16 @@ class Particle {
         _forest.addIncrement(_lot); // for comparison of sim.log vs smc.log
 #endif
        _log_weight = _forest.joinTaxa(prev_log_likelihood, _lot, _particle_taxsets, _unused_particle_taxsets, _particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils, _particle_fossils);
+        
+        // check that at least one taxon set is valid
+         // if there is no valid taxon set, keep adding increments until a valid set has been reached
+         
+        if (_forest._lineages.size() > 1) {
+            // after the last step, there should be no valid taxon sets
+             bool valid = _forest.checkForValidTaxonSet(_particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils);
+             assert (valid); // when fossils aren't part of the tree, don't consider any of this because there should always be a valid taxon set
+        }
+
         
         if (step_number == G::_ntaxa - 2) {
             // if we are on the last step, check that the forest is down to 1 lineage

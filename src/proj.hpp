@@ -1306,10 +1306,9 @@ namespace proj {
 
     inline void Proj::simProposeParticles(unsigned step_number) {
         assert(G::_nthreads > 0);
-        if (G::_nthreads == 1) {
-            for (auto & p : _particle_vec) {
-                p.simProposal(step_number);
-            }
+        // don't bother threading simulations
+        for (auto & p : _particle_vec) {
+            p.simProposal(step_number);
         }
     }
 
@@ -1413,14 +1412,17 @@ namespace proj {
              }
          }
         
+        for (auto &p:_particle_vec) {
+            p.setParticleTaxSets();
+            p.setOverlappingTaxSets();
+            p.setTaxSetsNoFossils();
+        }
+        
 #if defined (FOSSILS)
         if (G::_fossils.size() > 0) {
             for (auto &p:_particle_vec) {
                 p.setFossils();
                 p.drawFossilAges(); // draw a separate fossil age for each particle
-                p.setParticleTaxSets();
-                p.setOverlappingTaxSets();
-                p.setTaxSetsNoFossils();
             }
         }
 #endif
