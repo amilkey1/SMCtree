@@ -505,15 +505,47 @@ namespace proj {
                 }
             }
 #endif
-        _particle_vec.resize(1);
+        
+        // simulate many particles, then choose among the survivors
+        // must do this to simulate fossils
+        
+        G::_nparticles = 100;
+        
+        // set group rng
+        G::_ngroups = 1.0;
+        _group_rng.resize(G::_ngroups);
+        unsigned psuffix = 1;
+        for (auto &g:_group_rng) {
+            g.reset(new Lot());
+            g->setSeed(rng->randint(1,9999)+psuffix);
+            psuffix += 2;
+        }
+        
+        _particle_vec.resize(G::_nparticles);
         initializeParticles();
         
+        vector<double> starting_log_likelihoods = _particle_vec[0].calcGeneTreeLogLikelihoods();
+        
+        // initialize starting log likelihoods for all other particles
+        // necessary for calculating the first weight
+        for (unsigned p=1; p<_particle_vec.size(); p++) {
+            _particle_vec[p].setStartingLogLikelihoods(starting_log_likelihoods);
+        }
+        
         unsigned nsteps = (G::_ntaxa-1);
+        
         for (unsigned n=0; n<nsteps; n++) {
 //            proposeParticles(n);
             simProposeParticles(n);
+            filterParticles(n, 0);
             G::_step++;
         }
+        
+        // save only one particle that survived
+        if (_particle_vec.size() > 1) {
+            _particle_vec.erase(_particle_vec.begin() + 1, _particle_vec.end());
+        }
+        
         // Interrogate _partition to determine number of genes, gene names, and
         // number of sites in each gene
         G::_nloci = _partition->getNumSubsets();

@@ -403,7 +403,7 @@ class Forest {
                 unsigned n = getNumLineages();
             
                 double t = 0.0;
-                for (unsigned a = 0; a < 100000; a++) {
+                for (unsigned a = 0; a < 1; a++) {
                     bool old = false;
                 
                     for (unsigned b = 0; b < 3; b++) {
@@ -538,7 +538,7 @@ class Forest {
             unsigned n = getNumLineages();
         
             double t = 0.0;
-            for (unsigned a = 0; a < 1; a++) {
+            for (unsigned a = 0; a < 100000; a++) {
             
                 for (unsigned b = 0; b < 3; b++) {
                         assert (n > 1);
@@ -549,10 +549,14 @@ class Forest {
                             vector<double> heights(n - 1, 0.0);
                             
                             double troot = 1.0;
+//                            _estimated_root_age = 2.0;
                             
                             double lambda_minus_mu = G::_lambda - G::_mu;
                             
+//                            double untransformed_cum_height = cum_height / _estimated_root_age;
+                            
                             double x = exp(-1*lambda_minus_mu*cum_height);
+//                            double x = exp(-1*lambda_minus_mu*untransformed_cum_height);
                             double z = exp(-1*lambda_minus_mu*troot);
 
                             double u = lot->uniform();
@@ -560,7 +564,7 @@ class Forest {
                             double k = b + 1;
                             n = getNumLineages();
                             
-                            double C = pow(u, (1/(n-k-1))) * (x - z) / (G::_lambda - G::_mu * x);
+                            double C = pow((1-u), (1/(n-k-1))) * (x - z) / (G::_lambda - G::_mu * x);
                             
                             double numerator = C * G::_lambda + z;
                             double denominator = C * G::_mu + 1;
@@ -572,6 +576,10 @@ class Forest {
                             
                             t = new_height - cum_height;
                             
+//                            t = new_height - untransformed_cum_height;
+//
+//                            t *= _estimated_root_age;
+                            
                             assert (t > 0.0);
                             
                 }
@@ -580,9 +588,12 @@ class Forest {
                     cum_height += t;
                 }
                 else {
-                    cum_height = 0.0;
+                    cum_height += t;
                     logf << a << "\t";
-                    logf << t << endl;
+                    logf << cum_height << endl;
+                    cum_height = 0.0;
+//                    logf << a << "\t";
+//                    logf << t << endl;
                     n = getNumLineages();
                 }
         }
@@ -621,7 +632,8 @@ class Forest {
         
         assert (n > 1);
         
-        double troot = _estimated_root_age;
+//        double troot = _estimated_root_age;
+        double troot = 1.0;
                 
         double u = lot->uniform();
             
@@ -630,21 +642,30 @@ class Forest {
         double b = G::_step;
         double k = b + 1;
         
+        double untransformed_cum_height = cum_height / _estimated_root_age;
+        
         double x = exp(-1*lambda_minus_mu*cum_height);
+//        double x = exp(-1*lambda_minus_mu*untransformed_cum_height);
         double z = exp(-1*lambda_minus_mu*troot);
         
-        double C = pow(u, (1/(n-k-1))) * (x - z) / (G::_lambda - G::_mu * x);
+        double C = pow((1-u), (1/(n-k-1))) * (x - z) / (G::_lambda - G::_mu * x);
 
         double numerator = C * G::_lambda + z;
         double denominator = C * G::_mu + 1;
 
         double new_height = log(numerator / denominator);
+        
         new_height /= (G::_mu - G::_lambda);
         
         assert (new_height > 0);
-        assert (new_height <= troot);
+//        assert (new_height <= troot);
+//        assert (new_height <= _estimated_root_age);
+//        assert (new_height > (cum_height / _estimated_root_age));
         
-        t = new_height - cum_height;
+//        t = new_height - cum_height;
+        t = new_height - untransformed_cum_height;
+        
+        t *= _estimated_root_age;
         
 # if defined (INCREMENT_COMPARISON_TEST)
         if (b == 1) {
@@ -871,6 +892,7 @@ class Forest {
         // find the new_nd from the previous step and accumulate height if needed
         
         // if lineages.back() is a fossil, go to the previous node
+        // TODO: don't need to do any of this if not actually including fossils in the tree
         unsigned end_node = (unsigned) _lineages.size() - 1;
         vector<unsigned> set_counts;
         
@@ -1449,7 +1471,12 @@ class Forest {
             return -1 * G::_infinity; // fossil constraint has been violated and particle weight is 0
         }
         else {
-            return log_weight;
+            if (G::_start_mode == "sim") {
+                return 1.0;
+            }
+            else {
+                return log_weight;
+            }
         }
     }
 
@@ -2911,7 +2938,7 @@ class Forest {
         ofstream logf("sim3.log");
         logf << "sample" << "\t" << "increment" << endl;
         // Draw n-1 internal node heights and store in vector heights
-        for (unsigned a =0; a < 100000; a++) {
+        for (unsigned a =0; a < 1; a++) {
             unsigned n = getNumLineages();
             vector<double> heights(n - 1, 0.0);
 
@@ -2926,7 +2953,8 @@ class Forest {
             for (unsigned i = 0; i < n - 2; i++) {
                 double u = rng->uniform();
                 
-                double troot = 1.0;
+//                double troot = 1.0;
+                double troot = 2.0;
                 
                 bool yule = false;
                 
