@@ -396,6 +396,49 @@ class Forest {
         
         bool yule = false;
         
+        double beast_test1 = 0.0;
+        double beast_test2 = 0.0;
+        double ntaxa = 5;
+        double a = G::_mu / G::_lambda;
+        double r = G::_lambda - G::_mu;
+        double ca = 1-a;
+        double height = 100.0;
+        double mrh = -r * height;
+        double emrh = exp(mrh);
+        double rho = 1.0;
+        
+        double erh = exp(r * height);
+        
+        beast_test1 = -(ntaxa - 2) * r * ca * emrh / (emrh - 1.0) / (emrh - 1.0 + ca);
+        
+        beast_test2 = -(ntaxa - 2) * ca / height / (r * height +ca);
+        
+        double tmp = a * emrh;
+        double zDeriv = tmp == 0.0 ? 0.0 : r * tmp / log(1.0 - tmp);
+        double beast_test3 = -2 * zDeriv - r;
+        
+//        cout << beast_test1 << endl;
+//        cout << beast_test2 << endl;
+//        cout << beast_test3 << endl;
+//
+//        double beast_test4 = log(r * ca * (rho + ca / (erh - 1)));
+//        cout << beast_test4 << endl;
+        
+        height = 40.0;
+        double n = 5;
+        double mu = 0.5;
+        double lamda = 5.0;
+        double k = 1;
+        double u = lot->uniform();
+        double phi = (1 - u)*exp(1/(n-k-1));
+        double tprev = 10.0;
+        a = exp((lamda - mu) * tprev);
+        double troot = 40.0;
+        double b = exp((lamda - mu) * troot);
+        
+        double incr_test = log(lamda * phi * (b - a) + lamda * a - 1 / b) - log(mu * phi * (b - a) + lamda * a * b - 1);
+        cout << incr_test << endl;
+        
         if (yule) {
                 ofstream logf("smc3.log");
                 logf << "sample" << "\t" << "increment" << endl;
@@ -403,7 +446,7 @@ class Forest {
                 unsigned n = getNumLineages();
             
                 double t = 0.0;
-                for (unsigned a = 0; a < 1; a++) {
+                for (unsigned a = 0; a < 100000; a++) {
                     bool old = false;
                 
                     for (unsigned b = 0; b < 3; b++) {
@@ -438,7 +481,7 @@ class Forest {
     //                            }
                                 
     //                            else {
-                            double troot = 1.0;
+                            double troot = 2.0;
                             double u = lot->uniform();
                             double k = b + 1;
                             n = 5;
@@ -522,17 +565,21 @@ class Forest {
     //                    n -= 1;
                     }
                     else {
-                        cum_height = 0.0;
+                        cum_height += t;
                         logf << a << "\t";
-                        logf << t << endl;
+                        logf << cum_height << endl;
+                        cum_height = 0.0;
+//                        logf << a << "\t";
+//                        logf << t << endl;
                         n = getNumLineages();
                     }
             }
             }
-            cout << "x";
+//            cout << "x";
         }
         else {
-            ofstream logf("smc3.log");
+            
+            ofstream logf("smc4.log");
             logf << "sample" << "\t" << "increment" << endl;
             double cum_height = 0.0;
             unsigned n = getNumLineages();
@@ -540,7 +587,10 @@ class Forest {
             double t = 0.0;
             for (unsigned a = 0; a < 100000; a++) {
             
-                for (unsigned b = 0; b < 3; b++) {
+                for (unsigned b = 0; b < 4; b++) {
+                    G::_lambda = 20.0;
+                    G::_mu = 10.0;
+                    
                         assert (n > 1);
 
                         if (n > 1) {
@@ -548,7 +598,8 @@ class Forest {
                             // Draw n-1 internal node heights and store in vector heights
                             vector<double> heights(n - 1, 0.0);
                             
-                            double troot = 1.0;
+//                            double troot = 1.0;
+                            double troot = 40.0;
 //                            _estimated_root_age = 2.0;
                             
                             double lambda_minus_mu = G::_lambda - G::_mu;
@@ -558,18 +609,113 @@ class Forest {
                             double x = exp(-1*lambda_minus_mu*cum_height);
 //                            double x = exp(-1*lambda_minus_mu*untransformed_cum_height);
                             double z = exp(-1*lambda_minus_mu*troot);
+                            
+                            double log_x = -1 * lambda_minus_mu * cum_height;
+                            double log_z = -1 * lambda_minus_mu * troot;
 
                             double u = lot->uniform();
                             
                             double k = b + 1;
                             n = getNumLineages();
                             
-                            double C = pow((1-u), (1/(n-k-1))) * (x - z) / (G::_lambda - G::_mu * x);
+                            double phi = pow((1-u), (1/(n-k-1)));
+                            double C = phi * (x-z) / (G::_lambda - G::_mu * x);
+                            
+//                            double C = pow((1-u), (1/(n-k-1))) * (x - z) / (G::_lambda - G::_mu * x);
                             
                             double numerator = C * G::_lambda + z;
                             double denominator = C * G::_mu + 1;
                             
-                            double new_height = log(numerator / denominator);
+                            double numerator1 = phi * (x-z) / (G::_lambda - G::_mu * x) * G::_lambda;
+                            double numerator2 = z;
+                            
+//                            double new_height = log(numerator / denominator);
+                            
+                            // caculate each term
+                            double log_phi = log(1 - u) / (n - k - 1);
+                            
+                            double log_lambda = log(G::_lambda);
+                            double log_mu = log(G::_mu);
+                            
+                            double term1_num = log_lambda + log_phi + log_x;
+                            double term2_num = log_lambda + log_phi + log_z;
+                            double term3_num = log_lambda + log_z;
+                            double term4_num = log_mu + log_x + log_z;
+                            
+                            vector<double> num_values;
+                            
+                            if (G::_mu == 0) {
+                                num_values.push_back(term1_num);
+                                num_values.push_back(term2_num);
+                                num_values.push_back(term3_num);
+                            }
+
+                            else {
+                                num_values.push_back(term1_num);
+                                num_values.push_back(term2_num);
+                                num_values.push_back(term3_num);
+                                num_values.push_back(term4_num);
+                            }
+                            
+                            double max_logv = *max_element(num_values.begin(), num_values.end());
+                            
+                            double factored_sum = 0.0;
+                            unsigned count = 0;
+                            for (auto & logv : num_values) {
+                                if (count == 1 || count == 3) {
+                                    factored_sum -= exp(logv - max_logv);
+                                }
+                                else {
+                                    factored_sum += exp(logv - max_logv);
+                                }
+                                count++;
+                            }
+                            double numerator_test = max_logv + log(factored_sum);
+                            
+//                            double numerator_test = G::calcLogSum(num_values);
+                            
+                            double term1_denom = log_mu + log_phi + log_x;
+                            double term2_denom = log_mu + log_phi + log_z;
+                            double term3_denom = log_lambda;
+                            double term4_denom = log_mu + log_x;
+                            
+                            vector<double> denom_values;
+                            if (G::_mu == 0) {
+                                denom_values.push_back(term3_denom);
+                            }
+                            else {
+                                denom_values.push_back(term1_denom);
+                                denom_values.push_back(term2_denom);
+                                denom_values.push_back(term3_denom);
+                                denom_values.push_back(term4_denom);
+                            }
+                                
+//                            double denominator_test = G::calcLogSum(denom_values);
+                            max_logv = *max_element(denom_values.begin(), denom_values.end());
+                            
+                            factored_sum = 0.0;
+                            count = 0;
+                            for (auto & logv : denom_values) {
+                                if (count == 1 || count == 3) {
+                                    factored_sum -= exp(logv - max_logv);
+                                }
+                                else {
+                                    factored_sum += exp(logv - max_logv);
+                                }
+                                count++;
+                            }
+                            double denominator_test = max_logv + log(factored_sum);
+                            
+                            double new_height_test = numerator_test - denominator_test;
+                            new_height_test /= (G::_mu - G::_lambda);
+                            
+                            cout << new_height_test << endl;
+                            
+                            double test1 = log(G::_lambda * phi * x - G::_lambda * phi * z + G::_lambda * z  - G::_mu * x * z);
+                            double test2 = log(G::_mu * phi * x - G::_mu * phi * z + G::_lambda - G::_mu * x);
+                            
+                            double new_height = log(G::_lambda * phi * x - G::_lambda * phi * z + G::_lambda * z - G::_mu * x * z) - log(G::_mu * phi * x - G::_mu * phi * z + G::_lambda - G::_mu * x);
+                            
                             new_height /= (G::_mu - G::_lambda);
                             
                             assert (new_height > 0.0);
@@ -581,10 +727,9 @@ class Forest {
 //                            t *= _estimated_root_age;
                             
                             assert (t > 0.0);
-                            
                 }
                            
-                if (b < 2) {
+                if (b < 3) {
                     cum_height += t;
                 }
                 else {
@@ -632,8 +777,8 @@ class Forest {
         
         assert (n > 1);
         
-//        double troot = _estimated_root_age;
-        double troot = 1.0;
+        double troot = _estimated_root_age;
+//        double troot = 1.0;
                 
         double u = lot->uniform();
             
@@ -642,30 +787,111 @@ class Forest {
         double b = G::_step;
         double k = b + 1;
         
-        double untransformed_cum_height = cum_height / _estimated_root_age;
-        
         double x = exp(-1*lambda_minus_mu*cum_height);
-//        double x = exp(-1*lambda_minus_mu*untransformed_cum_height);
         double z = exp(-1*lambda_minus_mu*troot);
         
-        double C = pow((1-u), (1/(n-k-1))) * (x - z) / (G::_lambda - G::_mu * x);
-
-        double numerator = C * G::_lambda + z;
-        double denominator = C * G::_mu + 1;
-
-        double new_height = log(numerator / denominator);
+        double phi = pow((1-u), (1/(n-k-1)));
+        double C = phi * (x-z) / (G::_lambda - G::_mu * x);
         
+        double log_phi = log(phi);
+        double log_lambda = log(birth_rate);
+        
+        double log_mu = log(death_rate);
+        
+        double log_x = -1 * lambda_minus_mu * cum_height;
+        double log_z = -1 * lambda_minus_mu * troot;
+
+        
+        double term1_num = log_lambda + log_phi + log_x;
+        double term2_num = log_lambda + log_phi + log_z;
+        double term3_num = log_lambda + log_z;
+        double term4_num = log_mu + log_x + log_z;
+
+        vector<double> num_values;
+
+        if (G::_mu == 0) {
+            num_values.push_back(term1_num);
+            num_values.push_back(term2_num);
+            num_values.push_back(term3_num);
+        }
+
+        else {
+            num_values.push_back(term1_num);
+            num_values.push_back(term2_num);
+            num_values.push_back(term3_num);
+            num_values.push_back(term4_num);
+        }
+
+        double max_logv = *max_element(num_values.begin(), num_values.end());
+
+        double factored_sum = 0.0;
+        unsigned count = 0;
+        for (auto & logv : num_values) {
+            if (count == 1 || count == 3) {
+                factored_sum -= exp(logv - max_logv);
+            }
+            else {
+                factored_sum += exp(logv - max_logv);
+            }
+            count++;
+        }
+        double numerator_test = max_logv + log(factored_sum);
+
+        double term1_denom = log_mu + log_phi + log_x;
+        double term2_denom = log_mu + log_phi + log_z;
+        double term3_denom = log_lambda;
+        double term4_denom = log_mu + log_x;
+
+        vector<double> denom_values;
+        if (G::_mu == 0) {
+            denom_values.push_back(term3_denom);
+        }
+        else {
+            denom_values.push_back(term1_denom);
+            denom_values.push_back(term2_denom);
+            denom_values.push_back(term3_denom);
+            denom_values.push_back(term4_denom);
+        }
+
+        max_logv = *max_element(denom_values.begin(), denom_values.end());
+
+        factored_sum = 0.0;
+        count = 0;
+        for (auto & logv : denom_values) {
+            if (count == 1 || count == 3) {
+                factored_sum -= exp(logv - max_logv);
+            }
+            else {
+                factored_sum += exp(logv - max_logv);
+            }
+            count++;
+        }
+        double denominator_test = max_logv + log(factored_sum);
+
+        double new_height = numerator_test - denominator_test;
         new_height /= (G::_mu - G::_lambda);
+
+//        cout << new_height << endl;
+
+        
+//        double C = pow((1-u), (1/(n-k-1))) * (x - z) / (G::_lambda - G::_mu * x);
+
+//        double numerator = C * G::_lambda + z;
+//        double denominator = C * G::_mu + 1;
+//
+//        double test = log(numerator / denominator);
+//
+//        test /= (G::_mu - G::_lambda);
+        
+//        cout << test << endl;
+//        assert (test > 0);
         
         assert (new_height > 0);
 //        assert (new_height <= troot);
-//        assert (new_height <= _estimated_root_age);
+        assert (new_height <= _estimated_root_age + 0.01);
 //        assert (new_height > (cum_height / _estimated_root_age));
         
-//        t = new_height - cum_height;
-        t = new_height - untransformed_cum_height;
-        
-        t *= _estimated_root_age;
+        t = new_height - cum_height;
         
 # if defined (INCREMENT_COMPARISON_TEST)
         if (b == 1) {
@@ -1658,7 +1884,7 @@ class Forest {
         
 //        birth_death_prior = log(birth_death_prior);
         
-        assert(birth_death_prior == birth_death_prior); // TODO: why does this turn into Nan?
+//        assert(birth_death_prior == birth_death_prior); // TODO: why does this turn into Nan?
         // check for NaN
         return birth_death_prior;
     }
