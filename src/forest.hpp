@@ -72,7 +72,7 @@ class Forest {
     
 #if defined (FOSSILS)
         void    addBirthDeathIncrementFossil(Lot::SharedPtr lot, double age, string fossil_name);
-//        double  calcTransitionProbabilityFossil(Node* child, double s, double s_child, unsigned locus);
+        double  calcTransitionProbabilityFossil(Node* child, double s, double s_child, unsigned locus);
         bool    checkForValidTaxonSet(vector<TaxSet> taxset, vector<TaxSet> unused_taxsets);
 #endif
     
@@ -218,7 +218,7 @@ class Forest {
             _nodes[i]._parent=0;
             _nodes[i]._number=i;
             _nodes[i]._edge_length=0.0;
-//            _nodes[i]._accumulated_height = 0.0;
+            _nodes[i]._accumulated_height = 0.0;
             _nodes[i]._position_in_lineages=i;
             _nodes[i]._partials = nullptr;
             _nodes[i]._name = G::_taxon_names[i];
@@ -330,7 +330,7 @@ class Forest {
         
         for (auto &nd:_lineages) {
             nd->_edge_length += t;
-//            nd->_accumulated_height += t;
+            nd->_accumulated_height += t;
         }
         
         // lorad only works if all topologies the same - then don't include the prior on joins because it is fixed
@@ -828,7 +828,7 @@ class Forest {
         
         for (auto &nd:_lineages) {
             nd->_edge_length += t;
-//            nd->_accumulated_height += t;
+            nd->_accumulated_height += t;
         }
         
         _tree_height += t;
@@ -880,15 +880,9 @@ class Forest {
         int chosen_taxset = -1;
 
         // TODO: can speed this up? for now, at every step, go through every node and reset accumulated height to 0
-//        for (auto &nd:_nodes) {
-//            nd._accumulated_height = nd._edge_length;
-//            if (!nd._set_partials && !boost::ends_with(nd._name, "FOSSIL")) {
-//                int next_node = nd._next_real_node;
-//                if (next_node != -1) {
-//                    _nodes[next_node]._accumulated_height += nd._edge_length;
-//                }
-//            }
-//        }
+        for (auto &nd:_nodes) {
+            nd._accumulated_height = nd._edge_length;
+        }
         
         unsigned nlineages = getNumLineages();
         Node *subtree1 = nullptr;
@@ -1068,35 +1062,6 @@ class Forest {
             subtree2->_parent=new_nd;
             
             // if new node has any child that is not a real node (set partials = false) and has no next node (next node != -1), the new node is not a real node either
-//            bool fake_node = false;
-//            if (!subtree1->_set_partials) {
-//                int next_node = subtree1->_next_real_node;
-//                if (next_node == -1) {
-//                    fake_node = true;
-//                }
-//                else {
-//                    if (next_node == -1 && !_nodes[next_node]._set_partials) {
-//                        fake_node = true;
-//                    }
-//                }
-//            }
-            
-//            if (!subtree2->_set_partials) {
-//                int next_node = subtree2->_next_real_node;
-//                if (next_node == -1) {
-//                    fake_node = true;
-//                }
-//                else {
-//                    if (next_node == -1 && !_nodes[next_node]._set_partials) {
-//                        fake_node = true;
-//                    }
-//                }
-//            }
-
-//            if (fake_node) {
-//                new_nd->_set_partials = false;
-//                new_nd->_use_in_likelihood = false;
-//            }
 
             if (new_nd->_set_partials) {
                 // calculate new partials
@@ -1378,36 +1343,6 @@ class Forest {
                 calcSubsetLogLikelihood(index);
             }
             
-            // after a new node is created, check if it's fake
-            // if it is, set the next real node
-//            if (!new_nd->_set_partials) {
-//                if (new_nd->_left_child) {
-//                    if (!boost::ends_with(new_nd->_left_child->_name, "FOSSIL")) {
-//                        // if new node's left child is not a fossil, use it to find the next real node
-//                        int next_node = new_nd->_left_child->_next_real_node;
-//                        if (next_node > -1) {
-//                            new_nd->_next_real_node = new_nd->_left_child->_number;
-//                        }
-//                        else {
-//                            if (new_nd->_left_child->_set_partials) {
-//                                new_nd->_next_real_node = new_nd->_left_child->_number;
-//                            }
-//                        }
-//                    }
-//                    if (!boost::ends_with(new_nd->_left_child->_right_sib->_name, "FOSSIL")) {
-//                        int next_node = new_nd->_left_child->_right_sib->_next_real_node;
-//                        if (next_node > -1) {
-//                            new_nd->_next_real_node = new_nd->_left_child->_right_sib->_number;
-//                        }
-//                        else {
-//                            if (new_nd->_left_child->_right_sib->_set_partials) {
-//                                new_nd->_next_real_node = new_nd->_left_child->_right_sib->_number;
-//                            }
-//                        }
-//                    }
-//                }
-//            }
-            
             double new_log_likelihood = 0.0;
             for (auto &g:_gene_tree_log_likelihoods) {
                 new_log_likelihood += g;
@@ -1429,8 +1364,7 @@ class Forest {
             assert (fossil_age != -1);
             // figure out if associated branch length has violated the fossil constraint
             // node must be at least as deep as the fossil, which sets the minimum age for the group
-            if (getLineageHeight(_lineages.back()->_left_child) < fossil_age) {
-//            if (_lineages.back()->_left_child->_accumulated_height < fossil_age) {
+            if (_lineages.back()->_left_child->_accumulated_height < fossil_age) {
                 fossil_age_is_violated = true;
             }
         }
@@ -1673,21 +1607,6 @@ class Forest {
                 else {
                     child = second_child;
                 }
-                int next_real_node = -1;
-                
-//                bool done = false;
-                // find the next real node to use in partial calculation
-                // even if you change the child, the right sib must stay the right sib from the original node
-//                while (!done) {
-//                    if (child->_next_real_node != -1) {
-//                        next_real_node = child->_next_real_node;
-//                        child = &_nodes[child->_next_real_node];
-//                    }
-//                    if (child->_next_real_node == -1) {
-//                        done = true;
-//                    }
-//                }
-                
                 if (child->_set_partials) {
                     if (child->_partials == nullptr) {
                         child->_partials = ps.getPartial(npatterns_total*G::_nstates);
@@ -1705,31 +1624,21 @@ class Forest {
                             double sum_over_child_states = 0.0;
                             for (unsigned s_child = 0; s_child < G::_nstates; s_child++) {
                                 double child_transition_prob = 0.0;
-//# if defined (FOSSILS)
-//                                child_transition_prob = calcTransitionProbabilityFossil(child, s, s_child, i);
-//#else
+# if defined (FOSSILS)
+                                child_transition_prob = calcTransitionProbabilityFossil(child, s, s_child, i);
+#else
                                 child_transition_prob = calcTransitionProbability(child, s, s_child, i);
-//#endif
+#endif
                                 double child_partial = child_partial_array[p*G::_nstates + s_child];
                                 sum_over_child_states += child_transition_prob * child_partial;
                             }   // child state loop
 //                            if (!skip) {
-                            if (next_real_node == -1) {
-                                if (child == new_nd->_left_child) {
-                                    parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
-                                }
-                                else {
-                                    parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
-                                }
+                            if (a == 0) {
+                                parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
                             }
                             else {
-                                if (a == 0) {
-                                    parent_partial_array[p*G::_nstates+s] = sum_over_child_states;
-                                }
-                                else {
-                                    assert (a == 1);
-                                    parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
-                                }
+                                assert (a == 1);
+                                parent_partial_array[p*G::_nstates+s] *= sum_over_child_states;
                             }
                         }   // parent state loop
                     }   // pattern loop
@@ -1891,87 +1800,87 @@ class Forest {
 #endif
 
 #if defined (FOSSILS)
-//    inline double Forest::calcTransitionProbabilityFossil(Node* child, double s, double s_child, unsigned locus) {
-//        // this function uses accumulated branch lengths for the likelihood calculations
-//        double relative_rate = G::_double_relative_rates[locus];
-//        assert (relative_rate > 0.0);
-//
-//        double child_transition_prob = 0.0;
-//
-//        if (G::_model == "JC" ) {
-//                double expterm = exp(-4.0*(child->_edge_length * relative_rate)/3.0);
-////            double expterm = exp(-4.0*(child->_accumulated_height * _clock_rate * relative_rate)/3.0);
-//            double prsame = 0.25+0.75*expterm;
-//            double prdif = 0.25 - 0.25*expterm;
-//
-//            child_transition_prob = (s == s_child ? prsame : prdif);
-//            assert (child_transition_prob > 0.0);
-//            return child_transition_prob;
-//        }
-//
-//        if (G::_model == "HKY") {
-//            double pi_A = G::_base_frequencies[0];
-//            double pi_C = G::_base_frequencies[1];
-//            double pi_G = G::_base_frequencies[2];
-//            double pi_T = G::_base_frequencies[3];
-//
-//            double pi_j = 0.0;
-//            double PI_J = 0.0;
-//
-//            double phi = (pi_A+pi_G)*(pi_C+pi_T)+G::_kappa*(pi_A*pi_G+pi_C*pi_T);
-//                double beta_t = 0.5*(child->_edge_length * relative_rate)/phi;
-////            double beta_t = 0.5*(child->_accumulated_height * _clock_rate * relative_rate)/phi;
-//
-//
-//            // transition prob depends only on ending state
-//            if (s_child == 0) {
-//                // purine
-//                pi_j = pi_A;
-//                PI_J = pi_A + pi_G;
-//            }
-//            else if (s_child == 1) {
-//                // pyrimidine
-//                pi_j = pi_C;
-//                PI_J = pi_C + pi_T;
-//            }
-//            else if (s_child == 2) {
-//                // purine
-//                pi_j = pi_G;
-//                PI_J = pi_A + pi_G;
-//            }
-//            else if (s_child == 3) {
-//                // pyrimidine
-//                pi_j = pi_T;
-//                PI_J = pi_C + pi_T;
-//            }
-//
-//            while (true) {
-//                if (s == s_child) {
-//                    // no transition or transversion
-//                    double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
-//                    double second_term = (PI_J-pi_j)/PI_J*exp(-beta_t*(PI_J*G::_kappa+(1-PI_J)));
-//                    child_transition_prob = pi_j*first_term+second_term;
-//                    break;
-//                }
-//
-//                else if ((s == 0 && s_child == 2) || (s == 2 && s_child == 0) || (s == 1 && s_child == 3) || (s == 3 && s_child==1)) {
-//                    // transition
-//                    double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
-//                    double second_term = (1/PI_J)*exp(-beta_t*(PI_J*G::_kappa+(1-PI_J)));
-//                    child_transition_prob = pi_j*(first_term-second_term);
-//                    break;
-//                }
-//
-//                else {
-//                    // transversion
-//                    child_transition_prob = pi_j*(1-exp(-beta_t));
-//                    break;
-//                }
-//            }
-//        }
-//        assert (child_transition_prob > 0.0);
-//        return child_transition_prob;
-//    }
+    inline double Forest::calcTransitionProbabilityFossil(Node* child, double s, double s_child, unsigned locus) {
+        // this function uses accumulated branch lengths for the likelihood calculations
+        double relative_rate = G::_double_relative_rates[locus];
+        assert (relative_rate > 0.0);
+        
+        double child_transition_prob = 0.0;
+
+        if (G::_model == "JC" ) {
+    //            double expterm = exp(-4.0*(child->_edge_length * relative_rate)/3.0);
+            double expterm = exp(-4.0*(child->_accumulated_height * _clock_rate * relative_rate)/3.0);
+            double prsame = 0.25+0.75*expterm;
+            double prdif = 0.25 - 0.25*expterm;
+
+            child_transition_prob = (s == s_child ? prsame : prdif);
+            assert (child_transition_prob > 0.0);
+            return child_transition_prob;
+        }
+
+        if (G::_model == "HKY") {
+            double pi_A = G::_base_frequencies[0];
+            double pi_C = G::_base_frequencies[1];
+            double pi_G = G::_base_frequencies[2];
+            double pi_T = G::_base_frequencies[3];
+
+            double pi_j = 0.0;
+            double PI_J = 0.0;
+
+            double phi = (pi_A+pi_G)*(pi_C+pi_T)+G::_kappa*(pi_A*pi_G+pi_C*pi_T);
+    //            double beta_t = 0.5*(child->_edge_length * relative_rate)/phi;
+            double beta_t = 0.5*(child->_accumulated_height * _clock_rate * relative_rate)/phi;
+
+
+            // transition prob depends only on ending state
+            if (s_child == 0) {
+                // purine
+                pi_j = pi_A;
+                PI_J = pi_A + pi_G;
+            }
+            else if (s_child == 1) {
+                // pyrimidine
+                pi_j = pi_C;
+                PI_J = pi_C + pi_T;
+            }
+            else if (s_child == 2) {
+                // purine
+                pi_j = pi_G;
+                PI_J = pi_A + pi_G;
+            }
+            else if (s_child == 3) {
+                // pyrimidine
+                pi_j = pi_T;
+                PI_J = pi_C + pi_T;
+            }
+
+            while (true) {
+                if (s == s_child) {
+                    // no transition or transversion
+                    double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
+                    double second_term = (PI_J-pi_j)/PI_J*exp(-beta_t*(PI_J*G::_kappa+(1-PI_J)));
+                    child_transition_prob = pi_j*first_term+second_term;
+                    break;
+                }
+
+                else if ((s == 0 && s_child == 2) || (s == 2 && s_child == 0) || (s == 1 && s_child == 3) || (s == 3 && s_child==1)) {
+                    // transition
+                    double first_term = 1+(1-PI_J)/PI_J*exp(-beta_t);
+                    double second_term = (1/PI_J)*exp(-beta_t*(PI_J*G::_kappa+(1-PI_J)));
+                    child_transition_prob = pi_j*(first_term-second_term);
+                    break;
+                }
+
+                else {
+                    // transversion
+                    child_transition_prob = pi_j*(1-exp(-beta_t));
+                    break;
+                }
+            }
+        }
+        assert (child_transition_prob > 0.0);
+        return child_transition_prob;
+    }
 #endif
 
     inline void Forest::showForest() {
@@ -2196,15 +2105,13 @@ class Forest {
             nd._number               = othernd._number;
             nd._name                 = othernd._name;
             nd._edge_length          = othernd._edge_length;
-//            nd._accumulated_height   = othernd._accumulated_height;
+            nd._accumulated_height   = othernd._accumulated_height;
             nd._position_in_lineages = othernd._position_in_lineages;
             nd._partials             = othernd._partials;
             nd._split                = othernd._split;
             nd._height               = othernd._height;
             nd._set_partials         = othernd._set_partials;
             nd._use_in_likelihood    = othernd._use_in_likelihood;
-//            nd._next_real_node       = othernd._next_real_node;
-            nd._renumber             = othernd._renumber;
             
             // Sanity check
             assert(nd._number >= 0);
