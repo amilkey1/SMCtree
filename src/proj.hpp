@@ -524,9 +524,18 @@ namespace proj {
         _particle_vec.resize(G::_nparticles);
         initializeParticles();
         
+//        vector<double> starting_log_likelihoods = _particle_vec[0].calcGeneTreeLogLikelihoods();
+//
+//        // initialize starting log likelihoods for all other particles
+//        // necessary for calculating the first weight
+//        for (unsigned p=1; p<_particle_vec.size(); p++) {
+//            _particle_vec[p].setStartingLogLikelihoods(starting_log_likelihoods);
+//        }
+        
         unsigned nsteps = (G::_ntaxa-1);
         
         for (unsigned n=0; n<nsteps; n++) {
+//            proposeParticles(n);
             simProposeParticles(n);
             filterParticles(n, 0);
             G::_step++;
