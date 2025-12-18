@@ -2618,14 +2618,6 @@ class Forest {
         
         // Create vector of states for each node in the tree
         unsigned nnodes = (unsigned)_nodes.size();
-//#if defined (FOSSILS)
-//        nnodes = 0;
-//        for (auto &nd:_nodes) {
-//            if (nd._set_partials) {
-//                nnodes++;
-//            }
-//        }
-//#endif
         vector< vector<unsigned> > sequences(nnodes);
         for (unsigned i = 0; i < nnodes; i++) {
             sequences[i].resize(nsites, 4);
@@ -2658,32 +2650,6 @@ class Forest {
             basefreq[3] = T/total;
         }
         
-//#if defined (FOSSILS)
-//        // skip some nodes by renumbering everything
-//        unsigned new_node_number = 0;
-//        for (auto &nd:_nodes) {
-//            if (nd._set_partials) {
-//                nd._renumber = new_node_number;
-//                new_node_number++;
-//            }
-//            else {
-//                nd._renumber = -1;
-//            }
-//        }
-//        // Simulate starting sequence at the root node
-//        Node * nd;
-//        for (auto &node:_nodes) {
-//            if (node._renumber == nnodes-1) {
-//                nd = &node;
-//                break;
-//            }
-//        }
-//        int ndnum = nd->_renumber;
-//        assert(ndnum < nnodes);
-//        for (unsigned i = 0; i < nsites; i++) {
-//            sequences[ndnum][i] = G::multinomialDraw(lot, basefreq);
-//        }
-//#else
         // Simulate starting sequence at the root node
         Node * nd = *(_lineages.begin());
         int ndnum = nd->_number;
@@ -2691,69 +2657,7 @@ class Forest {
         for (unsigned i = 0; i < nsites; i++) {
             sequences[ndnum][i] = G::multinomialDraw(lot, basefreq);
         }
-//#endif
-        
-//# if defined (FOSSILS)
-//        nd = findNextPreorder(nd);
-//
-//        while (nd) {
-//            if (nd->_set_partials) {
-//                ndnum = nd->_number;
-//
-//                // Get reference to parent sequence
-//                assert(nd->_parent);
-//
-//                bool parent_found = false;
-//                bool skip_node = false;
-//                unsigned parnum = nd->_parent->_number;
-//                Node parent = _nodes[parnum];
-//
-//                while (!parent_found) {
-//                    if (!parent._set_partials) { // if parent is not a real node, use its parent
-//                        if (parent._parent) {
-//                            parnum = parent._parent->_number;
-//                            parent = _nodes[parnum];
-//                        }
-//                        else {
-//                            skip_node = true;
-//                            // skip node if the parent is not a real node and neither is its parent
-//                            parent_found = true;
-//                        }
-//                    }
-//                    else {
-//                        parent_found = true;
-//                    }
-//                }
-//
-//                if (!skip_node) {
-//                    assert (_nodes[parnum]._set_partials);
-//
-//                        // Evolve nd's sequence given parent's sequence and edge length
-//                    for (unsigned i = 0; i < nsites; i++) {
-//                        // Choose relative rate for this site
-//                        double site_relrate = 1.0;
-//                        if (G::_asrv_shape != G::_infinity)
-//                            site_relrate = lot->gamma(G::_asrv_shape, 1.0/G::_asrv_shape);
-//                        unsigned from_state = sequences[_nodes[parnum]._renumber][i];
-//                        double cum_prob = 0.0;
-//                        double u = lot->uniform();
-//                        for (unsigned to_state = 0; to_state < 4; to_state++) {
-//                            cum_prob += calcSimTransitionProbability(from_state, to_state, basefreq, site_relrate*nd->_accumulated_height);
-//                            if (u < cum_prob) {
-//                                sequences[_nodes[ndnum]._renumber][i] = to_state;
-//                                break;
-//                            }
-//                        }
-//                        assert(sequences[_nodes[ndnum]._renumber][i] < 4);
-//                    }
-//                }
-//            }
-//            // else, node is not a real node and should not be included in the data
-//            // Move to next node in preorder sequence
-//            nd = findNextPreorder(nd);
-//        }
-//
-//#else
+
         nd = findNextPreorder(nd);
         while (nd) {
             ndnum = nd->_number;
@@ -2854,70 +2758,6 @@ class Forest {
         
         updateNodeVector(_lineages, lchild, rchild, ancnd);
         //removeTwoAddOne(_lineages, lchild, rchild, ancnd);
-        
-#if defined (FOSSILS)
-        // if subtree1 or subtree2 is a fossil, set partials to false for the new node
-        if (boost::ends_with(lchild->_name, "FOSSIL") || boost::ends_with(rchild->_name, "FOSSIL")) {
-            ancnd->_set_partials = false;
-            ancnd->_use_in_likelihood = false;
-        }
-        // check if both of child's children are fossils
-        if (lchild->_left_child) {
-            if (boost::ends_with(lchild->_left_child->_name, "FOSSIL") && boost::ends_with(lchild->_left_child->_right_sib->_name, "FOSSIL")) {
-                ancnd->_set_partials = false;
-                ancnd->_use_in_likelihood = false;
-            }
-        }
-        if (rchild->_left_child) {
-            if (boost::ends_with(rchild->_left_child->_name, "FOSSIL") && boost::ends_with(rchild->_left_child->_right_sib->_name, "FOSSIL")) {
-                ancnd->_set_partials = false;
-                ancnd->_use_in_likelihood = false;
-            }
-        }
-        
-        unsigned end_node = (unsigned) _lineages.size() - 1;
-        Node *node_to_check = _lineages[end_node];
-        
-        // check for the new node that was added in the previous step
-        bool done = false;
-        while (!done) {
-            if (boost::ends_with(node_to_check->_name, "FOSSIL")) {
-                end_node --;
-                node_to_check = _lineages[end_node];
-            }
-            else {
-                done = true;
-            }
-        }
-        
-        if (!node_to_check->_set_partials &&node_to_check->_left_child) {
-            if (!boost::ends_with(node_to_check->_left_child->_name, "FOSSIL")) {
-                // add extra branch length to the next node
-                int next_node = node_to_check->_left_child->_next_real_node;
-                if (next_node > -1) {
-                    _nodes[next_node]._accumulated_height += node_to_check->_edge_length;
-                    node_to_check->_next_real_node = _nodes[next_node]._number;
-                }
-                else {
-                    node_to_check->_left_child->_accumulated_height += node_to_check->_edge_length;
-                    node_to_check->_next_real_node = node_to_check->_left_child->_number;
-                }
-            }
-            else if (!boost::ends_with(node_to_check->_left_child->_right_sib->_name, "FOSSIL")) {
-                // add extra branch length to the next node
-                // can't accumulate to a fake node - if the node is fake, find its next real node
-                int next_node = node_to_check->_left_child->_right_sib->_next_real_node;
-                if (next_node > -1) {
-                    _nodes[next_node]._accumulated_height += node_to_check->_edge_length;
-                    node_to_check->_next_real_node = _nodes[next_node]._number;
-                }
-                else {
-                    node_to_check->_left_child->_right_sib->_accumulated_height += node_to_check->_edge_length;
-                    node_to_check->_next_real_node = node_to_check->_left_child->_right_sib->_number;
-                }
-            }
-        }
-#endif
     }
     
     inline void Forest::renumberInternals() {
