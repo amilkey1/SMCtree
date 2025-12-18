@@ -54,7 +54,6 @@ namespace proj {
             PartialStore::partial_t _partials;
             unsigned            _position_in_lineages;
             bool                _set_partials; // true if node is included in likelihood calculation
-            double              _accumulated_height; // only add to this if a parent node is being skipped
             bool                _use_in_likelihood;
         
             // distance from node to any leaf
@@ -80,7 +79,6 @@ namespace proj {
         //_partials.clear();
         _partials = nullptr;
         _set_partials = true;
-        _accumulated_height = 0.0;
         _use_in_likelihood = true;
     }
     
