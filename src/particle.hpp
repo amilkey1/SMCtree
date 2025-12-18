@@ -61,7 +61,6 @@ class Particle {
 #endif
     
         // validation stuff
-        double getLowestFossilAge();
         double getRootAge();
     
     private:
@@ -178,12 +177,12 @@ class Particle {
         
         double prev_log_likelihood = _forest.getLogLikelihood();
         
-        _forest.addIncrementFossil(_lot, -1, "placeholder");
+        _forest.addBirthDeathIncrementFossil(_lot, -1, "placeholder");
             
 #if defined (INCREMENT_COMPARISON_TEST)
         _forest.addIncrement(_lot); // for comparison of sim.log vs smc.log
 #endif
-       _log_weight = _forest.joinTaxa(prev_log_likelihood, _lot, _particle_taxsets, _unused_particle_taxsets, _particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils, _particle_fossils);
+       _log_weight = _forest.joinPriorPrior(prev_log_likelihood, _lot, _particle_taxsets, _unused_particle_taxsets, _particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils, _particle_fossils);
         
         // check that at least one taxon set is valid
          // if there is no valid taxon set, keep adding increments until a valid set has been reached
@@ -571,10 +570,6 @@ class Particle {
 
     inline string Particle::makeNewick(unsigned precision, bool use_names) {
         return _forest.makeNewick(precision, use_names);
-    }
-
-    inline double Particle::getLowestFossilAge() {
-        return _particle_fossils[0]._age;
     }
 
     inline double Particle::getRootAge() {

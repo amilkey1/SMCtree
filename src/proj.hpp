@@ -40,7 +40,9 @@ namespace proj {
             void debugSaveParticleVectorInfo(string fn, unsigned step);
             
             void simulate();
+#if defined (INCREMENT_COMPARISON_TEST)
             void simulateTree();
+#endif
             void simulateData(Lot::SharedPtr lot, unsigned startat, unsigned locus_length);
             void simulateSave(string fnprefix);
 
@@ -523,7 +525,7 @@ namespace proj {
         initializeParticles();
         
 //        vector<double> starting_log_likelihoods = _particle_vec[0].calcGeneTreeLogLikelihoods();
-//        
+//
 //        // initialize starting log likelihoods for all other particles
 //        // necessary for calculating the first weight
 //        for (unsigned p=1; p<_particle_vec.size(); p++) {
@@ -575,7 +577,10 @@ namespace proj {
         simulateSave(G::_sim_filename_prefix);
     }
 
+#if defined (INCREMENT_COMPARISON_TEST)
     inline void Proj::simulateTree() {
+        // this function is only for the increment comparison test
+        
         // Set global _ntaxa
         unsigned nleaves = G::_sim_ntaxa;
         G::_ntaxa = nleaves;
@@ -587,12 +592,9 @@ namespace proj {
         
         _sim_tree = Forest::SharedPtr(new Forest);
         
-#if defined (INCREMENT_COMPARISON_TEST)
-        _sim_tree->buildBirthDeathTreeTest();
-#else
-        _sim_tree->buildBirthDeathTree();
-#endif
+        _sim_tree->incrementComparisonTest();
     }
+#endif
         
     inline void Proj::simulateSave(string fnprefix) {
         // Show simulation settings to user
