@@ -173,6 +173,7 @@ class Particle {
         if (step_number == 0) {
             bool valid = _forest.checkForValidTaxonSet(_particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils);
             assert (valid); // when fossils aren't part of the tree, don't consider any of this because there should always be a valid taxon set
+            // TODO: need to check if any taxsets only have 1 lineage if no fossils
         }
         
         double prev_log_likelihood = _forest.getLogLikelihood();

@@ -98,6 +98,7 @@ vector<double> G::_double_relative_rates;
 string G::_proposal = "prior-prior";
 bool G::_est_lambda = false;
 bool G::_est_mu = false;
+bool G::_est_clock_rate = false;
 bool G::_est_root_age = false;
 unsigned G::_ngroups = 1.0;
 unsigned G::_save_every = 1.0;

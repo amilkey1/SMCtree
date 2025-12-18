@@ -178,6 +178,7 @@ class Forest {
         _first_split_height = 0.0;
         _second_incr = 0.0;
         _third_incr = 0.0;
+        _clock_rate = 1.0;
 #if defined (FOSSILS)
         _tree_height = 0.0;
         _valid_taxsets.clear();
@@ -194,9 +195,9 @@ class Forest {
         assert(G::_ntaxa == G::_taxon_names.size());
         clear();
         unsigned nnodes = 2*G::_ntaxa - 1;
-#if defined (FOSSILS)
-        nnodes = (unsigned) 2*(G::_ntaxa + G::_fossils.size()) - 1;
-#endif
+//#if defined (FOSSILS)
+//        nnodes = (unsigned) 2*(G::_ntaxa + G::_fossils.size()) - 1;
+//#endif
         _nodes.reserve(nnodes);
         _nodes.resize(G::_ntaxa);
         _nleaves = G::_ntaxa;
@@ -224,10 +225,10 @@ class Forest {
         auto &data_matrix=_data->getDataMatrix();
 
         unsigned nnodes = 2*G::_ntaxa - 1;
-#if defined (FOSSILS)
+//#if defined (FOSSILS)
 //        nnodes += G::_fossils.size();
-        nnodes = (unsigned) 2*(G::_ntaxa + G::_fossils.size()) - 1;
-#endif
+//        nnodes = (unsigned) 2*(G::_ntaxa + G::_fossils.size()) - 1;
+//#endif
         _nodes.reserve(nnodes);
         _nodes.resize(G::_ntaxa);
 
@@ -758,7 +759,8 @@ class Forest {
 
 #if defined (FOSSILS)
     bool Forest::addBirthDeathIncrementFossil(Lot::SharedPtr lot, double age, string fossil_name) {
-        // TODO: NO FOSSILS YET
+        // fossils are age constraints and not part of the tree
+        
         bool fossil_added = false;
         
         // if there is only one lineage left, all extant taxa have been joined and remaining fossils must be added
@@ -1251,7 +1253,7 @@ class Forest {
             
             double weight_posterior = 0;
             
-            for (auto &s:set_probabilities) {
+            for (auto &s:set_probabilities) { //s * s  because you have ex (3/4) probability of choosing a taxset * 3 taxa within that taxset
                 weight_posterior += (s * s / total_choices);
                 s /= total_choices;
             }
@@ -2191,7 +2193,7 @@ class Forest {
                 }
             
             if (real_count == t._species_included.size()) {
-                valid = true;
+                valid = true; // TODO: what if real count is 1? in that case, the fossil has no constraint? just make that not an option?
             }
             _valid_taxsets.push_back(valid);
             valid = false;
@@ -2616,14 +2618,14 @@ class Forest {
         
         // Create vector of states for each node in the tree
         unsigned nnodes = (unsigned)_nodes.size();
-#if defined (FOSSILS)
-        nnodes = 0;
-        for (auto &nd:_nodes) {
-            if (nd._set_partials) {
-                nnodes++;
-            }
-        }
-#endif
+//#if defined (FOSSILS)
+//        nnodes = 0;
+//        for (auto &nd:_nodes) {
+//            if (nd._set_partials) {
+//                nnodes++;
+//            }
+//        }
+//#endif
         vector< vector<unsigned> > sequences(nnodes);
         for (unsigned i = 0; i < nnodes; i++) {
             sequences[i].resize(nsites, 4);
@@ -2656,32 +2658,32 @@ class Forest {
             basefreq[3] = T/total;
         }
         
-#if defined (FOSSILS)
-        // skip some nodes by renumbering everything
-        unsigned new_node_number = 0;
-        for (auto &nd:_nodes) {
-            if (nd._set_partials) {
-                nd._renumber = new_node_number;
-                new_node_number++;
-            }
-            else {
-                nd._renumber = -1;
-            }
-        }
-        // Simulate starting sequence at the root node
-        Node * nd;
-        for (auto &node:_nodes) {
-            if (node._renumber == nnodes-1) {
-                nd = &node;
-                break;
-            }
-        }
-        int ndnum = nd->_renumber;
-        assert(ndnum < nnodes);
-        for (unsigned i = 0; i < nsites; i++) {
-            sequences[ndnum][i] = G::multinomialDraw(lot, basefreq);
-        }
-#else
+//#if defined (FOSSILS)
+//        // skip some nodes by renumbering everything
+//        unsigned new_node_number = 0;
+//        for (auto &nd:_nodes) {
+//            if (nd._set_partials) {
+//                nd._renumber = new_node_number;
+//                new_node_number++;
+//            }
+//            else {
+//                nd._renumber = -1;
+//            }
+//        }
+//        // Simulate starting sequence at the root node
+//        Node * nd;
+//        for (auto &node:_nodes) {
+//            if (node._renumber == nnodes-1) {
+//                nd = &node;
+//                break;
+//            }
+//        }
+//        int ndnum = nd->_renumber;
+//        assert(ndnum < nnodes);
+//        for (unsigned i = 0; i < nsites; i++) {
+//            sequences[ndnum][i] = G::multinomialDraw(lot, basefreq);
+//        }
+//#else
         // Simulate starting sequence at the root node
         Node * nd = *(_lineages.begin());
         int ndnum = nd->_number;
@@ -2689,69 +2691,69 @@ class Forest {
         for (unsigned i = 0; i < nsites; i++) {
             sequences[ndnum][i] = G::multinomialDraw(lot, basefreq);
         }
-#endif
+//#endif
         
-# if defined (FOSSILS)
-        nd = findNextPreorder(nd);
-                
-        while (nd) {
-            if (nd->_set_partials) {
-                ndnum = nd->_number;
-                
-                // Get reference to parent sequence
-                assert(nd->_parent);
-                
-                bool parent_found = false;
-                bool skip_node = false;
-                unsigned parnum = nd->_parent->_number;
-                Node parent = _nodes[parnum];
-                
-                while (!parent_found) {
-                    if (!parent._set_partials) { // if parent is not a real node, use its parent
-                        if (parent._parent) {
-                            parnum = parent._parent->_number;
-                            parent = _nodes[parnum];
-                        }
-                        else {
-                            skip_node = true;
-                            // skip node if the parent is not a real node and neither is its parent
-                            parent_found = true;
-                        }
-                    }
-                    else {
-                        parent_found = true;
-                    }
-                }
-                
-                if (!skip_node) {
-                    assert (_nodes[parnum]._set_partials);
-                        
-                        // Evolve nd's sequence given parent's sequence and edge length
-                    for (unsigned i = 0; i < nsites; i++) {
-                        // Choose relative rate for this site
-                        double site_relrate = 1.0;
-                        if (G::_asrv_shape != G::_infinity)
-                            site_relrate = lot->gamma(G::_asrv_shape, 1.0/G::_asrv_shape);
-                        unsigned from_state = sequences[_nodes[parnum]._renumber][i];
-                        double cum_prob = 0.0;
-                        double u = lot->uniform();
-                        for (unsigned to_state = 0; to_state < 4; to_state++) {
-                            cum_prob += calcSimTransitionProbability(from_state, to_state, basefreq, site_relrate*nd->_accumulated_height);
-                            if (u < cum_prob) {
-                                sequences[_nodes[ndnum]._renumber][i] = to_state;
-                                break;
-                            }
-                        }
-                        assert(sequences[_nodes[ndnum]._renumber][i] < 4);
-                    }
-                }
-            }
-            // else, node is not a real node and should not be included in the data
-            // Move to next node in preorder sequence
-            nd = findNextPreorder(nd);
-        }
-
-#else
+//# if defined (FOSSILS)
+//        nd = findNextPreorder(nd);
+//
+//        while (nd) {
+//            if (nd->_set_partials) {
+//                ndnum = nd->_number;
+//
+//                // Get reference to parent sequence
+//                assert(nd->_parent);
+//
+//                bool parent_found = false;
+//                bool skip_node = false;
+//                unsigned parnum = nd->_parent->_number;
+//                Node parent = _nodes[parnum];
+//
+//                while (!parent_found) {
+//                    if (!parent._set_partials) { // if parent is not a real node, use its parent
+//                        if (parent._parent) {
+//                            parnum = parent._parent->_number;
+//                            parent = _nodes[parnum];
+//                        }
+//                        else {
+//                            skip_node = true;
+//                            // skip node if the parent is not a real node and neither is its parent
+//                            parent_found = true;
+//                        }
+//                    }
+//                    else {
+//                        parent_found = true;
+//                    }
+//                }
+//
+//                if (!skip_node) {
+//                    assert (_nodes[parnum]._set_partials);
+//
+//                        // Evolve nd's sequence given parent's sequence and edge length
+//                    for (unsigned i = 0; i < nsites; i++) {
+//                        // Choose relative rate for this site
+//                        double site_relrate = 1.0;
+//                        if (G::_asrv_shape != G::_infinity)
+//                            site_relrate = lot->gamma(G::_asrv_shape, 1.0/G::_asrv_shape);
+//                        unsigned from_state = sequences[_nodes[parnum]._renumber][i];
+//                        double cum_prob = 0.0;
+//                        double u = lot->uniform();
+//                        for (unsigned to_state = 0; to_state < 4; to_state++) {
+//                            cum_prob += calcSimTransitionProbability(from_state, to_state, basefreq, site_relrate*nd->_accumulated_height);
+//                            if (u < cum_prob) {
+//                                sequences[_nodes[ndnum]._renumber][i] = to_state;
+//                                break;
+//                            }
+//                        }
+//                        assert(sequences[_nodes[ndnum]._renumber][i] < 4);
+//                    }
+//                }
+//            }
+//            // else, node is not a real node and should not be included in the data
+//            // Move to next node in preorder sequence
+//            nd = findNextPreorder(nd);
+//        }
+//
+//#else
         nd = findNextPreorder(nd);
         while (nd) {
             ndnum = nd->_number;
@@ -2784,7 +2786,7 @@ class Forest {
             // Move to next node in preorder sequence
             nd = findNextPreorder(nd);
         }
-#endif
+//#endif
 
         assert(data);
         Data::data_matrix_t & dm = data->getDataMatrixNonConst();

@@ -471,7 +471,7 @@ namespace proj {
 #endif
         
         // create vector of particles
-        G::_nparticles = 1;
+        G::_nparticles = 100;
         G::_ngroups = 1;
         G::_est_lambda = false;
         G::_est_root_age = false;
@@ -508,9 +508,7 @@ namespace proj {
         
         // simulate many particles, then choose among the survivors
         // must do this to simulate fossils
-        
-        G::_nparticles = 100;
-        
+                
         // set group rng
         G::_ngroups = 1.0;
         _group_rng.resize(G::_ngroups);
@@ -524,13 +522,13 @@ namespace proj {
         _particle_vec.resize(G::_nparticles);
         initializeParticles();
         
-        vector<double> starting_log_likelihoods = _particle_vec[0].calcGeneTreeLogLikelihoods();
-        
-        // initialize starting log likelihoods for all other particles
-        // necessary for calculating the first weight
-        for (unsigned p=1; p<_particle_vec.size(); p++) {
-            _particle_vec[p].setStartingLogLikelihoods(starting_log_likelihoods);
-        }
+//        vector<double> starting_log_likelihoods = _particle_vec[0].calcGeneTreeLogLikelihoods();
+//        
+//        // initialize starting log likelihoods for all other particles
+//        // necessary for calculating the first weight
+//        for (unsigned p=1; p<_particle_vec.size(); p++) {
+//            _particle_vec[p].setStartingLogLikelihoods(starting_log_likelihoods);
+//        }
         
         unsigned nsteps = (G::_ntaxa-1);
         
@@ -1427,7 +1425,9 @@ namespace proj {
              
              // set particle seed for drawing new values
              p.setSeed(rng->randint(1,9999) + psuffix);
-             p.drawClockRate();
+             if (G::_est_clock_rate) {
+                 p.drawClockRate();
+             }
              psuffix += 2;
              
              if (G::_est_lambda) {
