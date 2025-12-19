@@ -62,6 +62,7 @@ namespace proj {
             void handleBaseFrequencies();
             void handleRelativeRates();
             void writePartialCount();
+            void removeUnecessaryTaxsets();
         
 #if defined(FOSSILS)
             Fossil parseFossilDefinition(string & fossil_def);
@@ -527,18 +528,9 @@ namespace proj {
         _particle_vec.resize(G::_nparticles);
         initializeParticles();
         
-//        vector<double> starting_log_likelihoods = _particle_vec[0].calcGeneTreeLogLikelihoods();
-//
-//        // initialize starting log likelihoods for all other particles
-//        // necessary for calculating the first weight
-//        for (unsigned p=1; p<_particle_vec.size(); p++) {
-//            _particle_vec[p].setStartingLogLikelihoods(starting_log_likelihoods);
-//        }
-        
         unsigned nsteps = (G::_ntaxa-1);
         
         for (unsigned n=0; n<nsteps; n++) {
-//            proposeParticles(n);
             simProposeParticles(n);
             filterParticles(n, 0);
             G::_step++;
@@ -1455,6 +1447,10 @@ namespace proj {
              }
          }
         
+        if (G::_taxsets.size() > 0) {
+            removeUnecessaryTaxsets(); // remove any taxsets with just one lineage and one fossil because they will not provide any constraints
+        }
+        
         for (auto &p:_particle_vec) {
             p.setParticleTaxSets();
             p.setOverlappingTaxSets();
@@ -1475,6 +1471,36 @@ namespace proj {
                 p.drawRootAge();
             }
         }
+    }
+
+    inline void Proj::removeUnecessaryTaxsets() {
+        // remove any taxsets with just one real taxon because there is no constraint in that case
+        vector<unsigned> taxsets_to_remove;
+        
+        for (int i= (int) G::_taxsets.size() - 1; i >=0; i--) {
+            if (G::_taxsets[i]._species_included.size() == 2) {
+                string name1 = G::_taxsets[i]._species_included[0];
+                string name2 = G::_taxsets[i]._species_included[1];
+                
+                if (boost::ends_with(name1, "FOSSIL") || (boost::ends_with(name2, "FOSSIL") )) {
+                    taxsets_to_remove.push_back(i);
+                }
+            }
+        }
+        
+        if (taxsets_to_remove.size() > 0) {
+            for (int a = 0; a < taxsets_to_remove.size(); a++) {
+                G::_taxsets.erase(G::_taxsets.begin() + taxsets_to_remove[a]);
+            }
+            
+            // renumber taxsets
+            int name_num = 1;
+            for (auto &g:G::_taxsets) {
+                g._name = name_num;
+                name_num++;
+            }
+        }
+        
     }
 
     inline void Proj::writePartialCount() {
