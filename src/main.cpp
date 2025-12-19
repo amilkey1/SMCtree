@@ -91,6 +91,7 @@ double   G::_lambda            = 1.0;
 double   G::_mu                = 1.0;
 double   G::_kappa             = 1.0;
 double   G::_root_age          = 1.0;
+double G::_clock_rate = 1.0;
 string   G::_string_base_frequencies = "";
 vector<double> G::_base_frequencies;
 string   G::_string_relative_rates = "";
@@ -131,6 +132,7 @@ double    G::_sim_lambda   = 1.0;
 double    G::_sim_mu       = 0.0;
 double    G::_sim_rho      = 1.0;
 double    G::_sim_root_age = 1.0;
+double    G::_sim_clock_rate = 1.0;
 string    G::_sim_filename_prefix = "sim";
 
 double    G::_occupancy  = 1.0;

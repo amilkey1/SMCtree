@@ -14,6 +14,7 @@ namespace proj {
         static double                   _sim_mu;
         static double                   _sim_rho;
         static double                   _sim_root_age;
+        static double                   _sim_clock_rate;
         static unsigned                 _rnseed;
         static unsigned                 _nthreads;
         static unsigned                 _verbosity;
@@ -30,6 +31,7 @@ namespace proj {
         static bool                     _est_mu;
         static bool                     _est_root_age;
         static bool                     _est_clock_rate;
+        static double                   _clock_rate;
         static unsigned                 _ngroups;
         static bool                     _run_on_empty;
         static string                   _sim_dir;

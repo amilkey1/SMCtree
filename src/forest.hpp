@@ -2064,7 +2064,7 @@ class Forest {
         //    = 2*betat*((A + G)*(C + T) + kappa(AG + CT))
         //  betat = v/[2*( (A + G)(C + T) + kappa*(AG + CT) )]
         double kappa = 1.0;
-        double betat = 0.5*_relrate*edge_length/((pi[0] + pi[2])*(pi[1] + pi[3]) + kappa*(pi[0]*pi[2] + pi[1]*pi[3]));
+        double betat = 0.5*_relrate*edge_length*_clock_rate/((pi[0] + pi[2])*(pi[1] + pi[3]) + kappa*(pi[0]*pi[2] + pi[1]*pi[3]));
         
         if (is_transition) {
             double pi_j = pi[to];

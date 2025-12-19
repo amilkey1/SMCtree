@@ -114,6 +114,7 @@ namespace proj {
         ("startmode",  value(&G::_start_mode)->default_value("smc"), "smc or sim")
         ("filename",  value(&G::_filename), "name of file containing data")
         ("subset",  value(&partition_subsets), "a string defining a partition subset, e.g. 'first:1-1234\3' or 'default[codon:standard]:1-3702'")
+        ("clock_rate",  value(&G::_clock_rate)->default_value(1.0), "clock rate if fixed, mean clock rate if estimating clock rate")
         ("nparticles",  value(&G::_nparticles)->default_value(500), "number of particles)")
         ("savememory",  value(&G::_save_memory)->default_value(false), "save memory by recalculating partials each round")
         ("model",  value(&G::_model)->default_value("JC"), "model to use for likelihood calculations")
@@ -124,6 +125,7 @@ namespace proj {
         ("simmu",  value(&G::_sim_mu)->default_value(0.0), "true extinction rate for simulating tree under the constant-rates Birth-Death model if startmode is 'sim'")
         ("simrho",  value(&G::_sim_rho)->default_value(1.0), "true extant taxon sampling rate for simulating tree under the constant-rates Birth-Death model if startmode is 'sim'")
         ("simrootage",  value(&G::_sim_root_age)->default_value(1.0), "true root age for simulating tree under the constant-rates Birth-Death model if startmode is 'sim'")
+        ("simclockrate",  value(&G::_sim_clock_rate)->default_value(1.0), "true clock rate for simulating tree under constant-rates Birth-Death model if startmode is 'sim'")
         ("kappa",  boost::program_options::value(&G::_kappa)->default_value(1.0), "value of kappa")
         ("base_frequencies", boost::program_options::value(&G::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
         ("relative_rates", boost::program_options::value(&G::_string_relative_rates)->default_value("null"), "relative rates by locus")
@@ -131,6 +133,7 @@ namespace proj {
         ("estimate_lambda", boost::program_options::value(&G::_est_lambda)->default_value(false), "estimate birth rate")
         ("estimate_mu", boost::program_options::value(&G::_est_mu)->default_value(false), "estimate death rate")
         ("estimate_root_age", boost::program_options::value(&G::_est_root_age)->default_value(false), "estimate root age")
+        ("estimate_clock_rate", boost::program_options::value(&G::_est_clock_rate)->default_value(false), "estimate clock rate")
         ("ngroups", boost::program_options::value(&G::_ngroups)->default_value(1.0), "number of subgroups")
         ("save_every", boost::program_options::value(&G::_save_every)->default_value(1.0), "save one out of this number of trees in params and tree files")
         ("run_on_empty", boost::program_options::value(&G::_run_on_empty)->default_value(false), "run without likelihood")
@@ -1427,9 +1430,15 @@ namespace proj {
              
              // set particle seed for drawing new values
              p.setSeed(rng->randint(1,9999) + psuffix);
-             if (G::_est_clock_rate) {
-                 p.drawClockRate();
+             if (G::_start_mode != "sim") {
+                 if (G::_est_clock_rate) {
+                     p.drawClockRate();
+                 }
              }
+             else {
+                 p.setSimClockRate();
+             }
+             
              psuffix += 2;
              
              if (G::_est_lambda) {
