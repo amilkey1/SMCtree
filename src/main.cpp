@@ -110,10 +110,8 @@ string G::_sim_dir = ".";
 bool G::_ruv = false;
 bool G::_coverage = false;
 
-#if defined (FOSSILS)
 vector<Fossil> G::_fossils;
 vector<TaxSet> G::_taxsets;
-#endif
 
 double   G::_small_enough      = 0.00001;
 double   G::_infinity          = numeric_limits<double>::infinity();

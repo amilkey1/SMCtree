@@ -1,8 +1,6 @@
 #pragma once
 
-#if defined (FOSSILS)
-    #include <codecvt>
-#endif
+#include <codecvt>
 #include <random>
 
 using boost::filesystem::current_path;
@@ -64,10 +62,8 @@ namespace proj {
             void writePartialCount();
             void removeUnecessaryTaxsets();
         
-#if defined(FOSSILS)
             Fossil parseFossilDefinition(string & fossil_def);
             TaxSet parseTaxsetDefinition(string & taxset_def);
-#endif
 
             vector<Particle>            _particle_vec;
         
@@ -97,11 +93,9 @@ namespace proj {
         vector<string> partition_subsets;
         variables_map vm;
         
-#if defined(FOSSILS)
         vector<string> taxsets;
         vector<string> fossils;
         vector<string> sim_fossils;
-#endif
         
         options_description desc("Allowed options");
         desc.add_options()
@@ -139,11 +133,9 @@ namespace proj {
         ("save_every", boost::program_options::value(&G::_save_every)->default_value(1.0), "save one out of this number of trees in params and tree files")
         ("run_on_empty", boost::program_options::value(&G::_run_on_empty)->default_value(false), "run without likelihood")
         ("sim_dir", boost::program_options::value(&G::_sim_dir)->default_value("."), "run without likelihood")
-#if defined(FOSSILS)
         ("fossil",  value(&fossils), "a string defining a fossil, e.g. 'Ursus_abstrusus         1.8–5.3 4.3' (4.3 is time, 1.8-5.3 is prior range)")
         ("taxset",  value(&taxsets), "a string defining a taxon set, e.g. 'Ursinae: Helarctos_malayanus Melursus_ursinus Ursus_abstrusus Ursus_americanus Ursus_arctos Ursus_maritimus Ursus_spelaeus Ursus_thibetanus'")
         ("simfossil",  value(&sim_fossils), "a string defining a fossil, e.g. 'Ursus_abstrusus         1.8–5.3 4.3' (4.3 is time, 1.8-5.3 is prior range)")
-#endif
         // the following variables relate to validation analyses
         ("ruv", boost::program_options::value(&G::_ruv)->default_value(false), "run ruv analysis")
         ("coverage", boost::program_options::value(&G::_coverage)->default_value(false), "run coverage analysis")
@@ -220,7 +212,6 @@ namespace proj {
             output(format("warning: extinction rate specified to be estimated but mean rate set to %d; extinction rate will be set to 0 and Yule model will be used\n")%G::_mu, 1);
         }
         
-#if defined(FOSSILS)
         // If user specified --fossil on command line, break specified
         // fossil definition into species name, taxset name, and age
         if (vm.count("fossil") > 0) {
@@ -247,10 +238,8 @@ namespace proj {
                 G::_taxsets.push_back(parseTaxsetDefinition(tdef));
             }
         }
-#endif
     }
 
-#if defined(FOSSILS)
     // Note: This code is unduly complex because of the fact that there are
     // many different kinds of dashes that can be used in a utf8-encoded text file.
     // One solution is to eliminate the dash separating the lower and upper
@@ -400,8 +389,6 @@ namespace proj {
         }
         return TaxSet(taxset_name, v);
     }
-    
-#endif
 
     inline void Proj::handleBaseFrequencies() {
         vector <string> temp;
@@ -492,7 +479,7 @@ namespace proj {
             G::_taxon_names[i] = G::inventName(i, /*lower_case*/false);
         }
         
-#if defined (FOSSILS)
+        if (G::_fossils.size() > 0) {
             // check that no fossil is older than the mean root age
             for (auto &f:G::_fossils) {
                 if (f._upper >= G::_root_age) {
@@ -510,7 +497,7 @@ namespace proj {
                     throw XProj(format("Root age set to %d but oldest fossil has age %d; root age must be older than fossils")% G::_root_age % f._age);
                 }
             }
-#endif
+        }
         
         // simulate many particles, then choose among the survivors
         // must do this to simulate fossils
@@ -725,7 +712,7 @@ namespace proj {
                 psuffix += 2;
             }
             
-#if defined (FOSSILS)
+
             if (G::_fossils.size() > 0) {
                 // check that no fossil is older than the mean root age
                 for (auto &f:G::_fossils) {
@@ -745,7 +732,7 @@ namespace proj {
                     }
                 }
             }
-#endif
+
             G::_step = 0;
             initializeParticles(); // TODO: make one template particle and copy it
             
@@ -1457,14 +1444,12 @@ namespace proj {
             p.setTaxSetsNoFossils();
         }
         
-#if defined (FOSSILS)
         if (G::_fossils.size() > 0) {
             for (auto &p:_particle_vec) {
                 p.setFossils();
                 p.drawFossilAges(); // draw a separate fossil age for each particle
             }
         }
-#endif
         
     if (G::_est_root_age) {
         for (auto &p:_particle_vec) {

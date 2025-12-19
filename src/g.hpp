@@ -64,10 +64,8 @@ namespace proj {
         static unsigned                 _save_every;
         static unsigned                 _step;
         
-#if defined(FOSSILS)
         static vector<Fossil>           _fossils;
         static vector<TaxSet>           _taxsets;
-#endif
         
         // validation
         static bool                     _ruv;

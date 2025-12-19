@@ -1,5 +1,3 @@
-#define FOSSILS
-
 //# define INCREMENT_COMPARISON_TEST
 
 # define SYSTEMATIC_FILTERING

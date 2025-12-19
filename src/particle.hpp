@@ -52,14 +52,12 @@ class Particle {
         double getHeightSecondIncr() {return _forest.getHeightSecondIncr();}
         double getHeightThirdIncr() {return _forest.getHeightThirdIncr();}
 
-#if defined (FOSSILS)
         void setFossils() {_particle_fossils = G::_fossils;}
         void setTaxSetsNoFossils();
         void drawFossilAges();
         void setParticleTaxSets();
         void setOverlappingTaxSets();
         void updateFossilTaxsets(string fossil_name);
-#endif
     
         // validation stuff
         double getRootAge();
@@ -70,7 +68,6 @@ class Particle {
     
         Forest                                  _forest;
         double                                  _log_weight;
-#if defined (FOSSILS)
         unsigned                                _fossil_number;
         vector<Fossil>                          _particle_fossils; // each particle needs it own set of fossils with their own ages
     
@@ -79,7 +76,6 @@ class Particle {
     
         vector<TaxSet>                          _particle_taxsets_no_fossils; // update this as nodes are joined
         vector<TaxSet>                          _unused_particle_taxsets_no_fossils; // if there are overlapping taxa in taxsets, put the largest groups here until they can be used
-#endif
 };
 
     inline string Particle::debugSaveParticleInfo(unsigned i) const {
@@ -107,9 +103,7 @@ class Particle {
 
     inline void Particle::clear() {
         _log_weight = 0.0;
-#if defined (FOSSILS)
         _fossil_number = 0;
-#endif
       }
 
     inline void Particle::setParticleData(Data::SharedPtr d, bool partials) {
@@ -172,13 +166,12 @@ class Particle {
     inline void Particle::proposal(unsigned step_number) {
         if (step_number == 0) {
             bool valid = _forest.checkForValidTaxonSet(_particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils);
-            assert (valid); // when fossils aren't part of the tree, don't consider any of this because there should always be a valid taxon set
-            // TODO: need to check if any taxsets only have 1 lineage if no fossils
+            assert (valid); // there should always be a valid taxon set if things have been merged correctly
         }
         
         double prev_log_likelihood = _forest.getLogLikelihood();
         
-        _forest.addBirthDeathIncrementFossil(_lot, -1, "placeholder");
+        _forest.addBirthDeathIncrement(_lot, -1);
             
 #if defined (INCREMENT_COMPARISON_TEST)
         _forest.addIncrement(_lot); // for comparison of sim.log vs smc.log
@@ -292,11 +285,9 @@ class Particle {
     inline void Particle::drawRootAge() {
         assert (G::_est_root_age > 0.0);
         double max_fossil_age = -1;
-#if defined (FOSSILS)
         if (_particle_fossils.size() > 0) {
             max_fossil_age = _particle_fossils.back()._age;
         }
-#endif
         _forest.drawRootAge(_lot, max_fossil_age);
     }
     
@@ -583,14 +574,12 @@ class Particle {
     inline void Particle::operator=(const Particle & other) {
         _forest = other._forest;
         _log_weight = other._log_weight;
-#if defined (FOSSILS)
         _fossil_number = other._fossil_number;
         _particle_fossils = other._particle_fossils;
         _particle_taxsets = other._particle_taxsets;
         _unused_particle_taxsets = other._unused_particle_taxsets;
         _particle_taxsets_no_fossils = other._particle_taxsets_no_fossils;
         _unused_particle_taxsets_no_fossils = other._unused_particle_taxsets_no_fossils;
-#endif
     }
     
 }

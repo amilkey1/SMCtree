@@ -68,12 +68,9 @@ class Forest {
         double calcTopologyPrior(unsigned nlineages);
         void clearPartials();
         double getLineageHeight(Node* nd);
-        void addBirthDeathTreeIncrement(Lot::SharedPtr lot);
     
-#if defined (FOSSILS)
-        void    addBirthDeathIncrementFossil(Lot::SharedPtr lot, double age, string fossil_name);
+        void    addBirthDeathIncrement(Lot::SharedPtr lot, double age);
         bool    checkForValidTaxonSet(vector<TaxSet> taxset, vector<TaxSet> unused_taxsets);
-#endif
     
         Data::SharedPtr             _data;
         vector<Node *>              _lineages;
@@ -101,10 +98,8 @@ class Forest {
         double                      _second_incr;
         double                      _third_incr;
     
-#if defined (FOSSILS)
         double _tree_height;
         vector<bool> _valid_taxsets;
-#endif
 };
 
     inline string Forest::debugSaveForestInfo() const {
@@ -161,10 +156,8 @@ class Forest {
         _second_incr = 0.0;
         _third_incr = 0.0;
         _clock_rate = 1.0;
-#if defined (FOSSILS)
         _tree_height = 0.0;
         _valid_taxsets.clear();
-#endif
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -286,88 +279,11 @@ class Forest {
         return _gene_tree_log_likelihoods[i];
     }
 
-    inline void Forest::addBirthDeathTreeIncrement(Lot::SharedPtr lot) {
-        // birth death
-        double cum_height = getLineageHeight(_lineages.back());
-        // Determine number of lineages remaining
-        unsigned n = getNumLineages();
-        assert(n > 1);
-        
-        // Draw n-1 internal node heights and store in vector heights
-        vector<double> heights(n - 1, 0.0);
-        
-        double rho = 1.0; // TODO: for now, assume rho = 1.0
-        
-        double birth_rate = _estimated_lambda;
-        
-        double death_rate = _estimated_mu;
-
-        double exp_death_minus_birth = exp(death_rate - birth_rate);
-        double phi = 0.0;
-        phi += rho*birth_rate*(exp_death_minus_birth - 1.0);
-        phi += (death_rate - birth_rate)*exp_death_minus_birth;
-        phi /= (exp_death_minus_birth - 1.0);
-        for (unsigned i = 0; i < n - 2; i++) {
-            double u = lot->uniform();
-            double y = u/(1.0 + birth_rate*rho*(1.0 - u));
-            if (birth_rate > death_rate) {
-                y = log(phi - u*rho*birth_rate);
-                y -= log(phi - u*rho*birth_rate + u*(birth_rate - death_rate));
-                y /= (death_rate - birth_rate);
-            }
-            heights[i] = y;
-        }
-        heights[n-2] = 1.0;
-        sort(heights.begin(), heights.end());
-        
-        // Waiting time to next speciation event is first height
-        // scaled so that max height is mu - cum_height
-        double t = heights[0]*(_estimated_root_age - cum_height); // TODO: not sure this is right
-        
-        assert (t > 0.0);
-        
-        for (auto &nd:_lineages) {
-            nd->_edge_length += t;
-        }
-        
-        // lorad only works if all topologies the same - then don't include the prior on joins because it is fixed
-        double rate = 0.0; // TODO: need to modify this for birth-death
-        rate = getNumLineages() * birth_rate;
-    }
-
 #if defined (INCREMENT_COMPARISON_TEST)
     inline void Forest::addBirthDeathTreeIncrementTest(Lot::SharedPtr lot) {
         // birth death
         
         bool yule = false;
-        
-        double beast_test1 = 0.0;
-        double beast_test2 = 0.0;
-        double ntaxa = 5;
-        double a = G::_mu / G::_lambda;
-        double r = G::_lambda - G::_mu;
-        double ca = 1-a;
-        double height = 100.0;
-        double mrh = -r * height;
-        double emrh = exp(mrh);
-        double rho = 1.0;
-        
-        double erh = exp(r * height);
-        
-        beast_test1 = -(ntaxa - 2) * r * ca * emrh / (emrh - 1.0) / (emrh - 1.0 + ca);
-        
-        beast_test2 = -(ntaxa - 2) * ca / height / (r * height +ca);
-        
-        double tmp = a * emrh;
-        double zDeriv = tmp == 0.0 ? 0.0 : r * tmp / log(1.0 - tmp);
-        double beast_test3 = -2 * zDeriv - r;
-        
-//        cout << beast_test1 << endl;
-//        cout << beast_test2 << endl;
-//        cout << beast_test3 << endl;
-//
-//        double beast_test4 = log(r * ca * (rho + ca / (erh - 1)));
-//        cout << beast_test4 << endl;
         
         height = 40.0;
         double n = 5;
@@ -402,58 +318,15 @@ class Forest {
 
                                 // Draw n-1 internal node heights and store in vector heights
                                 vector<double> heights(n - 1, 0.0);
-
-    //                    for (unsigned i = 0; i < 1; i++) {
-    //                        for (unsigned i = 0; i < n - 2; i++) {
                                 
-    //                            bool birth_death = false;
-    //                            if (birth_death) {
-    //                            double phi = 0.0;
-    //
-    //                            double u = lot->uniform();
-    //
-    //                            phi += G::_lambda - G::_mu * exp((G::_mu - G::_lambda) * (_estimated_root_age - cum_height));
-    //                            phi /= (1 - exp((G::_mu - G::_lambda) * (_estimated_root_age - cum_height)));
-    //
-    //
-    //                            double s = 0.0;
-    //                            double inner_term = (u * G::_lambda - phi) / (u * G::_mu - phi);
-    //                            s = -1 * log(inner_term) / (G::_lambda - G::_mu);
-    //                            s += cum_height;
-    //
-    //                            assert (s > 0);
-    //                            heights[i] = s;
-    //                            }
-                                
-    //                            else {
-                            double troot = 2.0;
-                            double u = lot->uniform();
-                            double k = b + 1;
-                            n = 5;
-                            double a = pow((1-u), (1 / (n-k-1)));
-                            double phi = exp(-1 * G::_lambda * (troot - cum_height));
-                            t = (-1 / G::_lambda) * log(phi + a * (1 - phi));
-                        
-    //                        double k = b + 1;
-    //
-    //                        n = 5;
-    //                        double a = pow((1-u), (1 / (n-k)));
-    //                        double b = exp(-1 * G::_lambda * cum_height);
-    //                        double c = exp(-1 * G::_lambda * troot);
-    //                        double d = -1 / G::_lambda;
-    //
-    //                        double s = d * log(a*b - a*c + c);
-    //
-    //                        assert (s > cum_height);
-    //                        t = s - cum_height;
-    //                            }
-    //                        }
-
-    //                        heights[n-2] = _estimated_root_age; // TODO: is this right?
-    //                        sort(heights.begin(), heights.end());
-    //
-    //                    t = heights[0] - cum_height;
-                    }
+                                double troot = 2.0;
+                                double u = lot->uniform();
+                                double k = b + 1;
+                                n = 5;
+                                double a = pow((1-u), (1 / (n-k-1)));
+                                double phi = exp(-1 * G::_lambda * (troot - cum_height));
+                                t = (-1 / G::_lambda) * log(phi + a * (1 - phi));
+                        }
                     }
                     
     //        double cum_height = getLineageHeight(_lineages.back());
@@ -694,8 +567,7 @@ class Forest {
     }
 #endif
 
-#if defined (FOSSILS)
-    void Forest::addBirthDeathIncrementFossil(Lot::SharedPtr lot, double age, string fossil_name) {
+    void Forest::addBirthDeathIncrement(Lot::SharedPtr lot, double age) {
         // fossils are age constraints and not part of the tree
         
         bool fossil_added = false;
@@ -724,9 +596,6 @@ class Forest {
         
         double b = G::_step;
         double k = b + 1;
-        
-        double x = exp(-1*lambda_minus_mu*cum_height);
-        double z = exp(-1*lambda_minus_mu*troot);
         
         double phi = pow((1-u), (1/(n-k-1)));
         
@@ -833,15 +702,12 @@ class Forest {
                 
         assert (!fossil_added);
     }
-#endif
 
-    inline void Forest::addIncrement(Lot::SharedPtr lot) {
 #if defined (INCREMENT_COMPARISON_TEST)
+    inline void Forest::addIncrement(Lot::SharedPtr lot) {
         addBirthDeathTreeIncrementTest(lot);
-#else
-        addBirthDeathTreeIncrement(lot);
-#endif
     }
+#endif
 
     inline double Forest::joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset, vector<TaxSet> &taxset_no_fossils, vector<TaxSet> &unused_taxset_no_fossils, vector<Fossil> &particle_fossils) {
         _weight_correction = 0.0;
@@ -854,24 +720,7 @@ class Forest {
         }
         // find the new_nd from the previous step and accumulate height if needed
         
-        // if lineages.back() is a fossil, go to the previous node
-        // TODO: don't need to do any of this if not actually including fossils in the tree
-        unsigned end_node = (unsigned) _lineages.size() - 1;
         vector<unsigned> set_counts;
-        
-        Node *node_to_check = _lineages[end_node];
-        
-        // check for the new node that was added in the previous step
-        bool done = false;
-        while (!done) {
-            if (boost::ends_with(node_to_check->_name, "FOSSIL")) {
-                end_node --;
-                node_to_check = _lineages[end_node];
-            }
-            else {
-                done = true;
-            }
-        }
         
         int chosen_taxset = -1;
         
@@ -1036,7 +885,6 @@ class Forest {
             if (nlineages > 2) {
                 t = chooseTaxaToJoin(nlineages, lot);
             }
-            // TODO: check for taxsets here
             subtree1 = _lineages[t.first];
             subtree2 = _lineages[t.second];
         }
@@ -1615,11 +1463,7 @@ class Forest {
                             double sum_over_child_states = 0.0;
                             for (unsigned s_child = 0; s_child < G::_nstates; s_child++) {
                                 double child_transition_prob = 0.0;
-//# if defined (FOSSILS)
-//                                child_transition_prob = calcTransitionProbabilityFossil(child, s, s_child, i);
-//#else
                                 child_transition_prob = calcTransitionProbability(child, s, s_child, i);
-//#endif
                                 double child_partial = child_partial_array[p*G::_nstates + s_child];
                                 sum_over_child_states += child_transition_prob * child_partial;
                             }   // child state loop
@@ -1716,7 +1560,6 @@ class Forest {
         return child_transition_prob;
     }
 
-#if defined (FOSSILS)
     inline bool Forest::checkForValidTaxonSet(vector<TaxSet> taxset, vector<TaxSet> unused_taxsets) {
         bool valid = false;
                 
@@ -1788,7 +1631,6 @@ class Forest {
         
         return at_least_one_valid;
     }
-#endif
 
     inline void Forest::showForest() {
         for (unsigned g=0; g<_gene_tree_log_likelihoods.size(); g++) {
@@ -1971,10 +1813,8 @@ class Forest {
         _first_split_prior = other._first_split_prior;
         _second_incr = other._second_incr;
         _third_incr = other._third_incr;
-#if defined (FOSSILS)
         _tree_height = other._tree_height;
         _valid_taxsets = other._valid_taxsets;
-#endif
 
         // Copy _nodes
         _nodes.clear();
@@ -2387,13 +2227,14 @@ class Forest {
             // mean = n
             // for now, n = G::_root_age set by user
             _estimated_root_age = lot->gamma(1, G::_root_age);
-#if defined (FOSSILS)
-            if (_estimated_root_age > max_fossil_age) {
+            if (max_fossil_age != -1) {
+                if (_estimated_root_age > max_fossil_age) {
+                    done = true;
+                }
+            }
+            else {
                 done = true;
             }
-#else
-            done = true;
-#endif
         }
     }
 
