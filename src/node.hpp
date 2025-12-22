@@ -17,27 +17,27 @@ namespace proj {
                                         Node();
                                         ~Node();
 
-                    typedef vector<Node *>  ptr_vect_t;
+            typedef vector<Node *>  ptr_vect_t;
 
-                    Node *              getParent()                 {return _parent;}
-                    Node *              getLeftChild()              {return _left_child;}
-                    Node *              getRightSib()               {return _right_sib;}
-                    int                 getNumber()                 {return _number;}
-                    std::string         getName()                   {return _name;}
-                    Split               getSplit()                  {return _split;}
+            Node *              getParent()                 {return _parent;}
+            Node *              getLeftChild()              {return _left_child;}
+            Node *              getRightSib()               {return _right_sib;}
+            int                 getNumber()                 {return _number;}
+            std::string         getName()                   {return _name;}
+            Split               getSplit()                  {return _split;}
 
-                    double              getEdgeLength()             {return _edge_length;}
-                    void                setEdgeLength(double v);
-                    double              getHeight() const           {return _height;}
-                    void                setHeight(double v);
-        
-                    unsigned            countChildren() const;
+            double              getEdgeLength()             {return _edge_length;}
+            void                setEdgeLength(double v);
+            double              getHeight() const           {return _height;}
+            void                setHeight(double v);
 
-                    void                clearPointers();
-                    void                resetNode();
-                    
-                    string              saveNodeInfo(string prefix = "") const;
-                                                            
+            unsigned            countChildren() const;
+
+            void                clearPointers();
+            void                resetNode();
+            
+            string              saveNodeInfo(string prefix = "") const;
+                                                    
             static const double _smallest_edge_length;
         
         private:

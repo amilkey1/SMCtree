@@ -66,7 +66,7 @@ class Forest {
         double getTreeLength();
         double getTreePrior();
         double calcTopologyPrior(unsigned nlineages);
-        void clearPartials();
+        void   clearPartials();
         double getLineageHeight(Node* nd);
     
         void    addBirthDeathIncrement(Lot::SharedPtr lot, double age);
@@ -718,8 +718,7 @@ class Forest {
                 _first_split_height = _lineages[0]->_edge_length;
             }
         }
-        // find the new_nd from the previous step and accumulate height if needed
-        
+
         vector<unsigned> set_counts;
         
         int chosen_taxset = -1;
