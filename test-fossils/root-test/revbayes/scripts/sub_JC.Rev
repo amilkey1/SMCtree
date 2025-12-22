@@ -1,0 +1,11 @@
+#######################################
+# JC nucleotide substitution model #
+#######################################
+
+# Initialize the parameters of substitution matrix #
+Q_cytb <- fnJC(4)
+
+
+# Create the substitution model and clamp with our observed DNA data #
+phySeq ~ dnPhyloCTMC(tree=timetree, Q=Q_cytb, type="DNA")
+phySeq.clamp(cytb)

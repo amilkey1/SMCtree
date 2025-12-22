@@ -1,1 +1,1 @@
-log marginal likelihood: -142987
+log marginal likelihood: -26080.7

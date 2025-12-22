@@ -49,8 +49,6 @@ moves.append( mvSubtreeScale(timetree, weight=n_taxa/5.0) )
 # Monitor the age of Ursinae #
 age_ursinae := tmrca(timetree, clade_ursinae)
 
-# Specify an exponetial distribution on the age of this node 
-
-#obs_age_ursinae ~ age_ursinae - dnExponential(1.0)
-#obs_age_ursinae.clamp(1.84)
-#?dn
+# Specify an exponetial distribution on the age of this node #
+obs_age_ursinae ~ age_ursinae - dnExponential(1.0)
+obs_age_ursinae.clamp(1.84)
