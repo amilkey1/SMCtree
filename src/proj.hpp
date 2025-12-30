@@ -1517,7 +1517,7 @@ namespace proj {
     inline void Proj::writeLogFile() {
         // this function creates a params file that is comparable to output from beast
         ofstream logf("params.log");
-        logf << "iter ";
+        logf << "Replicate_ID ";
         logf << "\t" << "posterior ";
         logf << "\t" << "likelihood ";
         logf << "\t" << "prior ";
@@ -1526,18 +1526,12 @@ namespace proj {
             logf << "\t" << "Tree" + to_string(i) + "Likelihood";
         }
         
-        logf << "\t" << "Tree.height";
-        logf << "\t" << "Tree.treeLength";
-        logf << "\t" << "clockRate";
-        
-        logf << "\t" << "FBD";
-        
-        logf << "\t" << "diversificationRateFBD";
-        logf << "\t" << "turnoverFBD";
-        
-        logf << "\t" << "samplingProportionFBD";
-        logf << "\t" << "originFBD";
-        logf << "\t" << "SACountFBD";
+        logf << "\t" << "branch_rates";
+        logf << "\t" << "diversificationRate";
+        logf << "\t" << "extant_mrca";
+        logf << "\t" << "extinction_rate";
+        logf << "\t" << "speciation_rate";
+        logf << "\t" << "turnover";
         
         for (auto &t:G::_taxsets) {
             string taxset_name = t._name;
@@ -1565,8 +1559,10 @@ namespace proj {
             }
             
             vector<double> tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
-            double height = p.getTreeHeight();
-            double length = p.getTreeLength();
+            
+//            double height = p.getTreeHeight();
+//            double length = p.getTreeLength();
+            
             double clock_rate = p.getClockRate();
             double FBD = p.getFBDModel();
             double sampling_proportion = 1.0;
@@ -1585,10 +1581,10 @@ namespace proj {
             for (auto &l:tree_log_likelihoods) {
                 logf << "\t" << l;
             }
-            logf << "\t" << height;
-            logf << "\t" << length;
+//            logf << "\t" << height;
+//            logf << "\t" << length;
             logf << "\t" << clock_rate;
-            logf << "\t" << FBD;
+//            logf << "\t" << FBD;
             
             double lambda = 0.0;
             double mu = 0.0;
@@ -1623,21 +1619,26 @@ namespace proj {
             
             double diversification_rate = lambda - mu;
             double turnover = mu / lambda;
-            double SACountFBD = 0;
+//            double SACountFBD = 0;
             
             map<string, double> particle_taxset_map = p.getTaxsetAges();
             
             logf << "\t" << diversification_rate;
             
-            if (G::_mu > 0.0) {
-                logf << "\t" << turnover;
-            }
+//            if (G::_mu > 0.0) {
+//                logf << "\t" << turnover;
+//            }
             
-            logf << "\t" << sampling_proportion;
+//            logf << "\t" << sampling_proportion;
             
             logf << "\t" << root_age;
             
-            logf << "\t" << SACountFBD;
+            logf << "\t" << mu;
+            logf << "\t" << lambda;
+            
+//            logf << "\t" << SACountFBD;
+            
+            logf << "\t" << turnover;
             
             for (auto &t:G::_taxsets) {
                 string name = t._name;
