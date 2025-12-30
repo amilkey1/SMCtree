@@ -21,8 +21,8 @@ turnover := extinction_rate/speciation_rate
 rho <- 1.0
 
 # Define min & max constraints for the root #
-extant_mrca_min <- 4.5
-extant_mrca_max <- 5.5
+extant_mrca_min <- 4.9
+extant_mrca_max <- 5.01
 
 # Specify the root age as a stochastic node drawn from a uniform distribution #
 extant_mrca ~ dnUniform(extant_mrca_min, extant_mrca_max)
