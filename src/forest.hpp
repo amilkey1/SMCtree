@@ -867,8 +867,6 @@ class Forest {
                                 break;
                             }
                         }
-                        // fossil name is s
-                        //
                         break;
                     }
                 }
@@ -901,7 +899,8 @@ class Forest {
             
             // if new node has any child that is not a real node (set partials = false) and has no next node (next node != -1), the new node is not a real node either
 
-            if (new_nd->_set_partials) {
+//            if (new_nd->_set_partials) {
+            assert (new_nd->_set_partials);
                 // calculate new partials
                 assert (new_nd->_partials == nullptr);
                 if (G::_start_mode != "sim") {
@@ -929,21 +928,24 @@ class Forest {
                 filter = true; // must filter if a real node has been added
                 
                 subtree1->_use_in_likelihood = false;
+                subtree1->_partials = nullptr;
+                
                 subtree2->_use_in_likelihood = false;
-            }
+                subtree2->_partials = nullptr;
+//            }
             
-            else {
-                if (!subtree1->_set_partials) {
-                    subtree1->_use_in_likelihood = false;
-        //                subtree1->_partials = nullptr;
-                }
-                if (!subtree2->_set_partials) {
-                    subtree2->_use_in_likelihood = false;
-        //                subtree2->_partials = nullptr;
-                }
-            }
+//            else {
+//                if (!subtree1->_set_partials) {
+//                    subtree1->_use_in_likelihood = false;
+//                    subtree1->_partials = nullptr;
+//                }
+//                if (!subtree2->_set_partials) {
+//                    subtree2->_use_in_likelihood = false;
+//                    subtree2->_partials = nullptr;
+//                }
+//            }
             
-            // if new_nd is a real node, none of its children should be used in the likelihood calculation
+            // if none of the new node's children should be used in the likelihood calculation
             // TODO: faster way to do this?
             
             if (new_nd->_set_partials && G::_start_mode != "sim") {
