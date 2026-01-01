@@ -1420,6 +1420,9 @@ namespace proj {
                  if (G::_est_clock_rate) {
                      p.drawClockRate();
                  }
+                 else {
+                     p.setClockRate(G::_clock_rate);
+                 }
              }
              else {
                  p.setSimClockRate();

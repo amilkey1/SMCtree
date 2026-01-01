@@ -36,6 +36,7 @@ class Particle {
         void                                    setSimClockRate();
         void                                    createTrivialForest();
         double                                  getClockRate() {return _forest._clock_rate;}
+        void                                    setClockRate(double rate) {_forest._clock_rate = rate;}
         void                                    simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites);
         string                                  makeNewick(unsigned precision, bool use_names);
         string                                  saveForestNewick() {
