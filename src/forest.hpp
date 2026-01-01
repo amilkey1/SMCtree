@@ -886,280 +886,278 @@ class Forest {
             subtree2 = _lineages[t.second];
         }
         
-            assert (subtree1 != subtree2);
+        assert (subtree1 != subtree2);
 
-            //new node is always needed
-            Node* new_nd = pullNode();
+        //new node is always needed
+        Node* new_nd = pullNode();
 
-            new_nd->_left_child=subtree1;
-            subtree1->_right_sib=subtree2;
+        new_nd->_left_child=subtree1;
+        subtree1->_right_sib=subtree2;
 
-            subtree1->_parent=new_nd;
-            subtree2->_parent=new_nd;
-            
-            // if new node has any child that is not a real node (set partials = false) and has no next node (next node != -1), the new node is not a real node either
+        subtree1->_parent=new_nd;
+        subtree2->_parent=new_nd;
 
-            assert (new_nd->_set_partials);
-            // calculate new partials
-            assert (new_nd->_partials == nullptr);
-            if (G::_start_mode != "sim") {
-                double npatterns_total = _data->getNumPatterns();
-                new_nd->_partials = ps.getPartial(G::_nstates*npatterns_total);
-            }
-            assert(new_nd->_left_child->_right_sib);
+        assert (new_nd->_set_partials);
+        // calculate new partials
+        assert (new_nd->_partials == nullptr);
+        if (G::_start_mode != "sim") {
+            double npatterns_total = _data->getNumPatterns();
+            new_nd->_partials = ps.getPartial(G::_nstates*npatterns_total);
+        }
+        assert(new_nd->_left_child->_right_sib);
 
-            if (G::_save_memory && G::_start_mode != "sim") {
-                double npatterns_total = _data->getNumPatterns();
-                new_nd->_partials = ps.getPartial(npatterns_total*G::_nstates);
-                
-                for (auto &nd:_lineages) {
-                    if (nd->_partials == nullptr) {
-                        nd->_partials = ps.getPartial(npatterns_total * G::_nstates);
-                        calcPartialArray(nd);
-                    }
+        if (G::_save_memory && G::_start_mode != "sim") {
+            double npatterns_total = _data->getNumPatterns();
+            new_nd->_partials = ps.getPartial(npatterns_total*G::_nstates);
+            
+            for (auto &nd:_lineages) {
+                if (nd->_partials == nullptr) {
+                    nd->_partials = ps.getPartial(npatterns_total * G::_nstates);
+                    calcPartialArray(nd);
                 }
             }
-            
-            if (G::_start_mode != "sim") {
-                calcPartialArray(new_nd);
-            }
-            
-            filter = true; // must filter if a real node has been added
-            
-            subtree1->_use_in_likelihood = false;
-            subtree1->_partials = nullptr;
-            
-            subtree2->_use_in_likelihood = false;
-            subtree2->_partials = nullptr;
-            
-            // none of the new node's children should be used in the likelihood calculation
-            
-            //update node lists
-            updateNodeVector(_lineages, subtree1, subtree2, new_nd);
-            
-            bool update_unused = false;
-            // update taxset if needed
-            // go through all taxsets in existence and look for chosen taxa, then update all of them
-            // because there might be multiple taxsets with the same taxon names
-            
-            string name1 = subtree1->_name;
-            string name2 = subtree2->_name;
-            
-            vector<bool> update_these_taxsets;
-            vector<bool> update_these_unused_taxsets;
-            
-            for (auto &t:taxset_no_fossils) {
-                bool update = false;
-                unsigned count = 0;
-                for (auto &n:t._species_included) {
-                    if (n == name1 || n == name2) {
-                        update_these_taxsets.push_back(true);
-                        break;
-                    }
-                    count++;
-                    if (count == t._species_included.size()) {
-                        update_these_taxsets.push_back(update);
-                    }
-                }
-            }
-            
-            for (auto &t:unused_taxset_no_fossils) {
-                bool update = false;
-                unsigned count = 0;
-                for (auto &n:t._species_included) {
-                    if (n == name1 || n == name2) {
-                        update_these_unused_taxsets.push_back(true);
-                        break;
-                    }
-                    count++;
-                    if (count == t._species_included.size()) {
-                        update_these_unused_taxsets.push_back(update);
-                    }
-                }
-            }
-            // update taxsets as needed
-            for (unsigned i=0; i<update_these_taxsets.size(); i++) {
-                if (update_these_taxsets[i] == true) {
-                    taxset_no_fossils[i]._species_included.erase(remove(taxset_no_fossils[i]._species_included.begin(), taxset_no_fossils[i]._species_included.end(), subtree1->_name));
-                    taxset_no_fossils[i]._species_included.erase(remove(taxset_no_fossils[i]._species_included.begin(), taxset_no_fossils[i]._species_included.end(), subtree2->_name));
-                    taxset_no_fossils[i]._species_included.push_back(new_nd->_name);
-                    
-                    if (taxset_no_fossils[i]._species_included.size() == 1) {
-                        update_unused = true;
-                        string name = taxset_no_fossils[i]._name;
-                        _taxset_ages[name] = _tree_height;
-                        taxset_no_fossils.erase(taxset_no_fossils.begin() + i);
-                    }
-                }
-            }
-            
-            for (unsigned i=0; i<update_these_unused_taxsets.size(); i++) {
-                if (update_these_unused_taxsets[i] == true) {
-                    unused_taxset_no_fossils[i]._species_included.erase(remove(unused_taxset_no_fossils[i]._species_included.begin(), unused_taxset_no_fossils[i]._species_included.end(), subtree1->_name));
-                    unused_taxset_no_fossils[i]._species_included.erase(remove(unused_taxset_no_fossils[i]._species_included.begin(), unused_taxset_no_fossils[i]._species_included.end(), subtree2->_name));
-                    unused_taxset_no_fossils[i]._species_included.push_back(new_nd->_name);
-                }
-            }
-            
-            // if a taxset is down to one taxon, find corresponding unused taxset and replace
-            if (update_unused) {
-                vector<unsigned> updateable_unused;
-                vector<unsigned> updateable_unused_sizes;
-                string new_name = new_nd->_name;
-                for (unsigned count=0; count < unused_taxset_no_fossils.size(); count++) {
-                    for (auto &n:unused_taxset_no_fossils[count]._species_included) {
-                        if (n == new_name) {
-                            updateable_unused.push_back(count);
-                            updateable_unused_sizes.push_back((unsigned) unused_taxset_no_fossils[count]._species_included.size());
-                            break;
-                        }
-                    }
-                }
-                
-                if (updateable_unused.size() > 0) {
-                    // check for overlapping taxa with existing taxsets before adding anything in
-                    auto min_it = min_element(updateable_unused_sizes.begin(), updateable_unused_sizes.end());
-                    unsigned min_index = (unsigned) std::distance(updateable_unused_sizes.begin(), min_it);
-                    vector<string> common_elements;
-                    // Find the intersection of the two vectors
-
-                    for (unsigned count = 0; count < taxset_no_fossils.size(); count++) {
-                        std::set_intersection(taxset_no_fossils[count]._species_included.begin(), taxset_no_fossils[count]._species_included.end(),
-                                              unused_taxset_no_fossils[min_index]._species_included.begin(), unused_taxset_no_fossils[min_index]._species_included.end(),
-                                          std::back_inserter(common_elements));
-                    }
-                        
-                    if (common_elements.size() == 0) {
-                        // add unused taxset into taxsets
-                        taxset_no_fossils.push_back(unused_taxset_no_fossils[updateable_unused[min_index]]);
-                        unused_taxset_no_fossils.erase(unused_taxset_no_fossils.begin() + min_index);
-                    }
-                }
-            }
-            
-            // update non fossil taxsets too
-            update_these_taxsets.clear();
-            update_these_unused_taxsets.clear();
-            update_unused = false;
-            
-            for (auto &t:taxset) {
-                bool update = false;
-                unsigned count = 0;
-                for (auto &n:t._species_included) {
-                    if (n == name1 || n == name2) {
-                        update_these_taxsets.push_back(true);
-                        break;
-                    }
-                    count++;
-                    if (count == t._species_included.size()) {
-                        update_these_taxsets.push_back(update);
-                    }
-                }
-            }
-            
-            for (auto &t:unused_taxset) {
-                bool update = false;
-                unsigned count = 0;
-                for (auto &n:t._species_included) {
-                    if (n == name1 || n == name2) {
-                        update_these_unused_taxsets.push_back(true);
-                        break;
-                    }
-                    count++;
-                    if (count == t._species_included.size()) {
-                        update_these_unused_taxsets.push_back(update);
-                    }
-                }
-            }
-            // update taxsets as needed
-            for (unsigned i=0; i<update_these_taxsets.size(); i++) {
-                if (update_these_taxsets[i] == true) {
-                    taxset[i]._species_included.erase(remove(taxset[i]._species_included.begin(), taxset[i]._species_included.end(), subtree1->_name));
-                    taxset[i]._species_included.erase(remove(taxset[i]._species_included.begin(), taxset[i]._species_included.end(), subtree2->_name));
-                    taxset[i]._species_included.push_back(new_nd->_name);
-                    
-                    unsigned n_non_fossil_lineages = 0;
-                    for (auto &t:taxset[i]._species_included) {
-                        string match_string = "FOSSIL";
-                        if (t.find(match_string) == std::string::npos) {
-                            n_non_fossil_lineages++;
-                        }
-                    }
-                        
-                    if (n_non_fossil_lineages == 1) {
-                        update_unused = true;
-                        string name = taxset[i]._name;
-                        _taxset_ages[name] = _tree_height;
-                        taxset.erase(taxset.begin() + i);
-                    }
-                }
-            }
-            
-            for (unsigned i=0; i<update_these_unused_taxsets.size(); i++) {
-                if (update_these_unused_taxsets[i] == true) {
-                    unused_taxset[i]._species_included.erase(remove(unused_taxset[i]._species_included.begin(), unused_taxset[i]._species_included.end(), subtree1->_name));
-                    unused_taxset[i]._species_included.erase(remove(unused_taxset[i]._species_included.begin(), unused_taxset[i]._species_included.end(), subtree2->_name));
-                    unused_taxset[i]._species_included.push_back(new_nd->_name);
-                }
-            }
-            
-            // if a taxset is down to one taxon, find corresponding unused taxset and replace
-            if (update_unused) {
-                vector<unsigned> updateable_unused;
-                vector<unsigned> updateable_unused_sizes;
-                string new_name = new_nd->_name;
-                for (unsigned count=0; count < unused_taxset.size(); count++) {
-                    for (auto &n:unused_taxset[count]._species_included) {
-                        if (n == new_name) {
-                            updateable_unused.push_back(count);
-                            updateable_unused_sizes.push_back((unsigned) unused_taxset[count]._species_included.size());
-                            break;
-                        }
-                    }
-                }
-                
-                if (updateable_unused.size() > 0) {
-                    // check for overlapping taxa with existing taxsets before adding anything in
-                    auto min_it = min_element(updateable_unused_sizes.begin(), updateable_unused_sizes.end());
-                    unsigned min_index = (unsigned) std::distance(updateable_unused_sizes.begin(), min_it);
-                    vector<string> common_elements;
-                    // Find the intersection of the two vectors
-
-                    for (unsigned count = 0; count < taxset.size(); count++) {
-                        std::set_intersection(taxset[count]._species_included.begin(), taxset[count]._species_included.end(),
-                                              unused_taxset[min_index]._species_included.begin(), unused_taxset[min_index]._species_included.end(),
-                                          std::back_inserter(common_elements));
-                    }
-                        
-                    if (common_elements.size() == 0) {
-                        // add unused taxset into taxsets
-                        taxset.push_back(unused_taxset[updateable_unused[min_index]]);
-                        unused_taxset.erase(unused_taxset.begin() + min_index);
-                    }
-                }
-            }
-
-            for (unsigned index = 0; index<G::_nloci; index++) {
-                calcSubsetLogLikelihood(index);
-            }
-            
-            double new_log_likelihood = 0.0;
-            for (auto &g:_gene_tree_log_likelihoods) {
-                new_log_likelihood += g;
-            }
-            
-            double log_weight = new_log_likelihood - prev_log_likelihood + _weight_correction;
-                   
-           if (G::_save_memory) {
-               for (auto &nd:_nodes) {
-                   nd._partials = nullptr;
-               }
-           }
-            
-            calcTopologyPrior(getNumLineages() +1);
-            
-            _valid_taxsets.clear();
+        }
         
+        if (G::_start_mode != "sim") {
+            calcPartialArray(new_nd);
+        }
+        
+        filter = true; // must filter if a real node has been added
+        
+        subtree1->_use_in_likelihood = false;
+        subtree1->_partials = nullptr;
+        
+        subtree2->_use_in_likelihood = false;
+        subtree2->_partials = nullptr;
+        
+        // none of the new node's children should be used in the likelihood calculation
+        
+        //update node lists
+        updateNodeVector(_lineages, subtree1, subtree2, new_nd);
+        
+        bool update_unused = false;
+        // update taxset if needed
+        // go through all taxsets in existence and look for chosen taxa, then update all of them
+        // because there might be multiple taxsets with the same taxon names
+        
+        string name1 = subtree1->_name;
+        string name2 = subtree2->_name;
+        
+        vector<bool> update_these_taxsets;
+        vector<bool> update_these_unused_taxsets;
+        
+        for (auto &t:taxset_no_fossils) {
+            bool update = false;
+            unsigned count = 0;
+            for (auto &n:t._species_included) {
+                if (n == name1 || n == name2) {
+                    update_these_taxsets.push_back(true);
+                    break;
+                }
+                count++;
+                if (count == t._species_included.size()) {
+                    update_these_taxsets.push_back(update);
+                }
+            }
+        }
+        
+        for (auto &t:unused_taxset_no_fossils) {
+            bool update = false;
+            unsigned count = 0;
+            for (auto &n:t._species_included) {
+                if (n == name1 || n == name2) {
+                    update_these_unused_taxsets.push_back(true);
+                    break;
+                }
+                count++;
+                if (count == t._species_included.size()) {
+                    update_these_unused_taxsets.push_back(update);
+                }
+            }
+        }
+        // update taxsets as needed
+        for (unsigned i=0; i<update_these_taxsets.size(); i++) {
+            if (update_these_taxsets[i] == true) {
+                taxset_no_fossils[i]._species_included.erase(remove(taxset_no_fossils[i]._species_included.begin(), taxset_no_fossils[i]._species_included.end(), subtree1->_name));
+                taxset_no_fossils[i]._species_included.erase(remove(taxset_no_fossils[i]._species_included.begin(), taxset_no_fossils[i]._species_included.end(), subtree2->_name));
+                taxset_no_fossils[i]._species_included.push_back(new_nd->_name);
+                
+                if (taxset_no_fossils[i]._species_included.size() == 1) {
+                    update_unused = true;
+                    string name = taxset_no_fossils[i]._name;
+                    _taxset_ages[name] = _tree_height;
+                    taxset_no_fossils.erase(taxset_no_fossils.begin() + i);
+                }
+            }
+        }
+        
+        for (unsigned i=0; i<update_these_unused_taxsets.size(); i++) {
+            if (update_these_unused_taxsets[i] == true) {
+                unused_taxset_no_fossils[i]._species_included.erase(remove(unused_taxset_no_fossils[i]._species_included.begin(), unused_taxset_no_fossils[i]._species_included.end(), subtree1->_name));
+                unused_taxset_no_fossils[i]._species_included.erase(remove(unused_taxset_no_fossils[i]._species_included.begin(), unused_taxset_no_fossils[i]._species_included.end(), subtree2->_name));
+                unused_taxset_no_fossils[i]._species_included.push_back(new_nd->_name);
+            }
+        }
+        
+        // if a taxset is down to one taxon, find corresponding unused taxset and replace
+        if (update_unused) {
+            vector<unsigned> updateable_unused;
+            vector<unsigned> updateable_unused_sizes;
+            string new_name = new_nd->_name;
+            for (unsigned count=0; count < unused_taxset_no_fossils.size(); count++) {
+                for (auto &n:unused_taxset_no_fossils[count]._species_included) {
+                    if (n == new_name) {
+                        updateable_unused.push_back(count);
+                        updateable_unused_sizes.push_back((unsigned) unused_taxset_no_fossils[count]._species_included.size());
+                        break;
+                    }
+                }
+            }
+            
+            if (updateable_unused.size() > 0) {
+                // check for overlapping taxa with existing taxsets before adding anything in
+                auto min_it = min_element(updateable_unused_sizes.begin(), updateable_unused_sizes.end());
+                unsigned min_index = (unsigned) std::distance(updateable_unused_sizes.begin(), min_it);
+                vector<string> common_elements;
+                // Find the intersection of the two vectors
+
+                for (unsigned count = 0; count < taxset_no_fossils.size(); count++) {
+                    std::set_intersection(taxset_no_fossils[count]._species_included.begin(), taxset_no_fossils[count]._species_included.end(),
+                                          unused_taxset_no_fossils[min_index]._species_included.begin(), unused_taxset_no_fossils[min_index]._species_included.end(),
+                                      std::back_inserter(common_elements));
+                }
+                    
+                if (common_elements.size() == 0) {
+                    // add unused taxset into taxsets
+                    taxset_no_fossils.push_back(unused_taxset_no_fossils[updateable_unused[min_index]]);
+                    unused_taxset_no_fossils.erase(unused_taxset_no_fossils.begin() + min_index);
+                }
+            }
+        }
+        
+        // update non fossil taxsets too
+        update_these_taxsets.clear();
+        update_these_unused_taxsets.clear();
+        update_unused = false;
+        
+        for (auto &t:taxset) {
+            bool update = false;
+            unsigned count = 0;
+            for (auto &n:t._species_included) {
+                if (n == name1 || n == name2) {
+                    update_these_taxsets.push_back(true);
+                    break;
+                }
+                count++;
+                if (count == t._species_included.size()) {
+                    update_these_taxsets.push_back(update);
+                }
+            }
+        }
+        
+        for (auto &t:unused_taxset) {
+            bool update = false;
+            unsigned count = 0;
+            for (auto &n:t._species_included) {
+                if (n == name1 || n == name2) {
+                    update_these_unused_taxsets.push_back(true);
+                    break;
+                }
+                count++;
+                if (count == t._species_included.size()) {
+                    update_these_unused_taxsets.push_back(update);
+                }
+            }
+        }
+        // update taxsets as needed
+        for (unsigned i=0; i<update_these_taxsets.size(); i++) {
+            if (update_these_taxsets[i] == true) {
+                taxset[i]._species_included.erase(remove(taxset[i]._species_included.begin(), taxset[i]._species_included.end(), subtree1->_name));
+                taxset[i]._species_included.erase(remove(taxset[i]._species_included.begin(), taxset[i]._species_included.end(), subtree2->_name));
+                taxset[i]._species_included.push_back(new_nd->_name);
+                
+                unsigned n_non_fossil_lineages = 0;
+                for (auto &t:taxset[i]._species_included) {
+                    string match_string = "FOSSIL";
+                    if (t.find(match_string) == std::string::npos) {
+                        n_non_fossil_lineages++;
+                    }
+                }
+                    
+                if (n_non_fossil_lineages == 1) {
+                    update_unused = true;
+                    string name = taxset[i]._name;
+                    _taxset_ages[name] = _tree_height;
+                    taxset.erase(taxset.begin() + i);
+                }
+            }
+        }
+        
+        for (unsigned i=0; i<update_these_unused_taxsets.size(); i++) {
+            if (update_these_unused_taxsets[i] == true) {
+                unused_taxset[i]._species_included.erase(remove(unused_taxset[i]._species_included.begin(), unused_taxset[i]._species_included.end(), subtree1->_name));
+                unused_taxset[i]._species_included.erase(remove(unused_taxset[i]._species_included.begin(), unused_taxset[i]._species_included.end(), subtree2->_name));
+                unused_taxset[i]._species_included.push_back(new_nd->_name);
+            }
+        }
+        
+        // if a taxset is down to one taxon, find corresponding unused taxset and replace
+        if (update_unused) {
+            vector<unsigned> updateable_unused;
+            vector<unsigned> updateable_unused_sizes;
+            string new_name = new_nd->_name;
+            for (unsigned count=0; count < unused_taxset.size(); count++) {
+                for (auto &n:unused_taxset[count]._species_included) {
+                    if (n == new_name) {
+                        updateable_unused.push_back(count);
+                        updateable_unused_sizes.push_back((unsigned) unused_taxset[count]._species_included.size());
+                        break;
+                    }
+                }
+            }
+            
+            if (updateable_unused.size() > 0) {
+                // check for overlapping taxa with existing taxsets before adding anything in
+                auto min_it = min_element(updateable_unused_sizes.begin(), updateable_unused_sizes.end());
+                unsigned min_index = (unsigned) std::distance(updateable_unused_sizes.begin(), min_it);
+                vector<string> common_elements;
+                // Find the intersection of the two vectors
+
+                for (unsigned count = 0; count < taxset.size(); count++) {
+                    std::set_intersection(taxset[count]._species_included.begin(), taxset[count]._species_included.end(),
+                                          unused_taxset[min_index]._species_included.begin(), unused_taxset[min_index]._species_included.end(),
+                                      std::back_inserter(common_elements));
+                }
+                    
+                if (common_elements.size() == 0) {
+                    // add unused taxset into taxsets
+                    taxset.push_back(unused_taxset[updateable_unused[min_index]]);
+                    unused_taxset.erase(unused_taxset.begin() + min_index);
+                }
+            }
+        }
+
+        for (unsigned index = 0; index<G::_nloci; index++) {
+            calcSubsetLogLikelihood(index);
+        }
+        
+        double new_log_likelihood = 0.0;
+        for (auto &g:_gene_tree_log_likelihoods) {
+            new_log_likelihood += g;
+        }
+        
+        double log_weight = new_log_likelihood - prev_log_likelihood + _weight_correction;
+               
+       if (G::_save_memory) {
+           for (auto &nd:_nodes) {
+               nd._partials = nullptr;
+           }
+       }
+        
+        calcTopologyPrior(getNumLineages() +1);
+        
+        _valid_taxsets.clear();
+    
         if (fossil_constraint) {
             assert (fossil_age != -1);
             // figure out if associated branch length has violated the fossil constraint
@@ -1168,7 +1166,7 @@ class Forest {
                 fossil_age_is_violated = true;
             }
         }
-        
+    
         if (fossil_age_is_violated) {
             return -1 * G::_infinity; // fossil constraint has been violated and particle weight is 0
         }

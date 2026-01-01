@@ -6,3 +6,7 @@ test/sim-paup.nex
 test/beast/
 test/pldist.txt
 test/rfdist.txt
+test-fossils/*
+bears/*
+bears-no-fossils/*
+test/*
