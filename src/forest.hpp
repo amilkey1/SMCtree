@@ -1482,7 +1482,7 @@ class Forest {
         
         double child_transition_prob = 0.0;
 
-        if (G::_model == "JC" ) {
+        if (G::_model_type == G::ModelType::MODEL_TYPE_JC) {
             double expterm = exp(-4.0*(child->_edge_length * _clock_rate * relative_rate)/3.0);
             double prsame = 0.25+0.75*expterm;
             double prdif = 0.25 - 0.25*expterm;
@@ -1492,7 +1492,7 @@ class Forest {
             return child_transition_prob;
         }
 
-        if (G::_model == "HKY") {
+        if (G::_model_type == G::ModelType::MODEL_TYPE_HKY) {
             double pi_A = G::_base_frequencies[0];
             double pi_C = G::_base_frequencies[1];
             double pi_G = G::_base_frequencies[2];

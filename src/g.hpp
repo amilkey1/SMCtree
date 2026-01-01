@@ -7,6 +7,12 @@ extern proj::Lot::SharedPtr rng;
 namespace proj {
 
     struct G {
+        
+        enum class ModelType {
+            MODEL_TYPE_JC,
+            MODEL_TYPE_HKY
+        };
+        
         // Program settings used in processCommandLineOptions
         static string                   _sim_filename_prefix;
         static unsigned                 _sim_ntaxa;
@@ -80,6 +86,8 @@ namespace proj {
         static string                   _program_name;
         static unsigned                 _major_version;
         static unsigned                 _minor_version;
+        
+        static ModelType                _model_type;
         
         // Utility functions
         static string   inventName(unsigned k, bool lower_case);

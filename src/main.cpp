@@ -144,6 +144,8 @@ map<unsigned,unsigned> G::_nexus_taxon_map;
 map<unsigned, double>  G::_relrate_for_locus;
 bool                   G::_save_memory;
 
+G::ModelType G::_model_type;
+
 string                  G::_start_mode = "smc";
 string                  G::_filename = "data.nex";
 unsigned                G::_nparticles = 500;

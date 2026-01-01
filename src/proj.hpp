@@ -238,6 +238,13 @@ namespace proj {
                 G::_taxsets.push_back(parseTaxsetDefinition(tdef));
             }
         }
+        
+        if (G::_model == "JC") {
+            G::_model_type = G::ModelType::MODEL_TYPE_JC;
+        }
+        else if (G::_model == "HKY") {
+           G:: _model_type = G::ModelType::MODEL_TYPE_HKY;
+        }
     }
 
     // Note: This code is unduly complex because of the fact that there are
