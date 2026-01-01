@@ -899,80 +899,40 @@ class Forest {
             
             // if new node has any child that is not a real node (set partials = false) and has no next node (next node != -1), the new node is not a real node either
 
-//            if (new_nd->_set_partials) {
             assert (new_nd->_set_partials);
-                // calculate new partials
-                assert (new_nd->_partials == nullptr);
-                if (G::_start_mode != "sim") {
-                    double npatterns_total = _data->getNumPatterns();
-                    new_nd->_partials = ps.getPartial(G::_nstates*npatterns_total);
-                }
-                assert(new_nd->_left_child->_right_sib);
+            // calculate new partials
+            assert (new_nd->_partials == nullptr);
+            if (G::_start_mode != "sim") {
+                double npatterns_total = _data->getNumPatterns();
+                new_nd->_partials = ps.getPartial(G::_nstates*npatterns_total);
+            }
+            assert(new_nd->_left_child->_right_sib);
 
-                if (G::_save_memory && G::_start_mode != "sim") {
-                    double npatterns_total = _data->getNumPatterns();
-                    new_nd->_partials = ps.getPartial(npatterns_total*G::_nstates);
-                    
-                    for (auto &nd:_lineages) {
-                        if (nd->_partials == nullptr) {
-                            nd->_partials = ps.getPartial(npatterns_total * G::_nstates);
-                            calcPartialArray(nd);
-                        }
-                    }
-                }
+            if (G::_save_memory && G::_start_mode != "sim") {
+                double npatterns_total = _data->getNumPatterns();
+                new_nd->_partials = ps.getPartial(npatterns_total*G::_nstates);
                 
-                if (G::_start_mode != "sim") {
-                    calcPartialArray(new_nd);
-                }
-                
-                filter = true; // must filter if a real node has been added
-                
-                subtree1->_use_in_likelihood = false;
-                subtree1->_partials = nullptr;
-                
-                subtree2->_use_in_likelihood = false;
-                subtree2->_partials = nullptr;
-//            }
-            
-//            else {
-//                if (!subtree1->_set_partials) {
-//                    subtree1->_use_in_likelihood = false;
-//                    subtree1->_partials = nullptr;
-//                }
-//                if (!subtree2->_set_partials) {
-//                    subtree2->_use_in_likelihood = false;
-//                    subtree2->_partials = nullptr;
-//                }
-//            }
-            
-            // if none of the new node's children should be used in the likelihood calculation
-            // TODO: faster way to do this?
-            
-            if (new_nd->_set_partials && G::_start_mode != "sim") {
-                for (auto nd:_nodes){
-                    unsigned node_number = nd._number;
-                    bool done = false;
-                    while (!done) {
-                        if (nd._parent) {
-                            if (nd._parent == new_nd) {
-                                _nodes[node_number]._use_in_likelihood = false;
-                                done = true;
-                            }
-                            else {
-                                if (nd._parent) {
-                                    nd = *nd._parent;
-                                }
-                                else {
-                                    done = true;
-                                }
-                            }
-                        }
-                        else {
-                            done = true;
-                        }
+                for (auto &nd:_lineages) {
+                    if (nd->_partials == nullptr) {
+                        nd->_partials = ps.getPartial(npatterns_total * G::_nstates);
+                        calcPartialArray(nd);
                     }
                 }
             }
+            
+            if (G::_start_mode != "sim") {
+                calcPartialArray(new_nd);
+            }
+            
+            filter = true; // must filter if a real node has been added
+            
+            subtree1->_use_in_likelihood = false;
+            subtree1->_partials = nullptr;
+            
+            subtree2->_use_in_likelihood = false;
+            subtree2->_partials = nullptr;
+            
+            // none of the new node's children should be used in the likelihood calculation
             
             //update node lists
             updateNodeVector(_lineages, subtree1, subtree2, new_nd);
