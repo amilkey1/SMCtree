@@ -2,6 +2,7 @@
 #include <cmath>
 
 extern proj::PartialStore ps;
+std::mutex mtx;
 
 namespace proj {
 
@@ -250,7 +251,9 @@ class Forest {
             for (auto &nd:_lineages) {
                 if (index == 0) {
                     double npatterns_total = _data->getNumPatterns();
+                    mtx.lock();
                     nd->_partials=ps.getPartial(npatterns_total*G::_nstates, index+1);
+                    mtx.unlock();
                 }
                 
                 Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(index);
