@@ -939,9 +939,12 @@ namespace proj {
         unsigned end = start + (G::_nparticles) - 1;
         
         vector<unsigned> particle_indices;
-        for (unsigned a=start; a <end+1; a++) {
-            particle_indices.push_back(a); // TODO: check this
+        for (unsigned a = 0; a < G::_nparticles * G::_ngroups; a++) {
+            particle_indices.push_back(a);
         }
+//        for (unsigned a=start; a <end+1; a++) {
+//            particle_indices.push_back(a); // TODO: check this
+//        }
         
         unsigned prob_count = 0;
         for (unsigned p=start; p < end + 1; p++) {
@@ -1041,7 +1044,7 @@ namespace proj {
         while (next_nonzero < nonzeros.size()) {
             double index_survivor = nonzeros[next_nonzero];
             
-            unsigned index_survivor_in_particles = particle_indices[index_survivor+start];
+            unsigned index_survivor_in_particles = particle_indices[index_survivor + start];
             
             // TODO: check this works with multiple groups
             _particle_vec[index_survivor_in_particles].finalizeLatestJoin(index_survivor_in_particles, nonzero_map);
@@ -1052,9 +1055,12 @@ namespace proj {
                 double index_nonsurvivor = zeros[next_zero++];
 
                 // Replace non-survivor with copy of survivor
-                unsigned survivor_index_in_particles = index_survivor+start;
-                unsigned non_survivor_index_in_particles = index_nonsurvivor+start;
+//                unsigned survivor_index_in_particles = index_survivor+start;
+//                unsigned non_survivor_index_in_particles = index_nonsurvivor+start;
 
+                unsigned survivor_index_in_particles = particle_indices[index_survivor+start];
+                unsigned non_survivor_index_in_particles = particle_indices[index_nonsurvivor+start];
+                
                 _particle_vec[non_survivor_index_in_particles] = _particle_vec[survivor_index_in_particles];
             }
             ++next_nonzero;
