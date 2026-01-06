@@ -20,9 +20,9 @@ class Particle {
         vector<double>                          getGeneTreeLogLikelihoods();
         double                                  getTreeHeight();
         double                                  getTreeLength();
-        double                                  getEstLambda() {return _forest._estimated_lambda;}
-        double                                  getEstMu() {return _forest._estimated_mu;}
-        double                                  getEstRootAge() {return _forest._estimated_root_age;}
+        double                                  getEstLambda() {return _forest_ptr->_estimated_lambda;}
+        double                                  getEstMu() {return _forest_ptr->_estimated_mu;}
+        double                                  getEstRootAge() {return _forest_ptr->_estimated_root_age;}
         double                                  getLogLikelihood();
         double                                  getYuleModel();
         double                                  getAllPriors();
@@ -35,12 +35,12 @@ class Particle {
         void                                    drawClockRate();
         void                                    setSimClockRate();
         void                                    createTrivialForest();
-        double                                  getClockRate() {return _forest._clock_rate;}
-        void                                    setClockRate(double rate) {_forest._clock_rate = rate;}
+        double                                  getClockRate() {return _forest_ptr->_clock_rate;}
+        void                                    setClockRate(double rate) {_forest_ptr->_clock_rate = rate;}
         void                                    simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites);
         string                                  makeNewick(unsigned precision, bool use_names);
         string                                  saveForestNewick() {
-                                                        return _forest.makeNewick(8, true);}
+                                                        return _forest_ptr->makeNewick(8, true);}
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
 
         string debugSaveParticleInfo(unsigned i) const;
@@ -49,9 +49,9 @@ class Particle {
         void drawRootAge();
         void calculateLambdaAndMu();
         void drawLambda();
-        double getHeightFirstSplit(){return _forest.getHeightFirstSplit();}
-        double getHeightSecondIncr() {return _forest.getHeightSecondIncr();}
-        double getHeightThirdIncr() {return _forest.getHeightThirdIncr();}
+        double getHeightFirstSplit(){return _forest_ptr->getHeightFirstSplit();}
+        double getHeightSecondIncr() {return _forest_ptr->getHeightSecondIncr();}
+        double getHeightThirdIncr() {return _forest_ptr->getHeightThirdIncr();}
 
         void setFossils() {_particle_fossils = G::_fossils;}
         void setTaxSetsNoFossils();
@@ -60,14 +60,21 @@ class Particle {
         void setOverlappingTaxSets();
         void updateFossilTaxsets(string fossil_name);
     
+        void    finalizeLatestJoin(unsigned index, map<const void *, list<unsigned> > & nonzero_map);
+        Forest::SharedPtr getForestPtr() {return _forest_ptr;}
+    
         // validation stuff
-        double getRootAge();
+        double  getRootAge();
     
     private:
         mutable                                 Lot::SharedPtr _lot;
         void                                    clear();
     
         Forest                                  _forest;
+    
+        mutable ForestExtension                 _forest_extension;
+        Forest::SharedPtr                       _forest_ptr;
+    
         double                                  _log_weight;
         unsigned                                _fossil_number;
         vector<Fossil>                          _particle_fossils; // each particle needs it own set of fossils with their own ages
@@ -77,13 +84,15 @@ class Particle {
     
         vector<TaxSet>                          _particle_taxsets_no_fossils; // update this as nodes are joined
         vector<TaxSet>                          _unused_particle_taxsets_no_fossils; // if there are overlapping taxa in taxsets, put the largest groups here until they can be used
+    
+        double                                  _prev_log_likelihood;
 };
 
     inline string Particle::debugSaveParticleInfo(unsigned i) const {
         string s;
         s += str(format("Particle %d:\n") % i);
         s += str(format("  _log_weight = %.9f:\n") % _log_weight);
-        s += _forest.debugSaveForestInfo();
+        s += _forest_ptr->debugSaveForestInfo();
         s += "\n";
         return s;
     }
@@ -105,15 +114,20 @@ class Particle {
     inline void Particle::clear() {
         _log_weight = 0.0;
         _fossil_number = 0;
+        _prev_log_likelihood = 0.0;
+        _forest_ptr = nullptr;
       }
 
     inline void Particle::setParticleData(Data::SharedPtr d, bool partials) {
         // one forest contains information about all loci since all loci share a tree
-        _forest.setForestData(d, partials);
+        _prev_log_likelihood = 0.0;
+        _forest_ptr = Forest::SharedPtr(new Forest());
+        Forest::SharedPtr gfp = _forest_ptr;
+        gfp->setForestData(d, partials);
     }
 
     inline void Particle::createTrivialForest() {
-        _forest.createTrivialForest();
+        _forest_ptr->createTrivialForest();
     }
 
     inline void Particle::setTaxSetsNoFossils() {
@@ -152,7 +166,7 @@ class Particle {
         //calculate likelihood for each gene tree
         for (unsigned i=0; i<G::_nloci; i++) {
             double gene_tree_log_likelihood  = 0.0;
-            gene_tree_log_likelihood = _forest.calcSubsetLogLikelihood(i);
+            gene_tree_log_likelihood = _forest_ptr->calcSubsetLogLikelihood(i);
             assert(!isnan (gene_tree_log_likelihood));
             gene_forest_likelihoods[i] = gene_tree_log_likelihood;
         }
@@ -165,37 +179,51 @@ class Particle {
     }
 
     inline void Particle::proposal(unsigned step_number) {
-        if (step_number == 0) {
-            bool valid = _forest.checkForValidTaxonSet(_particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils);
-            assert (valid); // there should always be a valid taxon set if things have been merged correctly
+        // TODO: lazy copying with taxon sets
+//        if (step_number == 0) {
+//            bool valid = _forest_ptr->checkForValidTaxonSet(_particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils);
+//            assert (valid); // there should always be a valid taxon set if things have been merged correctly
+//        }
+        
+//        double prev_log_likelihood = _forest_ptr->getLogLikelihood();
+        
+        for (unsigned i=0; i<G::_nloci; i++) {
+            _forest_extension.dock(_forest_ptr, _forest_ptr->pullPartial(i+1), _lot);
         }
         
-        double prev_log_likelihood = _forest.getLogLikelihood();
-        
-        _forest.addBirthDeathIncrement(_lot, -1);
+        double increment = _forest_ptr->drawBirthDeathIncrement(_lot, -1);
+        _forest_extension.addIncrement(increment);
             
 #if defined (INCREMENT_COMPARISON_TEST)
-        _forest.addIncrement(_lot); // for comparison of sim.log vs smc.log
+        _forest_ptr->addIncrement(_lot);
 #endif
-       _log_weight = _forest.joinPriorPrior(prev_log_likelihood, _lot, _particle_taxsets, _unused_particle_taxsets, _particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils, _particle_fossils);
+//       _log_weight = _forest_ptr->joinPriorPrior(prev_log_likelihood, _lot, _particle_taxsets, _unused_particle_taxsets, _particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils, _particle_fossils);
+//        _log_weight = _forest_ptr->joinPriorPrior(prev_log_likelihood, _lot, _particle_taxsets, _unused_particle_taxsets, _particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils, _particle_fossils);
+        
+        _forest_extension.joinPriorPrior();
+
         
         // check that at least one taxon set is valid
          // if there is no valid taxon set, keep adding increments until a valid set has been reached
          
-        if (_forest._lineages.size() > 1) {
-            // after the last step, there should be no valid taxon sets
-             bool valid = _forest.checkForValidTaxonSet(_particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils);
-             assert (valid); // when fossils aren't part of the tree, don't consider any of this because there should always be a valid taxon set
-        }
+        // TODO: fix for tax sets
+//        if (_forest_ptr->_lineages.size() > 1) {
+//            // after the last step, there should be no valid taxon sets
+//             bool valid = _forest_ptr->checkForValidTaxonSet(_particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils);
+//             assert (valid); // when fossils aren't part of the tree, don't consider any of this because there should always be a valid taxon set
+//        }
 
         
         if (step_number == G::_ntaxa - 2) {
-            // if we are on the last step, check that the forest is down to 1 lineage
-            assert (_forest._lineages.size() == 1);
+            // if we are on the last step, check that the forest is down to 2 lineages (because last two lineags will be joined in the finalizing step in filtering)
+            assert (_forest_ptr->_lineages.size() == 2);
         }
         
         if (G::_run_on_empty) {
             _log_weight = 0.0;
+        }
+        else {
+            _log_weight = _forest_extension.getLogWeight();
         }
     }
 
@@ -204,16 +232,16 @@ class Particle {
         output("\nParticle:\n", 1);
         output(format("log weight: %d") % _log_weight, 1);
         output("\nForest:\n", 1);
-        _forest.showForest();
+        _forest_ptr->showForest();
     }
 
     inline vector<double> Particle::getGeneTreeLogLikelihoods() {
-        return _forest._gene_tree_log_likelihoods;
+        return _forest_ptr->_gene_tree_log_likelihoods;
     }
 
     inline double Particle::getLogLikelihood() {
         double log_likelihood = 0.0;
-        for (auto &l:_forest._gene_tree_log_likelihoods) {
+        for (auto &l:_forest_ptr->_gene_tree_log_likelihoods) {
             log_likelihood += l;
         }
         
@@ -221,37 +249,37 @@ class Particle {
     }
 
     inline double Particle::getTreeHeight() {
-        return _forest.getTreeHeight();
+        return _forest_ptr->getTreeHeight();
     }
 
     inline double Particle::getTreeLength() {
-        return _forest.getTreeLength();
+        return _forest_ptr->getTreeLength();
     }
 
     inline double Particle::getYuleModel() {
-        return _forest.getTreePrior();
+        return _forest_ptr->getTreePrior();
     }
 
     inline double Particle::getFBDModel() {
-        return _forest.getTreePrior();
+        return _forest_ptr->getTreePrior();
     }
 
     inline double Particle::getAllPriors() {
-        double tree_prior = _forest.getTreePrior();
+        double tree_prior = _forest_ptr->getTreePrior();
         double param_prior = 0.0;
         
         // TODO: for now, these params are all drawn from exponential distributions - need to change priors if distribution is changed
         // TODO: this also assumes the mean of the exponential distribution is the user-specified param
         if (G::_est_mu && G::_mu > 0.0) {
-            param_prior += log(G::_mu) - (_forest._estimated_mu * G::_mu);
+            param_prior += log(G::_mu) - (_forest_ptr->_estimated_mu * G::_mu);
         }
         
         if (G::_est_lambda) {
-            param_prior += log(G::_lambda) - (_forest._estimated_lambda * G::_lambda);
+            param_prior += log(G::_lambda) - (_forest_ptr->_estimated_lambda * G::_lambda);
         }
         
         if (G::_est_root_age) {
-            param_prior += log(G::_root_age) - (_forest._estimated_root_age * G::_root_age);
+            param_prior += log(G::_root_age) - (_forest_ptr->_estimated_root_age * G::_root_age);
         }
                 
         double total_prior = tree_prior + param_prior;
@@ -260,27 +288,34 @@ class Particle {
 
     inline double Particle::getBirthDeathModel() {
         // TODO: fix this for birth death model
-        return _forest.getTreePrior();
+        return _forest_ptr->getTreePrior();
     }
 
     inline void Particle::setStartingLogLikelihoods(vector<double> starting_log_likelihoods) {
-        _forest._gene_tree_log_likelihoods = starting_log_likelihoods;
+        _forest_ptr->_gene_tree_log_likelihoods = starting_log_likelihoods;
+        
+        double total = 0;
+        for (auto &s:starting_log_likelihoods) {
+            total += s;
+        }
+        
+        _prev_log_likelihood = total;
     }
 
     inline void Particle::clearPartials() {
-        _forest.clearPartials();
+        _forest_ptr->clearPartials();
     }
 
     inline void Particle::drawBirthDiff() {
         assert (G::_est_lambda);
         assert (G::_est_mu);
-        _forest.drawBirthDiff(_lot);
+        _forest_ptr->drawBirthDiff(_lot);
     }
 
     inline void Particle::drawTurnover() {
         assert (G::_est_mu);
         assert (G::_est_lambda);
-        _forest.drawTurnover(_lot);
+        _forest_ptr->drawTurnover(_lot);
     }
 
     inline void Particle::drawRootAge() {
@@ -289,15 +324,15 @@ class Particle {
         if (_particle_fossils.size() > 0) {
             max_fossil_age = _particle_fossils.back()._age;
         }
-        _forest.drawRootAge(_lot, max_fossil_age);
+        _forest_ptr->drawRootAge(_lot, max_fossil_age);
     }
     
     inline void Particle::calculateLambdaAndMu() {
-        _forest.calculateLambdaAndMu();
+        _forest_ptr->calculateLambdaAndMu();
     }
 
     inline void Particle::drawLambda() {
-        _forest.drawLambda(_lot);
+        _forest_ptr->drawLambda(_lot);
     }
 
     inline void Particle::drawFossilAges() {
@@ -545,31 +580,86 @@ class Particle {
     }
 
     inline map<string, double> Particle::getTaxsetAges() {
-        return _forest._taxset_ages;
+        return _forest_ptr->_taxset_ages;
     }
 
     inline double Particle::getPartialCount() {
-        return _forest._partial_count;
+        return _forest_ptr->_partial_count;
     }
 
     inline void Particle::drawClockRate() {
-        _forest._clock_rate = _lot->gamma(1, G::_clock_rate);
+        _forest_ptr->_clock_rate = _lot->gamma(1, G::_clock_rate);
     }
 
     inline void Particle::setSimClockRate() {
-        _forest._clock_rate = G::_sim_clock_rate;
+        _forest_ptr->_clock_rate = G::_sim_clock_rate;
     }
 
     inline void Particle::simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites) {
-        _forest.simulateData(lot, data, starting_site, nsites);
+        _forest_ptr->simulateData(lot, data, starting_site, nsites);
     }
 
     inline string Particle::makeNewick(unsigned precision, bool use_names) {
-        return _forest.makeNewick(precision, use_names);
+        return _forest_ptr->makeNewick(precision, use_names);
     }
 
     inline double Particle::getRootAge() {
-        return _forest._estimated_root_age;
+        return _forest_ptr->_estimated_root_age;
+    }
+
+    inline void Particle::finalizeLatestJoin(unsigned index, map<const void *, list<unsigned> > & nonzero_map) {
+        // Makes join closest to leaf-level in _forest_extension
+        // permanent, then undocks _forest_extension
+        
+        // Get reference to gene forest extension for this locus
+        ForestExtension & gfx = _forest_extension;
+        
+        // Get pointer to gene forest for this locus
+        Forest::SharedPtr gfp = _forest_ptr;
+        
+        // If we are not finalizing the last particle for this
+        // gene forest object, make a copy that can be modified
+        // without affecting other surviving particles
+        unsigned nz = (unsigned)nonzero_map[gfp.get()].size();
+        if (nz > 1) {
+            // Remove the element corresponding to index
+            list<unsigned> & v = nonzero_map[gfp.get()];
+            auto it = find(v.begin(), v.end(), index);
+            assert(it != v.end());
+            v.erase(it);
+            
+            // Make a copy of the object pointed to by gfp
+            Forest::SharedPtr gfcpy = Forest::SharedPtr(new Forest());
+            *gfcpy = *gfp;
+            _forest_ptr = gfcpy;
+            
+            // Let gpf point to the copy
+            gfp = gfcpy;
+        }
+        
+        // Copy log likelihood
+        gfp->setLogLikelihood(_prev_log_likelihood + gfx.getLogWeight());
+                        
+        // Get splits for children of _proposed_anc
+        const Node * anc = gfx.getProposedAnc();
+        assert(anc);
+        const Node * lchild = gfx.getProposedLChild();
+        assert(lchild);
+        const Node * rchild = gfx.getProposedRChild();
+        assert(rchild);
+        Split lsplit = lchild->_split;
+        Split rsplit = rchild->_split;
+        
+        assert(anc->_split.isEquivalent(lsplit + rsplit));
+        
+        // Recreate extension's join in the actual gene forest
+        double incr = gfx.getProposedDelta();
+        assert(incr > 0.0);
+        
+        gfp->addIncrAndJoin(incr, lsplit, rsplit, gfx);
+
+        // Can now get rid of extension
+        _forest_extension.undock();
     }
 
     inline void Particle::operator=(const Particle & other) {
@@ -581,6 +671,12 @@ class Particle {
         _unused_particle_taxsets = other._unused_particle_taxsets;
         _particle_taxsets_no_fossils = other._particle_taxsets_no_fossils;
         _unused_particle_taxsets_no_fossils = other._unused_particle_taxsets_no_fossils;
+        _prev_log_likelihood = other._prev_log_likelihood;
+        
+        // undock forest extension
+        _forest_extension.undock();
+        
+        _forest_ptr = other._forest_ptr;
     }
     
 }

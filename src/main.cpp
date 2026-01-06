@@ -61,6 +61,8 @@ using boost::algorithm::join;
 #include "partial_store.hpp"
 #include "node.hpp"
 #include "forest.hpp"
+#include "forest-extension.hpp"
+#include "forest-func.hpp"
 #include "particle.hpp"
 #include "proj.hpp"
 

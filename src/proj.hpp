@@ -61,6 +61,7 @@ namespace proj {
             void handleRelativeRates();
             void writePartialCount();
             void removeUnecessaryTaxsets();
+            void buildNonzeroMap(vector<Particle> & particles, map<const void *, list<unsigned> > & nonzero_map, const vector<unsigned> & nonzeros, vector<unsigned> particle_indices, unsigned start, unsigned end);
         
             Fossil parseFossilDefinition(string & fossil_def);
             TaxSet parseTaxsetDefinition(string & taxset_def);
@@ -702,6 +703,13 @@ namespace proj {
             if (G::_verbosity > 0) {
                 summarizeData(_data);
             }
+            
+            assert (G::_nloci > 0);
+            ps.setNLoci(G::_nloci);
+            for (unsigned locus = 1; locus < G::_nloci+1; locus++) {
+                // Set length of partials for gene g
+                ps.setNElements(G::_nstates*_data->getNumPatternsInSubset(locus-1), locus);
+            }
                         
             // create vector of particles
             _particle_vec.resize(G::_nparticles * G::_ngroups);
@@ -820,7 +828,7 @@ namespace proj {
             
             writeTreeFile();
             writePartialCount();
-            writeLogFile();
+//            writeLogFile(); // TODO: fix this
             writeLogMarginalLikelihoodFile();
             
             if (G::_ruv) {
@@ -930,6 +938,11 @@ namespace proj {
         unsigned start = group_number * G::_nparticles;
         unsigned end = start + (G::_nparticles) - 1;
         
+        vector<unsigned> particle_indices;
+        for (unsigned a=start; a <end+1; a++) {
+            particle_indices.push_back(a); // TODO: check this
+        }
+        
         unsigned prob_count = 0;
         for (unsigned p=start; p < end + 1; p++) {
             probs[prob_count] = _particle_vec[p].getLogWeight();
@@ -991,6 +1004,19 @@ namespace proj {
             prev_cum_count = cum_count;
         }
         
+//        unsigned locus = _particle_vec[particle_indices[start]].getNextGene() - 1; // subtract 1 because vector of gene forests starts at 0
+//        assert (locus == _particle_vec[particle_indices[end]].getNextGene() - 1);
+        // Create map (nonzero_map) in which the key for an element
+        // is the memory address of a gene forest and
+        // the value is a vector of indices of non-zero counts.
+        // This map is used to determine which of the nonzeros
+        // that need to be copied (last nonzero count for any
+        // memory address does not need to be copied and can be
+        // modified in place).
+        map<const void *, list<unsigned> > nonzero_map;
+        buildNonzeroMap(_particle_vec, nonzero_map, nonzeros, particle_indices, start, end);
+
+        
         // Example of following code that replaces dead
         // particles with copies of surviving particles:
         //             0  1  2  3  4  5  6  7  8  9
@@ -1014,14 +1040,21 @@ namespace proj {
         unsigned next_nonzero = 0;
         while (next_nonzero < nonzeros.size()) {
             double index_survivor = nonzeros[next_nonzero];
+            
+            unsigned index_survivor_in_particles = particle_indices[index_survivor+start];
+            
+            // TODO: check this works with multiple groups
+            _particle_vec[index_survivor_in_particles].finalizeLatestJoin(index_survivor_in_particles, nonzero_map);
+
+            
             unsigned ncopies = counts[index_survivor] - 1;
             for (unsigned k = 0; k < ncopies; k++) {
                 double index_nonsurvivor = zeros[next_zero++];
-                
+
                 // Replace non-survivor with copy of survivor
                 unsigned survivor_index_in_particles = index_survivor+start;
                 unsigned non_survivor_index_in_particles = index_nonsurvivor+start;
-                
+
                 _particle_vec[non_survivor_index_in_particles] = _particle_vec[survivor_index_in_particles];
             }
             ++next_nonzero;
@@ -1666,6 +1699,24 @@ namespace proj {
         // this function writes the log marginal likelihood to a file
         ofstream logf ("marginal_likelihood.txt");
         logf << "log marginal likelihood: " << _log_marginal_likelihood << "\n";
+    }
+
+    inline void Proj::buildNonzeroMap(vector<Particle> &particles, map<const void *, list<unsigned> > & nonzero_map, const vector<unsigned> & nonzeros, vector<unsigned> particle_indices, unsigned start, unsigned end) {
+        
+        for (auto i : nonzeros) {
+            unsigned particle_index = particle_indices[start + i];
+            void * ptr = particles[particle_index].getForestPtr().get();
+
+    //            void * ptr = particles[i].getGeneForestPtr(locus).get();
+            if (nonzero_map.count(ptr) > 0) {
+    //                nonzero_map[ptr].push_back(i);
+                nonzero_map[ptr].push_back(particle_index);
+            }
+            else {
+    //                nonzero_map[ptr] = {i};
+                nonzero_map[ptr] = {particle_index};
+            }
+        }
     }
 
 }

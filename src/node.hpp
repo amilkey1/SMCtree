@@ -6,12 +6,14 @@ namespace proj {
     class Forest;
     class Forest;
     class Particle;
+    class ForestExtension;
 
     class Node {
         friend class Likelihood;
         friend class Forest;
         friend class Forest;
         friend class Particle;
+        friend class ForestExtension;
 
         public:
                                         Node();
@@ -103,30 +105,30 @@ namespace proj {
         _right_sib=0;
     }
     
-    inline string Node::saveNodeInfo(string prefix) const {
-        string s = str(format("%sNode %d:\n") % prefix % _number);
-        s += str(format("%s  _number               = %d\n") % prefix % _number);
-        s += str(format("%s  _name                 = %s\n") % prefix % _name);
-        s += str(format("%s  _edge_length          = %.9f\n") % prefix % _edge_length);
-        s += str(format("%s  _height               = %.9f\n") % prefix % _height);
-        s += str(format("%s  _position_in_lineages = %d\n") % prefix % _position_in_lineages);
-        s += str(format("%s  _split                = %s\n") % prefix %  _split.createPatternRepresentation());
-        if (_partials)
-            s += str(format("%s  _partials             = %d\n") % prefix % _partials->size());
-        else
-            s += str(format("%s  _partials             = nullptr\n") % prefix);
-        if (_left_child)
-            s += str(format("%s  _left_child           = Node %d\n") % prefix % _left_child->_number);
-        else
-            s += str(format("%s  _left_child           = nullptr\n") % prefix);
-        if (_right_sib)
-            s += str(format("%s  _right_sib            = Node %d\n") % prefix % _right_sib->_number);
-        else
-            s += str(format("%s  _right_sib            = nullptr\n") % prefix);
-        if (_parent)
-            s += str(format("%s  _parent               = Node %d\n") % prefix % _parent->_number);
-        else
-            s += str(format("%s  _parent               = nullptr\n") % prefix);
-        return s;
-    }
+//    inline string Node::saveNodeInfo(string prefix) const {
+//        string s = str(format("%sNode %d:\n") % prefix % _number);
+//        s += str(format("%s  _number               = %d\n") % prefix % _number);
+//        s += str(format("%s  _name                 = %s\n") % prefix % _name);
+//        s += str(format("%s  _edge_length          = %.9f\n") % prefix % _edge_length);
+//        s += str(format("%s  _height               = %.9f\n") % prefix % _height);
+//        s += str(format("%s  _position_in_lineages = %d\n") % prefix % _position_in_lineages);
+//        s += str(format("%s  _split                = %s\n") % prefix %  _split.createPatternRepresentation());
+//        if (_partials)
+//            s += str(format("%s  _partials             = %d\n") % prefix % _partials->size());
+//        else
+//            s += str(format("%s  _partials             = nullptr\n") % prefix);
+//        if (_left_child)
+//            s += str(format("%s  _left_child           = Node %d\n") % prefix % _left_child->_number);
+//        else
+//            s += str(format("%s  _left_child           = nullptr\n") % prefix);
+//        if (_right_sib)
+//            s += str(format("%s  _right_sib            = Node %d\n") % prefix % _right_sib->_number);
+//        else
+//            s += str(format("%s  _right_sib            = nullptr\n") % prefix);
+//        if (_parent)
+//            s += str(format("%s  _parent               = Node %d\n") % prefix % _parent->_number);
+//        else
+//            s += str(format("%s  _parent               = nullptr\n") % prefix);
+//        return s;
+//    }
 }

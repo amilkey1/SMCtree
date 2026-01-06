@@ -13,6 +13,8 @@ namespace proj {
             MODEL_TYPE_HKY
         };
         
+        typedef pair<unsigned, unsigned>    uint_pair_t;
+        
         // Program settings used in processCommandLineOptions
         static string                   _sim_filename_prefix;
         static unsigned                 _sim_ntaxa;
