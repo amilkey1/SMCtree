@@ -80,7 +80,7 @@ class Forest {
         bool    checkForValidTaxonSet(vector<TaxSet> taxset, vector<TaxSet> unused_taxsets);
     
         double  getForestHeight() {return _tree_height;}
-        PartialStore::partial_t         pullPartial(unsigned locus_index);
+        PartialStore::partial_t         pullPartial();
     
         void                            setLogLikelihood(double log_likelihood) {_log_likelihood = log_likelihood;}
         void                            addIncrAndJoin(double incr, const Split & lsplit, const Split & rsplit, ForestExtension & gfx);
@@ -247,18 +247,19 @@ class Forest {
         
         _nleaves = G::_ntaxa;
 
-        for (unsigned index = 0; index < G::_nloci; index ++) {
+//        for (unsigned index = 0; index < G::_nloci; index ++) {
             for (auto &nd:_lineages) {
-                if (index == 0) {
-                    double npatterns_total = _data->getNumPatterns();
+//                if (index == 0) {
+//                    double npatterns_total = _data->getNumPatterns();
                     mtx.lock();
-                    nd->_partials=ps.getPartial(npatterns_total*G::_nstates, index+1);
+                    nd->_partials=ps.getPartial();
                     mtx.unlock();
-                }
+//                }
                 
-                Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(index);
+                Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(0);
                 _first_pattern = gene_begin_end.first;
-                _npatterns = _data->getNumPatternsInSubset(index);
+//                _npatterns = _data->getNumPatternsInSubset(index);
+                _npatterns = _data->getNumPatterns();
                 
                 
                 if (!nd->_left_child) {
@@ -276,7 +277,7 @@ class Forest {
                     }
                 }
             }
-        }
+//        }
     }
 
     inline double Forest::calcSubsetLogLikelihood(unsigned i) {
@@ -1524,38 +1525,55 @@ class Forest {
         double prev_loglike = 0.0;
         
 //        _partial_count++;
-        auto &data_matrix=_data->getDataMatrix();
+//        auto &data_matrix=_data->getDataMatrix();
         // Get pattern counts
         auto counts = _data->getPatternCounts();
+        
+        // Determine if there is an edge length extension (this would be the
+        // case if new_nd comes from a gene forest extension)
+        double lchild_stem_height = lchild->_height + lchild->_edge_length;
+        double rchild_stem_height = rchild->_height + rchild->_edge_length;
+        assert(fabs(lchild_stem_height - rchild_stem_height) < G::_small_enough);
+        
+        // Calculate the edge length extension
+        double edgelen_extension = new_nd->_height - lchild_stem_height;
+        
+        // Edge length extension may be slightly negative due to roundoff
+        assert(edgelen_extension >= -G::_small_enough);
+        if (edgelen_extension < 0.0) {
+            edgelen_extension = 0.0;
+        }
 
         for (unsigned i=0; i<G::_nloci; i++) {
             Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(i);
             auto & parent_partial_array = new_nd->_partials->_v;
             unsigned first_pattern = gene_begin_end.first;
-            unsigned npatterns = _data->getNumPatternsInSubset(i);
+            unsigned last_pattern = gene_begin_end.second;
+//            unsigned npatterns = _data->getNumPatternsInSubset(i);
             
-            // Determine if there is an edge length extension (this would be the
-            // case if new_nd comes from a gene forest extension)
-            double lchild_stem_height = lchild->_height + lchild->_edge_length;
-            double rchild_stem_height = rchild->_height + rchild->_edge_length;
-            assert(fabs(lchild_stem_height - rchild_stem_height) < G::_small_enough);
-            
-            // Calculate the edge length extension
-            double edgelen_extension = new_nd->_height - lchild_stem_height;
-            
-            // Edge length extension may be slightly negative due to roundoff
-            assert(edgelen_extension >= -G::_small_enough);
-            if (edgelen_extension < 0.0) {
-                edgelen_extension = 0.0;
-            }
-        
+//            // Determine if there is an edge length extension (this would be the
+//            // case if new_nd comes from a gene forest extension)
+//            double lchild_stem_height = lchild->_height + lchild->_edge_length;
+//            double rchild_stem_height = rchild->_height + rchild->_edge_length;
+//            assert(fabs(lchild_stem_height - rchild_stem_height) < G::_small_enough);
+//
+//            // Calculate the edge length extension
+//            double edgelen_extension = new_nd->_height - lchild_stem_height;
+//
+//            // Edge length extension may be slightly negative due to roundoff
+//            assert(edgelen_extension >= -G::_small_enough);
+//            if (edgelen_extension < 0.0) {
+//                edgelen_extension = 0.0;
+//            }
+//
         for (const Node * child : {lchild, rchild})  {
             assert(child->_partials);
             auto & child_partial_array = child->_partials->_v;
 
             double pr_same = calcTransitionProbabilityLazy(0, 0, child->_edge_length + edgelen_extension);
             double pr_diff = calcTransitionProbabilityLazy(0, 1, child->_edge_length + edgelen_extension);
-            for (unsigned p = 0; p < npatterns; p++) {
+//            for (unsigned p = 0; p < npatterns; p++) {
+            for (unsigned p = first_pattern; p < last_pattern; p++) {
                 unsigned pxnstates = p*G::_nstates;
                 //unsigned pp = first_pattern + p;
 
@@ -1696,10 +1714,17 @@ class Forest {
         auto & newnd_partial_array = new_nd->_partials->_v;
         auto & lchild_partial_array = lchild->_partials->_v;
         auto & rchild_partial_array = rchild->_partials->_v;
-        for (unsigned p = 0; p < npatterns; p++) {
-            unsigned pxnstates = p*G::_nstates;
+            
+//        unsigned npatterns = _data->getNumPatterns();
+//        for (unsigned p = 0; p < npatterns; p++) {
+//        for (unsigned p = first_pattern; p < last_pattern; p++) {
+        for (unsigned p = 0; p < (last_pattern - first_pattern); p++) {
+//            unsigned pxnstates = p*G::_nstates;
+            
+            unsigned pxnstates = (first_pattern + p) * G::_nstates;
 
             unsigned pp = first_pattern + p;
+            
             //unsigned count = counts[pp];
             double left_sitelike = 0.0;
             double right_sitelike = 0.0;
@@ -2691,12 +2716,12 @@ class Forest {
         }
     }
 
-    inline PartialStore::partial_t Forest::pullPartial(unsigned locus_index) {
+    inline PartialStore::partial_t Forest::pullPartial() {
         lock_guard<mutex> guard(mutex);
         PartialStore::partial_t ptr;
         
         // Grab one partial from partial storage
-        ptr = ps.getPartial(_npatterns*G::_nstates, locus_index);
+        ptr = ps.getPartial();
         return ptr;
     }
 

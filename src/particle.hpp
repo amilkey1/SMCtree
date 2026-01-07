@@ -187,9 +187,9 @@ class Particle {
         
 //        double prev_log_likelihood = _forest_ptr->getLogLikelihood();
         
-        for (unsigned i=0; i<G::_nloci; i++) {
-            _forest_extension.dock(_forest_ptr, _forest_ptr->pullPartial(i+1), _lot);
-        }
+//        for (unsigned i=0; i<G::_nloci; i++) {
+            _forest_extension.dock(_forest_ptr, _forest_ptr->pullPartial(), _lot);
+//        }
         
         double increment = _forest_ptr->drawBirthDeathIncrement(_lot, -1);
         _forest_extension.addIncrement(increment);
