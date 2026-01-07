@@ -13,7 +13,6 @@ class Particle {
         void                                    setParticleData(Data::SharedPtr d, bool partials);
         void                                    operator=(const Particle & other);
         vector<double>                          calcGeneTreeLogLikelihoods();
-//        double                                  calcGeneTreeLogLikelihood(unsigned locus);
         double                                  getLogWeight() const {return _log_weight;}
         void                                    proposal(unsigned step_number);
         void                                    simProposal(unsigned step_number);
@@ -160,10 +159,6 @@ class Particle {
         }
     }
 
-//    inline double Particle::calcGeneTreeLogLikelihood(unsigned locus) {
-//        return _gene_forest_ptr->calcSubsetLogLikelihood(locus);
-//    }
-
     inline vector<double> Particle::calcGeneTreeLogLikelihoods() {
         vector<double> gene_forest_likelihoods;
         gene_forest_likelihoods.resize(G::_nloci);
@@ -185,16 +180,7 @@ class Particle {
 
     inline void Particle::proposal(unsigned step_number) {
         // TODO: lazy copying with taxon sets
-//        if (step_number == 0) {
-//            bool valid = _forest_ptr->checkForValidTaxonSet(_particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils);
-//            assert (valid); // there should always be a valid taxon set if things have been merged correctly
-//        }
-        
-//        double prev_log_likelihood = _forest_ptr->getLogLikelihood();
-        
-//        for (unsigned i=0; i<G::_nloci; i++) {
-            _forest_extension.dock(_forest_ptr, _forest_ptr->pullPartial(), _lot);
-//        }
+        _forest_extension.dock(_forest_ptr, _forest_ptr->pullPartial(), _lot);
         
         double increment = _forest_ptr->drawBirthDeathIncrement(_lot, -1);
         _forest_extension.addIncrement(increment);
@@ -202,22 +188,7 @@ class Particle {
 #if defined (INCREMENT_COMPARISON_TEST)
         _forest_ptr->addIncrement(_lot);
 #endif
-//       _log_weight = _forest_ptr->joinPriorPrior(prev_log_likelihood, _lot, _particle_taxsets, _unused_particle_taxsets, _particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils, _particle_fossils);
-//        _log_weight = _forest_ptr->joinPriorPrior(prev_log_likelihood, _lot, _particle_taxsets, _unused_particle_taxsets, _particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils, _particle_fossils);
-        
         _forest_extension.joinPriorPrior();
-
-        
-        // check that at least one taxon set is valid
-         // if there is no valid taxon set, keep adding increments until a valid set has been reached
-         
-        // TODO: fix for tax sets
-//        if (_forest_ptr->_lineages.size() > 1) {
-//            // after the last step, there should be no valid taxon sets
-//             bool valid = _forest_ptr->checkForValidTaxonSet(_particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils);
-//             assert (valid); // when fossils aren't part of the tree, don't consider any of this because there should always be a valid taxon set
-//        }
-
         
         if (step_number == G::_ntaxa - 2) {
             // if we are on the last step, check that the forest is down to 2 lineages (because last two lineags will be joined in the finalizing step in filtering)

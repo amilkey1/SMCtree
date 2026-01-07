@@ -1427,7 +1427,6 @@ namespace proj {
                 log_likelihood += t;
             }
             
-//            double log_likelihood = p.getLogLikelihood();
             double yule = 0.0;
             
             double total_log_prior = p.getAllPriors();
@@ -1437,15 +1436,8 @@ namespace proj {
             if (G::_coverage) {
                 _hpd_values.push_back(make_pair(p.getHeightFirstSplit(), log_posterior));
             }
-            
-//            vector<double> tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
-            
-//            double height = p.getTreeHeight();
-//            double length = p.getTreeLength();
-            
+
             double clock_rate = p.getClockRate();
-//            double FBD = p.getFBDModel();
-//            double sampling_proportion = 1.0;
             
             double birth_death = 0.0;
             if (G::_mu > 0.0) {
@@ -1461,10 +1453,7 @@ namespace proj {
             for (auto &l:tree_log_likelihoods) {
                 logf << "\t" << l;
             }
-//            logf << "\t" << height;
-//            logf << "\t" << length;
             logf << "\t" << clock_rate;
-//            logf << "\t" << FBD;
             
             double lambda = 0.0;
             double mu = 0.0;
@@ -1499,24 +1488,15 @@ namespace proj {
             
             double diversification_rate = lambda - mu;
             double turnover = mu / lambda;
-//            double SACountFBD = 0;
             
             map<string, double> particle_taxset_map = p.getTaxsetAges();
             
             logf << "\t" << diversification_rate;
             
-//            if (G::_mu > 0.0) {
-//                logf << "\t" << turnover;
-//            }
-            
-//            logf << "\t" << sampling_proportion;
-            
             logf << "\t" << root_age;
             
             logf << "\t" << mu;
             logf << "\t" << lambda;
-            
-//            logf << "\t" << SACountFBD;
             
             logf << "\t" << turnover;
             
@@ -1544,13 +1524,10 @@ namespace proj {
             unsigned particle_index = particle_indices[start + i];
             void * ptr = particles[particle_index].getForestPtr().get();
 
-    //            void * ptr = particles[i].getGeneForestPtr(locus).get();
             if (nonzero_map.count(ptr) > 0) {
-    //                nonzero_map[ptr].push_back(i);
                 nonzero_map[ptr].push_back(particle_index);
             }
             else {
-    //                nonzero_map[ptr] = {i};
                 nonzero_map[ptr] = {particle_index};
             }
         }
