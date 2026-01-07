@@ -13,6 +13,7 @@ class Particle {
         void                                    setParticleData(Data::SharedPtr d, bool partials);
         void                                    operator=(const Particle & other);
         vector<double>                          calcGeneTreeLogLikelihoods();
+//        double                                  calcGeneTreeLogLikelihood(unsigned locus);
         double                                  getLogWeight() const {return _log_weight;}
         void                                    proposal(unsigned step_number);
         void                                    simProposal(unsigned step_number);
@@ -158,6 +159,10 @@ class Particle {
             }
         }
     }
+
+//    inline double Particle::calcGeneTreeLogLikelihood(unsigned locus) {
+//        return _gene_forest_ptr->calcSubsetLogLikelihood(locus);
+//    }
 
     inline vector<double> Particle::calcGeneTreeLogLikelihoods() {
         vector<double> gene_forest_likelihoods;

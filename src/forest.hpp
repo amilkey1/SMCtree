@@ -280,14 +280,69 @@ class Forest {
 //        }
     }
 
+//    inline double Forest::calcSubsetLogLikelihoods() {
+//        //calc likelihood for each lineage separately
+//        auto &counts = _data->getPatternCounts();
+//        _gene_tree_log_likelihoods[i] = 0.0;
+//
+//        for (auto &nd:_lineages) {
+//            double log_like = 0.0;
+//            for (unsigned p=0; p<_npatterns; p++) {
+//                double site_like = 0.0;
+//                unsigned pxnstates = p*G::_nstates;
+//
+//                // loop 1
+//                unsigned s = 0;
+//                double partial = (nd->_partials->_v)[pxnstates+s];
+//                site_like += 0.25*partial;
+//
+//                // loop 2
+//                s = 1;
+//                partial = (nd->_partials->_v)[pxnstates+s];
+//                site_like += 0.25*partial;
+//
+//                // loop 3
+//                s = 2;
+//                partial = (nd->_partials->_v)[pxnstates+s];
+//                site_like += 0.25*partial;
+//
+//                // loop 4
+//                s = 3;
+//                partial = (nd->_partials->_v)[pxnstates+s];
+//                site_like += 0.25*partial;
+//
+//
+//                assert(site_like>0);
+//                log_like += log(site_like)*counts[_first_pattern+p];
+//            }
+//
+//            _gene_tree_log_likelihood += log_like;
+//
+//        }
+//        return _gene_tree_log_likelihood;
+//    }
+
     inline double Forest::calcSubsetLogLikelihood(unsigned i) {
-        _gene_tree_log_likelihoods[i] = 0.0;
+        if (_lineages.size() == 1) {
+            // if forest is complete, only include the root node in the likelihood calculation
+            unsigned nnodes = (unsigned) _nodes.size();
+            for (auto &nd:_nodes) {
+                if (nd._number != nnodes - 1) {
+                    nd._use_in_likelihood = false;
+                }
+                else {
+                    nd._use_in_likelihood = true;
+                }
+            }
+        }
         
+        _gene_tree_log_likelihoods[i] = 0.0;
+
         auto &counts = _data->getPatternCounts();
         _npatterns = _data->getNumPatternsInSubset(i);
         Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(i);
         _first_pattern = gene_begin_end.first;
-        
+
         for (auto &nd:_nodes) {
             if (nd._use_in_likelihood) {
                 assert (nd._partials != nullptr); // ignore fossils and fake nodes in likelihood calculations

@@ -828,7 +828,7 @@ namespace proj {
             
             writeTreeFile();
             writePartialCount();
-//            writeLogFile(); // TODO: fix this
+            writeLogFile(); // TODO: fix this
             writeLogMarginalLikelihoodFile();
             
             if (G::_ruv) {
@@ -1421,7 +1421,13 @@ namespace proj {
             logf << iter;
             iter++;
             
-            double log_likelihood = p.getLogLikelihood();
+            vector<double> tree_log_likelihoods = p.calcGeneTreeLogLikelihoods();
+            double log_likelihood = 0.0;
+            for (auto &t:tree_log_likelihoods) {
+                log_likelihood += t;
+            }
+            
+//            double log_likelihood = p.getLogLikelihood();
             double yule = 0.0;
             
             double total_log_prior = p.getAllPriors();
@@ -1432,14 +1438,14 @@ namespace proj {
                 _hpd_values.push_back(make_pair(p.getHeightFirstSplit(), log_posterior));
             }
             
-            vector<double> tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
+//            vector<double> tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
             
 //            double height = p.getTreeHeight();
 //            double length = p.getTreeLength();
             
             double clock_rate = p.getClockRate();
-            double FBD = p.getFBDModel();
-            double sampling_proportion = 1.0;
+//            double FBD = p.getFBDModel();
+//            double sampling_proportion = 1.0;
             
             double birth_death = 0.0;
             if (G::_mu > 0.0) {
