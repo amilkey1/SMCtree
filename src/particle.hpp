@@ -17,7 +17,6 @@ class Particle {
         void                                    proposal(unsigned step_number);
         void                                    simProposal(unsigned step_number);
         void                                    showParticle();
-        vector<double>                          getGeneTreeLogLikelihoods();
         double                                  getTreeHeight();
         double                                  getTreeLength();
         double                                  getEstLambda() {return _forest_ptr->_estimated_lambda;}
@@ -26,7 +25,6 @@ class Particle {
         double                                  getLogLikelihood();
         double                                  getYuleModel();
         double                                  getAllPriors();
-        double                                  getFBDModel();
         map<string, double>                     getTaxsetAges();
         double                                  getBirthDeathModel();
         void                                    setStartingLogLikelihoods(vector<double> starting_log_likelihoods);
@@ -185,8 +183,41 @@ class Particle {
     }
 
     inline void Particle::proposal(unsigned step_number) {
-        // TODO: lazy copying with taxon sets
         if (step_number == 0) {
+            // set parameters and taxon sets
+            if (G::_est_clock_rate) {
+                drawClockRate();
+            }
+            else {
+                setClockRate(G::_clock_rate);
+            }
+            
+            if (G::_est_lambda) {
+                if (G::_mu > 0) {
+                    assert (G::_est_mu);
+                    drawBirthDiff();
+                    drawTurnover();
+                    calculateLambdaAndMu();
+                }
+                else {
+                    // Yule model
+                    drawLambda();
+                }
+            }
+            
+            setParticleTaxSets();
+            setOverlappingTaxSets();
+            setTaxSetsNoFossils();
+            
+            if (G::_fossils.size() > 0) {
+                setFossils();
+                drawFossilAges();
+            }
+            
+            if (G::_est_root_age) {
+                drawRootAge();
+            }
+            
             pair<bool, vector<bool>> valid_output = _forest_ptr->checkForValidTaxonSet(_particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils);
             assert (valid_output.first); // there should always be a valid taxon set if things have been merged correctly
             _valid_taxsets = valid_output.second;
@@ -202,19 +233,9 @@ class Particle {
         
         double increment = _forest_ptr->drawBirthDeathIncrement(_lot, -1);
         _forest_extension.addIncrement(increment);
-            
-#if defined (INCREMENT_COMPARISON_TEST)
-        _forest_ptr->addIncrement(_lot);
-#endif
+
         _forest_extension.joinPriorPrior(_particle_taxsets, _unused_particle_taxsets, _particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils, _particle_fossils, _valid_taxsets, _taxset_ages);
         _total_particle_partials++;
-        
-//        if (step_number < G::_ntaxa - 2) {
-//            // if not on the last step, reset the valid taxon sets
-//            pair<bool, vector<bool>> valid_output = _forest_ptr->checkForValidTaxonSet(_particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils);
-//            assert (valid_output.first); // there should always be a valid taxon set if things have been merged correctly
-//            _valid_taxsets = valid_output.second;
-//        }
         
         if (step_number == G::_ntaxa - 2) {
             // if we are on the last step, check that the forest is down to 2 lineages (because last two lineags will be joined in the finalizing step in filtering)
@@ -237,10 +258,6 @@ class Particle {
         _forest_ptr->showForest();
     }
 
-    inline vector<double> Particle::getGeneTreeLogLikelihoods() {
-        return _forest_ptr->_gene_tree_log_likelihoods;
-    }
-
     inline double Particle::getLogLikelihood() {
         double log_likelihood = 0.0;
         for (auto &l:_forest_ptr->_gene_tree_log_likelihoods) {
@@ -259,10 +276,6 @@ class Particle {
     }
 
     inline double Particle::getYuleModel() {
-        return _forest_ptr->getTreePrior();
-    }
-
-    inline double Particle::getFBDModel() {
         return _forest_ptr->getTreePrior();
     }
 

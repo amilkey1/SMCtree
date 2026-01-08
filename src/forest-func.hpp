@@ -4,7 +4,6 @@ namespace proj {
 
 // put some forest functions in here to avoid circular include issues
     
-#if defined(LAZY_COPYING)
     inline void Forest::addIncrAndJoin(double incr, const Split & lsplit, const Split & rsplit, ForestExtension & gfx) {
         // Identify the two nodes to join
         _increments.push_back(incr);
@@ -61,7 +60,6 @@ namespace proj {
         updateNodeVector(_lineages, first_node, second_node, anc_node);
         refreshAllPreorders();
     }
-#endif
 
 }
 

@@ -64,22 +64,14 @@ namespace proj {
         // Should be called before any partials are stored
         assert(_nelements == 0);
         assert(_storage == nullptr);
-        
-        // Resize both containers
-//        _nelements.resize(nloci);
-//        _storage.resize(nloci);
     }
 
     inline void PartialStore::setNElements(unsigned nelements) {
-//        assert(_nelements.size() > locus-1);
-//        _nelements[locus-1] = nelements;
         _nelements = nelements;
     }
 
     inline PartialStore::partial_t PartialStore::getPartial() {
         // Check to make sure supplied value of locus is valid
-//        assert(_nelements.size() > locus-1);
-//        assert(_nelements[locus-1] > 0);
         assert (_nelements > 0);
         
         partial_t partial;
@@ -90,10 +82,8 @@ namespace proj {
             _total_elements_created += _nelements;
         }
         else {
-//            size_t n = _storage.size();
             partial = _storage;
-//            _storage.pop_back();
-            _storage = nullptr; // TODO: check
+            _storage = nullptr;
             _total_partials_reused++;
             _total_elements_reused += _nelements;
         }
@@ -103,8 +93,6 @@ namespace proj {
         
     inline void PartialStore::putPartial(partial_t partial) {
         // Check to make sure supplied value of locus is valid
-//        assert(_nelements.size() > locus-1);
-//        assert(_nelements[locus-1] > 0);
         assert (_nelements > 0);
 
         // Store the partial for later

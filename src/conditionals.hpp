@@ -1,7 +1,3 @@
-//# define INCREMENT_COMPARISON_TEST
-
 # define SYSTEMATIC_FILTERING
-
-# define LAZY_COPYING
 
 # define UNROLL_LOOPS

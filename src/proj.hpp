@@ -31,6 +31,7 @@ namespace proj {
             void processCommandLineOptions(int argc, const char * argv[]);
             void run();
             void initializeParticles();
+            void initializeParticle(Particle &particle);
         
         private:
             void clear();
@@ -38,9 +39,6 @@ namespace proj {
             void debugSaveParticleVectorInfo(string fn, unsigned step);
             
             void simulate();
-#if defined (INCREMENT_COMPARISON_TEST)
-            void simulateTree();
-#endif
             void simulateData(Lot::SharedPtr lot, unsigned startat, unsigned locus_length);
             void simulateSave(string fnprefix);
 
@@ -465,11 +463,6 @@ namespace proj {
         // Sanity checks
         assert(G::_sim_ntaxa > 0);
         
-        // Simulate the tree
-#if defined (INCREMENT_COMPARISON_TEST)
-        simulateTree();
-#endif
-        
         // create vector of particles
         G::_nparticles = 100;
         G::_ngroups = 1;
@@ -565,25 +558,6 @@ namespace proj {
         // Save simulated data to file
         simulateSave(G::_sim_filename_prefix);
     }
-
-#if defined (INCREMENT_COMPARISON_TEST)
-    inline void Proj::simulateTree() {
-        // this function is only for the increment comparison test
-        
-        // Set global _ntaxa
-        unsigned nleaves = G::_sim_ntaxa;
-        G::_ntaxa = nleaves;
-        
-        // Make up taxon names
-        G::_taxon_names.resize(nleaves);
-        for (unsigned i = 0; i < nleaves; i++)
-            G::_taxon_names[i] = G::inventName(i, /*lower_case*/false);
-        
-        _sim_tree = Forest::SharedPtr(new Forest);
-        
-        _sim_tree->incrementComparisonTest();
-    }
-#endif
         
     inline void Proj::simulateSave(string fnprefix) {
         // Show simulation settings to user
@@ -710,11 +684,11 @@ namespace proj {
             ps.setNElements(G::_nstates * _data->getNumPatterns());
                         
             // create vector of particles
-            _particle_vec.resize(G::_nparticles * G::_ngroups);
+//            _particle_vec.resize(G::_nparticles * G::_ngroups);
 
-            for (unsigned i=0; i<G::_nparticles * G::_ngroups; i++) {
-                _particle_vec[i] = Particle();
-            }
+//            for (unsigned i=0; i<G::_nparticles * G::_ngroups; i++) {
+//                _particle_vec[i] = Particle();
+//            }
             
             // set group rng
             _group_rng.resize(G::_ngroups);
@@ -746,13 +720,16 @@ namespace proj {
             }
 
             G::_step = 0;
-            initializeParticles(); // TODO: make one template particle and copy it
+            Particle p;
+            initializeParticle(p);
+//            initializeParticles(); // TODO: make one template particle and copy it
             
             //debugSaveParticleVectorInfo("debug-initialized.txt", 0);
 
             // reset marginal likelihood
             _log_marginal_likelihood = 0.0;
-            vector<double> starting_log_likelihoods = _particle_vec[0].calcGeneTreeLogLikelihoods();
+            vector<double> starting_log_likelihoods = p.calcGeneTreeLogLikelihoods();
+//            vector<double> starting_log_likelihoods = _particle_vec[0].calcGeneTreeLogLikelihoods();
             
             _log_marginal_likelihood = 0.0;
             for (auto &l:starting_log_likelihoods) {
@@ -764,14 +741,21 @@ namespace proj {
             // initialize starting log likelihoods for all other particles
             // necessary for calculating the first weight
             
+            _particle_vec.resize(G::_nparticles * G::_ngroups, p);
+            
+            psuffix = 1;
+            for (auto &p:_particle_vec) {
+                p.setSeed(rng->randint(1,9999) + psuffix);
+                psuffix += 2;
+            }
+            
+            
             for (unsigned p=1; p<_particle_vec.size(); p++) {
                 _particle_vec[p].setStartingLogLikelihoods(starting_log_likelihoods);
             }
             
-            if (G::_save_memory) {
-                for (auto &p:_particle_vec) {
-                    p.clearPartials();
-                }
+            if (G::_taxsets.size() > 0) {
+                removeUnecessaryTaxsets(); // remove any taxsets with just one lineage and one fossil because they will not provide any constraints
             }
             
             unsigned nsteps = (G::_ntaxa-1);
@@ -791,31 +775,12 @@ namespace proj {
                 
                 proposeParticles(g);
                 
-# if defined (INCREMENT_COMPARISON_TEST)
-                
-                if (G::_step == 2) {
-                    ofstream outFile("test3.log", std::ios::app);
-                    unsigned count = 0;
-                    outFile << "sample" << "\t" << "increment";
-                    outFile << endl;
-                    for (auto &p:_particle_vec) {
-//                        outFile << count << "\t" << p.getHeightFirstSplit() << endl;
-//                        outFile << count << "\t" << p.getHeightSecondIncr() << endl;
-                        outFile << count << "\t" << p.getHeightThirdIncr() << endl;
-                        count++;
-                    }
-                }
-#endif
-                
-//                debugSaveParticleVectorInfo("debug-proposed.txt", g+1);
-                
                 if (G::_nthreads == 1) {
                     for (unsigned a=0; a<G::_ngroups; a++) {
                         double ess = filterParticles(g, a);
                         output(format("     ESS = %d\n") % ess, 2);
                     }
                     
-                    //debugSaveParticleVectorInfo("debug-filtered.txt", g+1);
                 }
                 else {
                     filterParticlesThreading(g);
@@ -1257,6 +1222,19 @@ namespace proj {
             std::cout << "    sites:     " << _data->calcSeqLenInSubset(subset) << std::endl;
             std::cout << "    patterns:  " << _data->getNumPatternsInSubset(subset) << std::endl;
         }
+    }
+
+    inline void Proj::initializeParticle(Particle &particle) { // TODO: make one template particle and copy it
+        // set partials for first particle under save_memory setting for initial marginal likelihood calculation
+         assert (G::_nthreads > 0);
+        
+        bool partials = true;
+        
+        if (G::_save_memory) {
+            partials = false; // no partials needed for running on empty
+        }
+        
+        particle.setParticleData(_data, partials);
     }
 
     inline void Proj::initializeParticles() { // TODO: make one template particle and copy it
