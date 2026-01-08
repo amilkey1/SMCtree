@@ -29,8 +29,8 @@ class Forest {
         double getHeightThirdIncr();
     
 #if defined (INCREMENT_COMPARISON_TEST)
-    void incrementComparisonTest();
-    void addBirthDeathTreeIncrementTest(Lot::SharedPtr lot);
+        void incrementComparisonTest();
+        void addBirthDeathTreeIncrementTest(Lot::SharedPtr lot);
 #endif
     
         typedef shared_ptr<Forest> SharedPtr;
@@ -86,8 +86,6 @@ class Forest {
         void                            addIncrAndJoin(double incr, const Split & lsplit, const Split & rsplit, ForestExtension & gfx);
         void                            advanceAllLineagesBy(double increment);
         void                            refreshAllPreorders();
-        void                            refreshPreorderNew(vector<Node*> & preorder) const;
-        Node *                          findNextPreorderNew(Node * nd) const;
         
         Data::SharedPtr             _data;
         vector<Node *>              _lineages;
@@ -111,13 +109,9 @@ class Forest {
         map<string, double>         _taxset_ages;
         double                      _clock_rate;
         double                      _weight_correction; // correct for taxon set constraints
-        double                      _first_split_height;
         double                      _first_split_prior;
-        double                      _second_incr;
-        double                      _third_incr;
     
         double _tree_height;
-//        vector<bool> _valid_taxsets;
 };
 
     inline string Forest::debugSaveForestInfo() const {
@@ -171,12 +165,8 @@ class Forest {
         _turnover = 0.0;
         _partial_count = 0;
         _weight_correction = 0.0;
-        _first_split_height = 0.0;
-        _second_incr = 0.0;
-        _third_incr = 0.0;
         _clock_rate = 1.0;
         _tree_height = 0.0;
-//        _valid_taxsets.clear();
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -720,15 +710,6 @@ class Forest {
         assert (new_height <= _estimated_root_age + 0.01);
         
         t = new_height - cum_height;
-        
-    # if defined (INCREMENT_COMPARISON_TEST)
-        if (b == 1) {
-            _second_incr = t;
-        }
-        else if (b == 2) {
-            _third_incr = t;
-        }
-    #endif
         
         return t;
     }
@@ -1621,12 +1602,8 @@ class Forest {
         _taxset_ages = other._taxset_ages;
         _clock_rate = other._clock_rate;
         _weight_correction = other._weight_correction;
-        _first_split_height = other._first_split_height;
         _first_split_prior = other._first_split_prior;
-        _second_incr = other._second_incr;
-        _third_incr = other._third_incr;
         _tree_height = other._tree_height;
-//        _valid_taxsets = other._valid_taxsets;
         _log_likelihood = other._log_likelihood;
 
         // Copy _nodes
@@ -1981,14 +1958,6 @@ class Forest {
         return _increments[0];
     }
 
-    inline double Forest::getHeightSecondIncr() {
-        return _second_incr;
-    }
-
-    inline double Forest::getHeightThirdIncr() {
-        return _third_incr;
-    }
-
     inline double Forest::getLineageHeight(Node* nd) {
         if (nd != nullptr) {
             double sum_height = 0.0;
@@ -2107,56 +2076,6 @@ class Forest {
 //            Node::ptr_vect_t & preorder_vector = *_preorder.rbegin();
             refreshPreorder();
         }
-    }
-
-    inline void Forest::refreshPreorderNew(vector<Node*> & preorder) const {
-        // Assumes preorder just contains the root node when this function is called
-        // Also assumes that _next_node_number was initialized prior to calling this function
-        assert(preorder.size() == 1);
-        
-        Node * nd = preorder[0];
-        while (true) {
-            nd = findNextPreorderNew(nd);
-            if (nd) {
-                preorder.push_back(nd);
-            }
-            else
-                break;
-        }
-    }
-
-    inline Node * Forest::findNextPreorderNew(Node * nd) const {
-        assert(nd);
-        Node * next = 0;
-        if (!nd->_left_child && !nd->_right_sib) {
-            // nd has no children and no siblings, so next preorder is the right sibling of
-            // the first ancestral node that has a right sibling.
-
-            Node * anc = nd->_parent;
-            while (anc && !anc->_right_sib)
-                anc = anc->_parent;
-            if (anc) {
-                // We found an ancestor with a right sibling
-                next = anc->_right_sib;
-            }
-            else {
-                // nd is last preorder node in the tree
-                next = 0;
-            }
-        }
-        else if (nd->_right_sib && !nd->_left_child) {
-            // nd has no children (it is a tip), but does have a sibling on its right
-            next = nd->_right_sib;
-        }
-        else if (nd->_left_child && !nd->_right_sib) {
-            // nd has children (it is an internal node) but no siblings on its right
-            next = nd->_left_child;
-        }
-        else {
-            // nd has both children and siblings on its right
-            next = nd->_left_child;
-        }
-        return next;
     }
     
 }
