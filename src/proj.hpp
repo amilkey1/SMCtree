@@ -825,7 +825,8 @@ namespace proj {
             
             writeTreeFile();
             writePartialCount();
-            writeLogFile(); // TODO: fix this
+            writeLogFile();
+            writePartialCount();
             writeLogMarginalLikelihoodFile();
             
             if (G::_ruv) {
@@ -1361,12 +1362,15 @@ namespace proj {
 
     inline void Proj::writePartialCount() {
         // save all partials to a .txt file
-        ofstream partialf("partials.txt");
-        double total_partial_count = 0;
+        ofstream partialf("partial_count.txt");
+        partialf << "total partials needed: ";
+        
+        unsigned total_partials = 0;
         for (auto &p:_particle_vec) {
-            total_partial_count += p.getPartialCount();
+            total_partials += p.getPartialCount();
         }
-        partialf << total_partial_count << endl;
+        partialf << total_partials << "\n";
+        
         partialf.close();
     }
 

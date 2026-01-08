@@ -31,7 +31,6 @@ class Particle {
         double                                  getBirthDeathModel();
         void                                    setStartingLogLikelihoods(vector<double> starting_log_likelihoods);
         void                                    clearPartials();
-        double                                  getPartialCount();
         void                                    drawClockRate();
         void                                    setSimClockRate();
         void                                    createTrivialForest();
@@ -63,6 +62,8 @@ class Particle {
         void    finalizeLatestJoin(unsigned index, map<const void *, list<unsigned> > & nonzero_map);
         Forest::SharedPtr getForestPtr() {return _forest_ptr;}
     
+        double  getPartialCount() {return _total_particle_partials;}
+    
         // validation stuff
         double  getRootAge();
     
@@ -88,6 +89,7 @@ class Particle {
         map<string, double>                     _taxset_ages;
     
         double                                  _prev_log_likelihood;
+        unsigned                                _total_particle_partials = 0;
 };
 
     inline string Particle::debugSaveParticleInfo(unsigned i) const {
@@ -118,6 +120,7 @@ class Particle {
         _fossil_number = 0;
         _prev_log_likelihood = 0.0;
         _forest_ptr = nullptr;
+        _total_particle_partials = 0.0;
       }
 
     inline void Particle::setParticleData(Data::SharedPtr d, bool partials) {
@@ -204,6 +207,7 @@ class Particle {
         _forest_ptr->addIncrement(_lot);
 #endif
         _forest_extension.joinPriorPrior(_particle_taxsets, _unused_particle_taxsets, _particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils, _particle_fossils, _valid_taxsets, _taxset_ages);
+        _total_particle_partials++;
         
 //        if (step_number < G::_ntaxa - 2) {
 //            // if not on the last step, reset the valid taxon sets
@@ -581,10 +585,6 @@ class Particle {
         return _forest_ptr->_taxset_ages;
     }
 
-    inline double Particle::getPartialCount() {
-        return _forest_ptr->_partial_count;
-    }
-
     inline void Particle::drawClockRate() {
         _forest_ptr->_clock_rate = _lot->gamma(1, G::_clock_rate);
     }
@@ -680,6 +680,7 @@ class Particle {
         _valid_taxsets = other._valid_taxsets;
         _taxset_ages = other._taxset_ages;
         _prev_log_likelihood = other._prev_log_likelihood;
+        _total_particle_partials = other._total_particle_partials;
         
         // undock forest extension
         _forest_extension.undock();
