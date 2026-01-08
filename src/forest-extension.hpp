@@ -29,13 +29,13 @@ namespace proj {
 
         private:
 
-            Forest::ConstSharedPtr        _docked_gene_forest;
-            double                        _log_weight;
-            double                        _proposed_delta;
-            Node                          _proposed_anc;
-            const Node *                  _proposed_lchild;
-            const Node *                  _proposed_rchild;
-            Lot::SharedPtr                _lot;
+            Forest::ConstSharedPtr          _docked_gene_forest;
+            double                          _log_weight;
+            double                          _proposed_delta;
+            Node                            _proposed_anc;
+            const Node *                    _proposed_lchild;
+            const Node *                    _proposed_rchild;
+            Lot::SharedPtr                  _lot;
         
     };
     
@@ -126,12 +126,6 @@ namespace proj {
     inline tuple<double, pair<unsigned, unsigned>, pair<bool, double>> ForestExtension::chooseNodesToJoin(vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset, vector<TaxSet> &taxset_no_fossils, vector<TaxSet> &unused_taxset_no_fossils, vector<Fossil> &particle_fossils, vector<bool> &valid_taxsets) {
         
         double weight_correction = 0.0;
-        
-//        if (G::_ruv || G::_start_mode == "sim") {
-//            if (lineages.size() == G::_ntaxa) {
-//                _first_split_height = _lineages[0]->_edge_length;
-//            }
-//        }
 
         vector<unsigned> set_counts;
         

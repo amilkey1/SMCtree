@@ -1977,7 +1977,8 @@ class Forest {
 #endif
 
     inline double Forest::getHeightFirstSplit() {
-        return _first_split_height;
+        assert (_increments.size() > 0);
+        return _increments[0];
     }
 
     inline double Forest::getHeightSecondIncr() {
