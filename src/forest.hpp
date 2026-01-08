@@ -77,7 +77,7 @@ class Forest {
     
         void  addBirthDeathIncrement(Lot::SharedPtr lot, double age);
         double    drawBirthDeathIncrement(Lot::SharedPtr lot, double age);
-        bool    checkForValidTaxonSet(vector<TaxSet> taxset, vector<TaxSet> unused_taxsets);
+        pair<bool, vector<bool>>    checkForValidTaxonSet(vector<TaxSet> taxset, vector<TaxSet> unused_taxsets);
     
         double  getForestHeight() {return _tree_height;}
         PartialStore::partial_t         pullPartial();
@@ -117,7 +117,7 @@ class Forest {
         double                      _third_incr;
     
         double _tree_height;
-        vector<bool> _valid_taxsets;
+//        vector<bool> _valid_taxsets;
 };
 
     inline string Forest::debugSaveForestInfo() const {
@@ -176,7 +176,7 @@ class Forest {
         _third_incr = 0.0;
         _clock_rate = 1.0;
         _tree_height = 0.0;
-        _valid_taxsets.clear();
+//        _valid_taxsets.clear();
     }
 
     inline Forest::Forest(const Forest & other) {
@@ -1370,8 +1370,9 @@ class Forest {
             return child_transition_prob;
     }
 
-    inline bool Forest::checkForValidTaxonSet(vector<TaxSet> taxset, vector<TaxSet> unused_taxsets) {
+    inline pair<bool, vector<bool>> Forest::checkForValidTaxonSet(vector<TaxSet> taxset, vector<TaxSet> unused_taxsets) {
         bool valid = false;
+        vector<bool> valid_taxsets;
                 
         vector<string> names_of_nodes_in_sets;
         for (auto &t:taxset) {
@@ -1404,7 +1405,7 @@ class Forest {
             if (real_count == t._species_included.size()) {
                 valid = true; // TODO: what if real count is 1? in that case, the fossil has no constraint? just make that not an option?
             }
-            _valid_taxsets.push_back(valid);
+            valid_taxsets.push_back(valid);
             valid = false;
             }
         
@@ -1429,17 +1430,17 @@ class Forest {
             valid = true;
         }
         
-        _valid_taxsets.push_back(valid);
+        valid_taxsets.push_back(valid);
         
         bool at_least_one_valid = false;
-        for (unsigned v=0; v<_valid_taxsets.size(); v++) {
-            if (_valid_taxsets[v]) {
+        for (unsigned v=0; v<valid_taxsets.size(); v++) {
+            if (valid_taxsets[v]) {
                 at_least_one_valid = true;
                 break;
             }
         }
         
-        return at_least_one_valid;
+        return make_pair(at_least_one_valid, valid_taxsets);
     }
 
     inline void Forest::showForest() {
@@ -1624,7 +1625,7 @@ class Forest {
         _second_incr = other._second_incr;
         _third_incr = other._third_incr;
         _tree_height = other._tree_height;
-        _valid_taxsets = other._valid_taxsets;
+//        _valid_taxsets = other._valid_taxsets;
         _log_likelihood = other._log_likelihood;
 
         // Copy _nodes

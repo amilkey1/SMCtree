@@ -84,6 +84,8 @@ class Particle {
     
         vector<TaxSet>                          _particle_taxsets_no_fossils; // update this as nodes are joined
         vector<TaxSet>                          _unused_particle_taxsets_no_fossils; // if there are overlapping taxa in taxsets, put the largest groups here until they can be used
+        vector<bool>                            _valid_taxsets;
+        map<string, double>                     _taxset_ages;
     
         double                                  _prev_log_likelihood;
 };
@@ -180,6 +182,13 @@ class Particle {
 
     inline void Particle::proposal(unsigned step_number) {
         // TODO: lazy copying with taxon sets
+        if (step_number == 0) {
+            pair<bool, vector<bool>> valid_output = _forest_ptr->checkForValidTaxonSet(_particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils);
+            assert (valid_output.first); // there should always be a valid taxon set if things have been merged correctly
+            _valid_taxsets = valid_output.second;
+            
+        }
+        
         _forest_extension.dock(_forest_ptr, _forest_ptr->pullPartial(), _lot);
         
         double increment = _forest_ptr->drawBirthDeathIncrement(_lot, -1);
@@ -188,7 +197,14 @@ class Particle {
 #if defined (INCREMENT_COMPARISON_TEST)
         _forest_ptr->addIncrement(_lot);
 #endif
-        _forest_extension.joinPriorPrior();
+        _forest_extension.joinPriorPrior(_particle_taxsets, _unused_particle_taxsets, _particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils, _particle_fossils, _valid_taxsets, _taxset_ages);
+        
+//        if (step_number < G::_ntaxa - 2) {
+//            // if not on the last step, reset the valid taxon sets
+//            pair<bool, vector<bool>> valid_output = _forest_ptr->checkForValidTaxonSet(_particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils);
+//            assert (valid_output.first); // there should always be a valid taxon set if things have been merged correctly
+//            _valid_taxsets = valid_output.second;
+//        }
         
         if (step_number == G::_ntaxa - 2) {
             // if we are on the last step, check that the forest is down to 2 lineages (because last two lineags will be joined in the finalizing step in filtering)
@@ -633,6 +649,14 @@ class Particle {
         assert(incr > 0.0);
         
         gfp->addIncrAndJoin(incr, lsplit, rsplit, gfx);
+        
+        // reset valid taxon sets
+        if (gfp->_lineages.size() > 1) {
+            // if not on the last step, reset the valid taxon sets
+            pair<bool, vector<bool>> valid_output = _forest_ptr->checkForValidTaxonSet(_particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils);
+            assert (valid_output.first); // there should always be a valid taxon set if things have been merged correctly
+            _valid_taxsets = valid_output.second;
+        }
 
         // Can now get rid of extension
         _forest_extension.undock();
@@ -647,6 +671,8 @@ class Particle {
         _unused_particle_taxsets = other._unused_particle_taxsets;
         _particle_taxsets_no_fossils = other._particle_taxsets_no_fossils;
         _unused_particle_taxsets_no_fossils = other._unused_particle_taxsets_no_fossils;
+        _valid_taxsets = other._valid_taxsets;
+        _taxset_ages = other._taxset_ages;
         _prev_log_likelihood = other._prev_log_likelihood;
         
         // undock forest extension

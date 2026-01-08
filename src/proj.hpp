@@ -705,11 +705,9 @@ namespace proj {
             
             assert (G::_nloci > 0);
             ps.setNLoci(G::_nloci);
+            
+            // set length of partials
             ps.setNElements(G::_nstates * _data->getNumPatterns());
-//            for (unsigned locus = 1; locus < G::_nloci+1; locus++) {
-//                // Set length of partials for gene g
-//                ps.setNElements(G::_nstates*_data->getNumPatternsInSubset(locus-1));
-//            }
                         
             // create vector of particles
             _particle_vec.resize(G::_nparticles * G::_ngroups);
@@ -726,7 +724,6 @@ namespace proj {
                 g->setSeed(rng->randint(1,9999)+psuffix);
                 psuffix += 2;
             }
-            
 
             if (G::_fossils.size() > 0) {
                 // check that no fossil is older than the mean root age
