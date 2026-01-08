@@ -544,15 +544,21 @@ namespace proj {
                     // fossil age is violated
                     _log_weight = -1 * G::_infinity;
                 }
-                else {
+                else if (G::_start_mode != "sim") {
                     _log_weight = _docked_gene_forest->calcPartialArrayLazy(&_proposed_anc, _proposed_lchild, _proposed_rchild);
                     _log_weight += weight_correction;
                 }
+                else {
+                    _log_weight = 0.0; // weight is 0 if simulation
+                }
             }
-            else {
+            else if (G::_start_mode != "sim") {
                 // Compute partial likelihood array of ancestral node
                 _log_weight = _docked_gene_forest->calcPartialArrayLazy(&_proposed_anc, _proposed_lchild, _proposed_rchild);
                 _log_weight += weight_correction;
+            }
+            else {
+                _log_weight = 0.0; // weight is 0 if simulation
             }
         }
     }

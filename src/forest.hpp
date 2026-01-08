@@ -190,7 +190,8 @@ class Forest {
         clear();
         unsigned nnodes = 2*G::_ntaxa - 1;
         _nodes.reserve(nnodes);
-        _nodes.resize(G::_ntaxa);
+        _nodes.resize(2*G::_ntaxa - 1);
+        
         _nleaves = G::_ntaxa;
         for (unsigned i = 0; i < G::_ntaxa; i++) {
             string taxon_name = G::_taxon_names[i];
@@ -247,31 +248,31 @@ class Forest {
         
         _nleaves = G::_ntaxa;
 
-            for (auto &nd:_lineages) {
-                mtx.lock();
-                nd->_partials=ps.getPartial();
-                mtx.unlock();
-                
-                Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(0);
-                _first_pattern = gene_begin_end.first;
-                _npatterns = _data->getNumPatterns();
-                
-                
-                if (!nd->_left_child) {
+        for (auto &nd:_lineages) {
+            mtx.lock();
+            nd->_partials=ps.getPartial();
+            mtx.unlock();
+            
+            Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(0);
+            _first_pattern = gene_begin_end.first;
+            _npatterns = _data->getNumPatterns();
+            
+            
+            if (!nd->_left_child) {
 
-                    if (!G::_save_memory || (G::_save_memory && partials)) { // if save memory setting, don't set tip partials yet
-                            for (unsigned p=_first_pattern; p<_npatterns + _first_pattern; p++) {
-                                unsigned pp = p;
-                                for (unsigned s=0; s<G::_nstates; s++) {
-                                    Data::state_t state = (Data::state_t)1 << s;
-                                    Data::state_t d = data_matrix[nd->_number][pp];
-                                    double result = state & d;
-                                    (nd->_partials->_v)[p*G::_nstates + s] = (result == 0.0 ? 0.0:1.0);
-                                }
+                if (!G::_save_memory || (G::_save_memory && partials)) { // if save memory setting, don't set tip partials yet
+                        for (unsigned p=_first_pattern; p<_npatterns + _first_pattern; p++) {
+                            unsigned pp = p;
+                            for (unsigned s=0; s<G::_nstates; s++) {
+                                Data::state_t state = (Data::state_t)1 << s;
+                                Data::state_t d = data_matrix[nd->_number][pp];
+                                double result = state & d;
+                                (nd->_partials->_v)[p*G::_nstates + s] = (result == 0.0 ? 0.0:1.0);
                             }
-                    }
+                        }
                 }
             }
+        }
     }
 
     inline double Forest::calcSubsetLogLikelihood(unsigned i) {

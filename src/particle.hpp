@@ -129,6 +129,7 @@ class Particle {
     }
 
     inline void Particle::createTrivialForest() {
+        _forest_ptr = Forest::SharedPtr(new Forest());
         _forest_ptr->createTrivialForest();
     }
 
@@ -189,7 +190,12 @@ class Particle {
             
         }
         
-        _forest_extension.dock(_forest_ptr, _forest_ptr->pullPartial(), _lot);
+        if (G::_start_mode != "sim") {
+            _forest_extension.dock(_forest_ptr, _forest_ptr->pullPartial(), _lot);
+        }
+        else {
+            _forest_extension.dockSim(_forest_ptr, _lot);
+        }
         
         double increment = _forest_ptr->drawBirthDeathIncrement(_lot, -1);
         _forest_extension.addIncrement(increment);
