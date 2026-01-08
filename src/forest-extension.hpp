@@ -329,6 +329,9 @@ namespace proj {
         _proposed_anc._split += _proposed_lchild->_split;
         _proposed_anc._split += _proposed_rchild->_split;
         
+        int proposed_anc_number = _docked_gene_forest->_lineages.back()->_number + 1;
+        string proposed_anc_name = "node-" + to_string(proposed_anc_number);
+        
         string name1 = _proposed_lchild->_name;
         string name2 = _proposed_rchild->_name;
         
@@ -369,7 +372,7 @@ namespace proj {
              if (update_these_taxsets[i] == true) {
                  taxset_no_fossils[i]._species_included.erase(remove(taxset_no_fossils[i]._species_included.begin(), taxset_no_fossils[i]._species_included.end(), _proposed_lchild->_name));
                  taxset_no_fossils[i]._species_included.erase(remove(taxset_no_fossils[i]._species_included.begin(), taxset_no_fossils[i]._species_included.end(), _proposed_rchild->_name));
-                 taxset_no_fossils[i]._species_included.push_back(_proposed_anc._name);
+                 taxset_no_fossils[i]._species_included.push_back(proposed_anc_name);
                  
                  if (taxset_no_fossils[i]._species_included.size() == 1) {
                      update_unused = true;
@@ -385,7 +388,7 @@ namespace proj {
              if (update_these_unused_taxsets[i] == true) {
                  unused_taxset_no_fossils[i]._species_included.erase(remove(unused_taxset_no_fossils[i]._species_included.begin(), unused_taxset_no_fossils[i]._species_included.end(), _proposed_lchild->_name));
                  unused_taxset_no_fossils[i]._species_included.erase(remove(unused_taxset_no_fossils[i]._species_included.begin(), unused_taxset_no_fossils[i]._species_included.end(), _proposed_rchild->_name));
-                 unused_taxset_no_fossils[i]._species_included.push_back(_proposed_anc._name);
+                 unused_taxset_no_fossils[i]._species_included.push_back(proposed_anc_name);
              }
          }
          
@@ -393,7 +396,7 @@ namespace proj {
          if (update_unused) {
              vector<unsigned> updateable_unused;
              vector<unsigned> updateable_unused_sizes;
-             string new_name = _proposed_anc._name;
+             string new_name = proposed_anc_name;
              for (unsigned count=0; count < unused_taxset_no_fossils.size(); count++) {
                  for (auto &n:unused_taxset_no_fossils[count]._species_included) {
                      if (n == new_name) {
@@ -464,7 +467,7 @@ namespace proj {
              if (update_these_taxsets[i] == true) {
                  taxset[i]._species_included.erase(remove(taxset[i]._species_included.begin(), taxset[i]._species_included.end(), _proposed_lchild->_name));
                  taxset[i]._species_included.erase(remove(taxset[i]._species_included.begin(), taxset[i]._species_included.end(), _proposed_rchild->_name));
-                 taxset[i]._species_included.push_back(_proposed_anc._name);
+                 taxset[i]._species_included.push_back(proposed_anc_name);
                  
                  unsigned n_non_fossil_lineages = 0;
                  for (auto &t:taxset[i]._species_included) {
@@ -488,7 +491,7 @@ namespace proj {
              if (update_these_unused_taxsets[i] == true) {
                  unused_taxset[i]._species_included.erase(remove(unused_taxset[i]._species_included.begin(), unused_taxset[i]._species_included.end(), _proposed_lchild->_name));
                  unused_taxset[i]._species_included.erase(remove(unused_taxset[i]._species_included.begin(), unused_taxset[i]._species_included.end(), _proposed_rchild->_name));
-                 unused_taxset[i]._species_included.push_back(_proposed_anc._name);
+                 unused_taxset[i]._species_included.push_back(proposed_anc_name);
              }
          }
          
@@ -496,7 +499,7 @@ namespace proj {
          if (update_unused) {
              vector<unsigned> updateable_unused;
              vector<unsigned> updateable_unused_sizes;
-             string new_name = _proposed_anc._name;
+             string new_name = proposed_anc_name;
              for (unsigned count=0; count < unused_taxset.size(); count++) {
                  for (auto &n:unused_taxset[count]._species_included) {
                      if (n == new_name) {
