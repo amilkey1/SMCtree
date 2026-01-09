@@ -61,6 +61,7 @@ class Particle {
         Forest::SharedPtr getForestPtr() {return _forest_ptr;}
     
         double  getPartialCount() {return _total_particle_partials;}
+        void    resetSubgroupPointers(Forest::SharedPtr gene_forest_copy);
     
         // validation stuff
         double  getRootAge();
@@ -679,6 +680,17 @@ class Particle {
 
         // Can now get rid of extension
         _forest_extension.undock();
+    }
+
+    inline void Particle::resetSubgroupPointers(Forest::SharedPtr forest_copy) {
+        Forest::SharedPtr gfp = _forest_ptr;
+        Forest::SharedPtr gfcpy = forest_copy;
+        
+        *gfcpy = *gfp;
+        _forest_ptr = gfcpy;
+        
+        // let gpf point to the copy
+        gfp = gfcpy;
     }
 
     inline void Particle::operator=(const Particle & other) {

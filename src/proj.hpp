@@ -729,7 +729,6 @@ namespace proj {
             // reset marginal likelihood
             _log_marginal_likelihood = 0.0;
             vector<double> starting_log_likelihoods = p.calcGeneTreeLogLikelihoods();
-//            vector<double> starting_log_likelihoods = _particle_vec[0].calcGeneTreeLogLikelihoods();
             
             _log_marginal_likelihood = 0.0;
             for (auto &l:starting_log_likelihoods) {
@@ -749,6 +748,18 @@ namespace proj {
                 psuffix += 2;
             }
             
+                // if using subgroups, reset pointers so particles within a group have same gene forest pointers
+            if (G::_ngroups > 1) {
+                for (unsigned i=0; i<G::_ngroups; i++) {
+                    unsigned start = i * G::_nparticles;
+                    unsigned end = start + (G::_nparticles) - 1;
+                    Forest::SharedPtr gfcpy;
+                    gfcpy = Forest::SharedPtr(new Forest());
+                    for (unsigned p=start; p<end+1; p++) {
+                        _particle_vec[p].resetSubgroupPointers(gfcpy);
+                    }
+                }
+            }
             
             for (unsigned p=1; p<_particle_vec.size(); p++) {
                 _particle_vec[p].setStartingLogLikelihoods(starting_log_likelihoods);
