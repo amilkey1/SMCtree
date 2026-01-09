@@ -30,7 +30,7 @@ namespace proj {
    
             void processCommandLineOptions(int argc, const char * argv[]);
             void run();
-            void initializeParticles();
+//            void initializeParticles();
             void initializeParticle(Particle &particle);
         
         private:
@@ -512,8 +512,10 @@ namespace proj {
             psuffix += 2;
         }
         
-        _particle_vec.resize(G::_nparticles);
-        initializeParticles();
+        Particle p;
+        initializeParticle(p);
+        
+        _particle_vec.resize(G::_nparticles, p);
         
         unsigned nsteps = (G::_ntaxa-1);
         
@@ -1245,79 +1247,84 @@ namespace proj {
             partials = false; // no partials needed for running on empty
         }
         
-        particle.setParticleData(_data, partials);
-    }
-
-    inline void Proj::initializeParticles() { // TODO: make one template particle and copy it
-        // set partials for first particle under save_memory setting for initial marginal likelihood calculation
-         assert (G::_nthreads > 0);
-
-        unsigned psuffix = 1;
-        
-         bool partials = true;
-
-         for (auto & p:_particle_vec ) {
-             if (G::_start_mode != "sim") {
-                 p.setParticleData(_data, partials);
-                 partials = false;
-             }
-             else {
-                 p.createTrivialForest();
-             }
-             
-             // set particle seed for drawing new values
-             p.setSeed(rng->randint(1,9999) + psuffix);
-             if (G::_start_mode != "sim") {
-                 if (G::_est_clock_rate) {
-                     p.drawClockRate();
-                 }
-                 else {
-                     p.setClockRate(G::_clock_rate);
-                 }
-             }
-             else {
-                 p.setSimClockRate();
-             }
-             
-             psuffix += 2;
-             
-             if (G::_est_lambda) {
-                 assert (G::_est_mu);
-                 if (G::_mu > 0.0) {
-                     p.drawBirthDiff();
-                     p.drawTurnover();
-                     p.calculateLambdaAndMu();
-                 }
-                 else {
-                     // Yule model
-                     p.drawLambda();
-                 }
-             }
-         }
-        
-        if (G::_taxsets.size() > 0) {
-            removeUnecessaryTaxsets(); // remove any taxsets with just one lineage and one fossil because they will not provide any constraints
+        if (G::_start_mode != "sim") {
+            particle.setParticleData(_data, partials);
         }
-        
-        for (auto &p:_particle_vec) {
-            p.setParticleTaxSets();
-            p.setOverlappingTaxSets();
-            p.setTaxSetsNoFossils();
-        }
-        
-        if (G::_fossils.size() > 0) {
-            for (auto &p:_particle_vec) {
-                p.setFossils();
-                p.drawFossilAges(); // draw a separate fossil age for each particle
-            }
-        }
-        
-    if (G::_est_root_age) {
-        for (auto &p:_particle_vec) {
-                p.drawRootAge();
-            }
+        else {
+            particle.createTrivialForest();
         }
     }
+
+//    inline void Proj::initializeParticles() {
+//        // set partials for first particle under save_memory setting for initial marginal likelihood calculation
+//         assert (G::_nthreads > 0);
+//
+//        unsigned psuffix = 1;
+//
+//         bool partials = true;
+//
+//         for (auto & p:_particle_vec ) {
+//             if (G::_start_mode != "sim") {
+//                 p.setParticleData(_data, partials);
+//                 partials = false;
+//             }
+//             else {
+//                 p.createTrivialForest();
+//             }
+//
+//             // set particle seed for drawing new values
+//             p.setSeed(rng->randint(1,9999) + psuffix);
+//             if (G::_start_mode != "sim") {
+//                 if (G::_est_clock_rate) {
+//                     p.drawClockRate();
+//                 }
+//                 else {
+//                     p.setClockRate(G::_clock_rate);
+//                 }
+//             }
+//             else {
+//                 p.setSimClockRate();
+//             }
+//
+//             psuffix += 2;
+//
+//             if (G::_est_lambda) {
+//                 assert (G::_est_mu);
+//                 if (G::_mu > 0.0) {
+//                     p.drawBirthDiff();
+//                     p.drawTurnover();
+//                     p.calculateLambdaAndMu();
+//                 }
+//                 else {
+//                     // Yule model
+//                     p.drawLambda();
+//                 }
+//             }
+//         }
+//
+//        if (G::_taxsets.size() > 0) {
+//            removeUnecessaryTaxsets(); // remove any taxsets with just one lineage and one fossil because they will not provide any constraints
+//        }
+//
+//        for (auto &p:_particle_vec) {
+//            p.setParticleTaxSets();
+//            p.setOverlappingTaxSets();
+//            p.setTaxSetsNoFossils();
+//        }
+//
+//        if (G::_fossils.size() > 0) {
+//            for (auto &p:_particle_vec) {
+//                p.setFossils();
+//                p.drawFossilAges(); // draw a separate fossil age for each particle
+//            }
+//        }
+//
+//    if (G::_est_root_age) {
+//        for (auto &p:_particle_vec) {
+//                p.drawRootAge();
+//            }
+//        }
+//    }
 
     inline void Proj::removeUnecessaryTaxsets() {
         // remove any taxsets with just one real taxon because there is no constraint in that case
