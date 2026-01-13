@@ -470,6 +470,8 @@ class Forest {
         
         birth_death_prior += log_joining_prob;
         
+        // TODO: if estimating lambda and mu and clock rate and root age, add those priors
+        
         assert(birth_death_prior == birth_death_prior);
         
         return birth_death_prior;

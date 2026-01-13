@@ -284,8 +284,8 @@ class Particle {
         double tree_prior = _forest_ptr->getTreePrior();
         double param_prior = 0.0;
         
-        // TODO: for now, these params are all drawn from exponential distributions - need to change priors if distribution is changed
-        // TODO: this also assumes the mean of the exponential distribution is the user-specified param
+        // these params are all drawn from exponential distributions
+        // this also assumes the mean of the exponential distribution is the user-specified param
         if (G::_est_mu && G::_mu > 0.0) {
             param_prior += log(G::_mu) - (_forest_ptr->_estimated_mu * G::_mu);
         }
@@ -303,7 +303,6 @@ class Particle {
     }
 
     inline double Particle::getBirthDeathModel() {
-        // TODO: fix this for birth death model
         return _forest_ptr->getTreePrior();
     }
 

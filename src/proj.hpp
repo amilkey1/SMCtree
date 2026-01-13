@@ -516,14 +516,20 @@ namespace proj {
         
         _particle_vec.resize(G::_nparticles, p);
         
+        psuffix = 1;
+        for (auto &p:_particle_vec) {
+            p.setSeed(rng->randint(1,9999) + psuffix);
+            psuffix += 2;
+        }
+        
         unsigned nsteps = (G::_ntaxa-1);
         
         for (unsigned n=0; n<nsteps; n++) {
             simProposeParticles(n);
             double ess = filterParticles(n, 0);
-            if (ess == -1) {
-                simulate();
-            }
+//            if (ess == -1) {
+//                simulate();
+//            }
             G::_step++;
         }
         
@@ -1352,8 +1358,6 @@ namespace proj {
                 log_likelihood += t;
             }
             
-            double yule = 0.0;
-            
             double total_log_prior = p.getAllPriors();
             
             double log_posterior = total_log_prior + log_likelihood;
@@ -1363,14 +1367,6 @@ namespace proj {
             }
 
             double clock_rate = p.getClockRate();
-            
-            double birth_death = 0.0;
-            if (G::_mu > 0.0) {
-                birth_death = p.getBirthDeathModel();
-            }
-            else {
-                yule = p.getYuleModel();
-            }
             
             logf << "\t" << log_posterior;
             logf << "\t" << log_likelihood;
