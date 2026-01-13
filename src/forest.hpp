@@ -44,7 +44,7 @@ class Forest {
         void calcPartialArray(Node* new_nd);
         double calcPartialArrayLazy(Node * new_nd, const Node * lchild, const Node * rchild) const;
         double calcTransitionProbability(Node* child, double s, double s_child, unsigned locus);
-        double calcTransitionProbabilityLazy(double s, double s_child, double edge_lengt) const;
+        double calcTransitionProbabilityLazy(double s, double s_child, double edge_length, unsigned locus) const;
         
         //POL added below
         Node * pullNode();
@@ -589,8 +589,8 @@ class Forest {
             assert(child->_partials);
             auto & child_partial_array = child->_partials->_v;
 
-            double pr_same = calcTransitionProbabilityLazy(0, 0, child->_edge_length + edgelen_extension);
-            double pr_diff = calcTransitionProbabilityLazy(0, 1, child->_edge_length + edgelen_extension);
+            double pr_same = calcTransitionProbabilityLazy(0, 0, child->_edge_length + edgelen_extension, i);
+            double pr_diff = calcTransitionProbabilityLazy(0, 1, child->_edge_length + edgelen_extension, i);
 //            for (unsigned p = 0; p < npatterns; p++) {
             for (unsigned p = first_pattern; p < last_pattern; p++) {
                 unsigned pxnstates = p*G::_nstates;
@@ -868,15 +868,16 @@ class Forest {
         return child_transition_prob;
     }
 
-    inline double Forest::calcTransitionProbabilityLazy(double s, double s_child, double edge_length) const {
+    inline double Forest::calcTransitionProbabilityLazy(double s, double s_child, double edge_length, unsigned locus) const {
         double child_transition_prob = 0.0;
+        double relative_rate = G::_double_relative_rates[locus];
 
             if (s == s_child) {
-                child_transition_prob = 0.25 + 0.75*exp(-4.0 * _clock_rate * edge_length / 3.0);
+                child_transition_prob = 0.25 + 0.75*exp(-4.0 * _clock_rate * edge_length * relative_rate / 3.0);
             }
             
             else {
-                child_transition_prob = 0.25 - 0.25*exp(-4.0 * edge_length * _clock_rate / 3.0);
+                child_transition_prob = 0.25 - 0.25*exp(-4.0 * edge_length * _clock_rate * relative_rate / 3.0);
             }
             return child_transition_prob;
     }
