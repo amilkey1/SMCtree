@@ -457,57 +457,21 @@ class Forest {
     inline double Forest::getTreePrior() {
         double birth_death_prior = 0.0;
         
-        // https://bio.libretexts.org/Bookshelves/Evolutionary_Developmental_Biology/Phylogenetic_Comparative_Methods_(Harmon)/10%3A_Introduction_to_Birth-Death_Models/10.02%3A_The_Birth-Death_Model
-        // Raup 1985
-        
-        // starting from the root, go increment by increment and calculate the following parameters:
-        
-        double E = _estimated_mu / _estimated_lambda;
-        double r = _estimated_lambda - _estimated_mu;
-        double t = 0.0;
-        unsigned count = (unsigned) _increments.size() - 1;
-        
-        unsigned nbranches = (unsigned) _increments.size();
-        
-        for (unsigned i = 1; i < nbranches + 1; i++) {
-            // i is number of species in existence
-            // i = 1, 2, 3, ... nbranches
-            // i is number of species in existence
-            // density increment is the probability of having exactly i species at time t
-            
-            // if starting at lineage at the root, prob of 1 lineage at time 0 = 1, so no need to include this
-
-                t += _increments[count]; // TODO: = or += ? - I think t is height not increment, so +=
-
-            double a = (E*(exp(r)*t - 1)) / (exp(r)*t - E);
-            double B = a / E;
-            
-            double density_increment = 0.0;
-//            if (birth_death_prior == 0) {
-//                density_increment = a; // starting with a single lineage
-//                birth_death_prior = log(density_increment);
-//            }
-//            else {
-            density_increment = (1-a)*(1-B)*pow(B, i-1);
-            assert (density_increment == density_increment);
-            
-            birth_death_prior += log(density_increment);
-            assert(birth_death_prior == birth_death_prior);
-//            }
-            
-//            double log_prob_density_increment = log((1-a)*(1-B)*pow(B, i-1));
-            
-//            birth_death_prior += log_prob_density_increment;
-            if (count == 0) {
-                _first_split_prior = density_increment;
-            }
-            count--;
+        // calculate prior on branch lengths
+        for (auto &t:_increments) {
+            birth_death_prior += log(t);
         }
         
-//        birth_death_prior = log(birth_death_prior);
+        double log_joining_prob = 0.0;
+        // calculate topology prior
+        for (unsigned nlineages=G::_ntaxa; nlineages > 1; nlineages--) {
+            log_joining_prob += -log(0.5*nlineages*(nlineages-1));
+        }
         
-//        assert(birth_death_prior == birth_death_prior); // TODO: why does this turn into Nan?
-        // check for NaN
+        birth_death_prior += log_joining_prob;
+        
+        assert(birth_death_prior == birth_death_prior);
+        
         return birth_death_prior;
     }
 

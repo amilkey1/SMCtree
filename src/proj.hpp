@@ -30,7 +30,6 @@ namespace proj {
    
             void processCommandLineOptions(int argc, const char * argv[]);
             void run();
-//            void initializeParticles();
             void initializeParticle(Particle &particle);
         
         private:
@@ -464,7 +463,7 @@ namespace proj {
         assert(G::_sim_ntaxa > 0);
         
         // create vector of particles
-        G::_nparticles = 100;
+        G::_nparticles = 1000;
         G::_ngroups = 1;
         G::_est_lambda = false;
         G::_est_root_age = false;
@@ -521,7 +520,10 @@ namespace proj {
         
         for (unsigned n=0; n<nsteps; n++) {
             simProposeParticles(n);
-            filterParticles(n, 0);
+            double ess = filterParticles(n, 0);
+            if (ess == -1) {
+                simulate();
+            }
             G::_step++;
         }
         
@@ -724,7 +726,6 @@ namespace proj {
             G::_step = 0;
             Particle p;
             initializeParticle(p);
-//            initializeParticles(); // TODO: make one template particle and copy it
             
             //debugSaveParticleVectorInfo("debug-initialized.txt", 0);
 
@@ -918,9 +919,6 @@ namespace proj {
         for (unsigned a = 0; a < G::_nparticles * G::_ngroups; a++) {
             particle_indices.push_back(a);
         }
-//        for (unsigned a=start; a <end+1; a++) {
-//            particle_indices.push_back(a); // TODO: check this
-//        }
         
         unsigned prob_count = 0;
         for (unsigned p=start; p < end + 1; p++) {
@@ -931,6 +929,8 @@ namespace proj {
         // Normalize log_weights to create discrete probability distribution
         double log_sum_weights = G::calcLogSum(probs);
         
+        double ess = 0.0;
+        
         // if all weights are -inf, exit
         if (log_sum_weights != log_sum_weights) {
             throw XProj("All particles have violated fossil constraints; try again with more particles");
@@ -940,7 +940,6 @@ namespace proj {
         // Compute component of the log marginal likelihood due to this step
         _log_marginal_likelihood += log_sum_weights - log(G::_nparticles);
         
-        double ess = 0.0;
         if (G::_verbosity > 1) {
             // Compute effective sample size
             ess = computeEffectiveSampleSize(probs);
@@ -1254,77 +1253,6 @@ namespace proj {
             particle.createTrivialForest();
         }
     }
-
-//    inline void Proj::initializeParticles() {
-//        // set partials for first particle under save_memory setting for initial marginal likelihood calculation
-//         assert (G::_nthreads > 0);
-//
-//        unsigned psuffix = 1;
-//
-//         bool partials = true;
-//
-//         for (auto & p:_particle_vec ) {
-//             if (G::_start_mode != "sim") {
-//                 p.setParticleData(_data, partials);
-//                 partials = false;
-//             }
-//             else {
-//                 p.createTrivialForest();
-//             }
-//
-//             // set particle seed for drawing new values
-//             p.setSeed(rng->randint(1,9999) + psuffix);
-//             if (G::_start_mode != "sim") {
-//                 if (G::_est_clock_rate) {
-//                     p.drawClockRate();
-//                 }
-//                 else {
-//                     p.setClockRate(G::_clock_rate);
-//                 }
-//             }
-//             else {
-//                 p.setSimClockRate();
-//             }
-//
-//             psuffix += 2;
-//
-//             if (G::_est_lambda) {
-//                 assert (G::_est_mu);
-//                 if (G::_mu > 0.0) {
-//                     p.drawBirthDiff();
-//                     p.drawTurnover();
-//                     p.calculateLambdaAndMu();
-//                 }
-//                 else {
-//                     // Yule model
-//                     p.drawLambda();
-//                 }
-//             }
-//         }
-//
-//        if (G::_taxsets.size() > 0) {
-//            removeUnecessaryTaxsets(); // remove any taxsets with just one lineage and one fossil because they will not provide any constraints
-//        }
-//
-//        for (auto &p:_particle_vec) {
-//            p.setParticleTaxSets();
-//            p.setOverlappingTaxSets();
-//            p.setTaxSetsNoFossils();
-//        }
-//
-//        if (G::_fossils.size() > 0) {
-//            for (auto &p:_particle_vec) {
-//                p.setFossils();
-//                p.drawFossilAges(); // draw a separate fossil age for each particle
-//            }
-//        }
-//
-//    if (G::_est_root_age) {
-//        for (auto &p:_particle_vec) {
-//                p.drawRootAge();
-//            }
-//        }
-//    }
 
     inline void Proj::removeUnecessaryTaxsets() {
         // remove any taxsets with just one real taxon because there is no constraint in that case
