@@ -334,7 +334,7 @@ class Forest {
                 
         double u = lot->uniform();
             
-        double lambda_minus_mu = G::_lambda - G::_mu;
+        double lambda_minus_mu = birth_rate - death_rate;
         
         double b = G::_step;
         double k = b + 1;
@@ -389,6 +389,7 @@ class Forest {
         double term2_denom = log_mu + log_phi + log_z;
         double term3_denom = log_lambda;
         double term4_denom = log_mu + log_x;
+        
 
         vector<double> denom_values;
         if (G::_mu == 0) {
@@ -417,7 +418,8 @@ class Forest {
         double denominator_test = max_logv + log(factored_sum);
 
         double new_height = numerator_test - denominator_test;
-        new_height /= (G::_mu - G::_lambda);
+        
+        new_height /= (death_rate - birth_rate);
 
         assert (new_height > 0);
         assert (new_height <= troot + 0.01);
