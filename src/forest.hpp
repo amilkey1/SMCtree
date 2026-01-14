@@ -259,17 +259,25 @@ class Forest {
     }
 
     inline double Forest::calcSubsetLogLikelihood(unsigned i) {
-        if (_lineages.size() == 1) {
-            // if forest is complete, only include the root node in the likelihood calculation
-            unsigned nnodes = (unsigned) _nodes.size();
-            for (auto &nd:_nodes) {
-                if (nd._number != nnodes - 1) {
-                    nd._use_in_likelihood = false;
-                }
-                else {
-                    nd._use_in_likelihood = true;
-                }
-            }
+//        if (_lineages.size() == 1) {
+//            // if forest is complete, only include the root node in the likelihood calculation
+//            unsigned nnodes = (unsigned) _nodes.size();
+//            for (auto &nd:_nodes) {
+//                if (nd._number != nnodes - 1) {
+//                    nd._use_in_likelihood = false;
+//                }
+//                else {
+//                    nd._use_in_likelihood = true;
+//                }
+//            }
+//        }
+        
+        for (auto &nd:_nodes) {
+            nd._use_in_likelihood = false;
+        }
+        
+        for (auto &nd:_lineages) {
+            nd->_use_in_likelihood = true;
         }
         
         _gene_tree_log_likelihoods[i] = 0.0;
@@ -279,14 +287,15 @@ class Forest {
         Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(i);
         _first_pattern = gene_begin_end.first;
 
-        for (auto &nd:_nodes) {
-            if (nd._use_in_likelihood) {
-                assert (nd._partials != nullptr); // ignore fossils and fake nodes in likelihood calculations
+//        for (auto &nd:_nodes) {
+        for (auto &nd:_lineages) {
+            if (nd->_use_in_likelihood) {
+                assert (nd->_partials != nullptr); // ignore fossils and fake nodes in likelihood calculations
                 double log_like = 0.0;
                 for (unsigned p=_first_pattern; p<_npatterns + _first_pattern; p++) {
                     double site_like = 0.0;
                     for (unsigned s=0; s<G::_nstates; s++) {
-                        double partial = (nd._partials->_v)[p*G::_nstates+s];
+                        double partial = (nd->_partials->_v)[p*G::_nstates+s];
                         site_like += 0.25*partial;
                     }
                     if (site_like == 0) {
@@ -786,7 +795,6 @@ class Forest {
         }
             
         }
-            
         return curr_loglike - prev_loglike;
     }
 

@@ -248,17 +248,21 @@ namespace proj {
             unsigned size1 = (unsigned) taxset.size();
             if (node_choice_index < size1) { // only existing taxon sets will have associated fossils; there is no branch length constraint if the node chosen is not in a taxon set
                 vector<string> species_included = taxset[node_choice_index]._species_included;
-                for (auto &s:species_included) {
-                    if (s.find(match_string) != std::string::npos) {
-                        fossil_constraint = true;
-                        string fossil_name = s;
-                        for (auto &f:particle_fossils) {
-                            if (f._name + "_FOSSIL" == fossil_name) {
-                                fossil_age = f._age;
-                                break;
+                if (species_included.size() == 2) {
+                    // fossil constraint only applies when the taxon set is down to last 2 lineages
+                    // TODO: double check this
+                    for (auto &s:species_included) {
+                        if (s.find(match_string) != std::string::npos) {
+                            fossil_constraint = true;
+                            string fossil_name = s;
+                            for (auto &f:particle_fossils) {
+                                if (f._name + "_FOSSIL" == fossil_name) {
+                                    fossil_age = f._age;
+                                    break;
+                                }
                             }
+                            break;
                         }
-                        break;
                     }
                 }
             }
@@ -531,6 +535,7 @@ namespace proj {
         }
         else {
             if (fossil_constraint) {
+                // TODO: I don't think this works if > 2 taxa in clade
                 assert (fossil_age != -1);
                 // figure out if associated branch length has violated the fossil constraint
                 // node must be at least as deep as the fossil, which sets the minimum age for the group

@@ -39,6 +39,7 @@ class Particle {
         string                                  saveForestNewick() {
                                                         return _forest_ptr->makeNewick(8, true);}
         void setSeed(unsigned seed) const {_lot->setSeed(seed);}
+        void                                    showTaxaJoined();
 
         string debugSaveParticleInfo(unsigned i) const;
         void drawBirthDiff();
@@ -58,6 +59,7 @@ class Particle {
         void updateFossilTaxsets(string fossil_name);
     
         void    finalizeLatestJoin(unsigned index, map<const void *, list<unsigned> > & nonzero_map);
+        void    finalizeThisParticle();
         Forest::SharedPtr getForestPtr() {return _forest_ptr;}
     
         double  getPartialCount() {return _total_particle_partials;}
@@ -69,9 +71,7 @@ class Particle {
     private:
         mutable                                 Lot::SharedPtr _lot;
         void                                    clear();
-    
-        Forest                                  _forest;
-    
+        
         mutable ForestExtension                 _forest_extension;
         Forest::SharedPtr                       _forest_ptr;
     
@@ -618,6 +618,49 @@ class Particle {
         return _forest_ptr->_estimated_root_age;
     }
 
+    inline void Particle::finalizeThisParticle() {
+        // Makes join closest to leaf-level in _forest_extension
+        // permanent, then undocks _forest_extension
+        
+        // Get reference to gene forest extension for this locus
+        ForestExtension & gfx = _forest_extension;
+        
+        // Get pointer to gene forest for this locus
+        Forest::SharedPtr gfp = _forest_ptr;
+        
+        // Copy log likelihood
+        gfp->setLogLikelihood(_prev_log_likelihood + gfx.getLogWeight());
+                        
+        // Get splits for children of _proposed_anc
+        const Node * anc = gfx.getProposedAnc();
+        assert(anc);
+        const Node * lchild = gfx.getProposedLChild();
+        assert(lchild);
+        const Node * rchild = gfx.getProposedRChild();
+        assert(rchild);
+        Split lsplit = lchild->_split;
+        Split rsplit = rchild->_split;
+        
+        assert(anc->_split.isEquivalent(lsplit + rsplit));
+        
+        // Recreate extension's join in the actual gene forest
+        double incr = gfx.getProposedDelta();
+        assert(incr > 0.0);
+        
+        gfp->addIncrAndJoin(incr, lsplit, rsplit, gfx);
+        
+        // reset valid taxon sets
+        if (gfp->_lineages.size() > 1) {
+            // if not on the last step, reset the valid taxon sets
+            pair<bool, vector<bool>> valid_output = _forest_ptr->checkForValidTaxonSet(_particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils);
+            assert (valid_output.first); // there should always be a valid taxon set if things have been merged correctly
+            _valid_taxsets = valid_output.second;
+        }
+
+        // Can now get rid of extension
+        _forest_extension.undock();
+    }
+
     inline void Particle::finalizeLatestJoin(unsigned index, map<const void *, list<unsigned> > & nonzero_map) {
         // Makes join closest to leaf-level in _forest_extension
         // permanent, then undocks _forest_extension
@@ -692,8 +735,11 @@ class Particle {
         gfp = gfcpy;
     }
 
+    inline void Particle::showTaxaJoined() {
+        cout << _forest_extension.getProposedLChild()->_name << "\t" << "\t" << _forest_extension.getProposedRChild()->_name << endl;
+    }
+
     inline void Particle::operator=(const Particle & other) {
-        _forest = other._forest;
         _log_weight = other._log_weight;
         _fossil_number = other._fossil_number;
         _particle_fossils = other._particle_fossils;

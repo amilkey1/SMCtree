@@ -795,8 +795,15 @@ namespace proj {
                 
                 proposeParticles(g);
                 
+                unsigned particle_num = 0;
                 if (G::_nthreads == 1) {
                     for (unsigned a=0; a<G::_ngroups; a++) {
+//                        for (auto &p:_particle_vec) {
+//                            cout << particle_num << "\t" << "\t";
+//                            p.showTaxaJoined();
+//                            p.showParticle();
+//                            particle_num++;
+//                        }
                         double ess = filterParticles(g, a);
                         output(format("     ESS = %d\n") % ess, 2);
                     }
@@ -805,6 +812,11 @@ namespace proj {
                 else {
                     filterParticlesThreading(g);
                 }
+                
+//                for (auto &p:_particle_vec) {
+//                    p.showParticle();
+//                    p.calcGeneTreeLogLikelihoods();
+//                }
             }
             output(format("     log marginal likelihood = %d\n") % _log_marginal_likelihood, 2);
             
@@ -1024,29 +1036,25 @@ namespace proj {
         unsigned next_nonzero = 0;
         while (next_nonzero < nonzeros.size()) {
             double index_survivor = nonzeros[next_nonzero];
-            
+
             unsigned index_survivor_in_particles = particle_indices[index_survivor + start];
-            
-            // TODO: check this works with multiple groups
+
             _particle_vec[index_survivor_in_particles].finalizeLatestJoin(index_survivor_in_particles, nonzero_map);
 
-            
+
             unsigned ncopies = counts[index_survivor] - 1;
             for (unsigned k = 0; k < ncopies; k++) {
                 double index_nonsurvivor = zeros[next_zero++];
 
                 // Replace non-survivor with copy of survivor
-//                unsigned survivor_index_in_particles = index_survivor+start;
-//                unsigned non_survivor_index_in_particles = index_nonsurvivor+start;
-
                 unsigned survivor_index_in_particles = particle_indices[index_survivor+start];
                 unsigned non_survivor_index_in_particles = particle_indices[index_nonsurvivor+start];
-                
+
                 _particle_vec[non_survivor_index_in_particles] = _particle_vec[survivor_index_in_particles];
             }
             ++next_nonzero;
         }
-        
+//
         return ess;
 #else
 
@@ -1180,9 +1188,20 @@ namespace proj {
 
     inline void Proj::proposeParticles(unsigned step_number) {
         assert(G::_nthreads > 0);
+        unsigned count = 0;
         if (G::_nthreads == 1) {
             for (auto & p : _particle_vec) {
+//                if (count == 46 || count == 48) {
+//                    cout << "stop";
+//                }
                 p.proposal(step_number);
+                
+//                if (count == 46 && step_number == 2) {
+//                    p.finalizeThisParticle();
+//                    p.showParticle();
+//                    p.calcGeneTreeLogLikelihoods();
+//                }
+                count++;
             }
         }
         else {
