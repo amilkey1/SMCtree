@@ -379,6 +379,7 @@ class Particle {
         // go through taxsets one by one and check for duplicate taxa
         for (unsigned count = 0; count < _particle_taxsets.size(); count++) {
             for (unsigned comparison = count + 1; comparison < _particle_taxsets.size(); comparison++) {
+                // TODO: if two taxsets are equal except for the fossil, combine them and use the older fossil
                 vector<string> common_elements;
                 // Find the intersection of the two vectors
 

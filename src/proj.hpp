@@ -522,6 +522,11 @@ namespace proj {
             psuffix += 2;
         }
         
+        
+        if (G::_taxsets.size() > 0) {
+            removeUnecessaryTaxsets(); // remove any taxsets with just one lineage and one fossil because they will not provide any constraints
+        }
+        
         unsigned nsteps = (G::_ntaxa-1);
         
         for (unsigned n=0; n<nsteps; n++) {
@@ -692,13 +697,6 @@ namespace proj {
             
             // set length of partials
             ps.setNElements(G::_nstates * _data->getNumPatterns());
-                        
-            // create vector of particles
-//            _particle_vec.resize(G::_nparticles * G::_ngroups);
-
-//            for (unsigned i=0; i<G::_nparticles * G::_ngroups; i++) {
-//                _particle_vec[i] = Particle();
-//            }
             
             // set group rng
             _group_rng.resize(G::_ngroups);
@@ -1289,6 +1287,22 @@ namespace proj {
     }
 
     inline void Proj::removeUnecessaryTaxsets() {
+        // check for duplicate taxsets
+        for (unsigned count = 0; count < G::_taxsets.size(); count++) {
+            for (unsigned comparison = count + 1; comparison < G::_taxsets.size(); comparison++) {
+                // TODO: if two taxsets are equal except for the fossil, combine them and use the older fossil
+                vector<string> common_elements;
+                // Find the intersection of the two vectors
+
+                std::set_intersection(G::_taxsets[count]._species_included.begin(), G::_taxsets[count]._species_included.end(),
+                                      G::_taxsets[comparison]._species_included.begin(), G::_taxsets[comparison]._species_included.end(),
+                                  std::back_inserter(common_elements));
+                if (common_elements.size() == G::_taxsets[count]._species_included.size() - 1) { // the larger taxset  goes in unused taxsets
+                    throw XProj ("can't specify multiple fossils for the same taxset; choose the older fossil");
+                }
+            }
+        }
+        
         // remove any taxsets with just one real taxon because there is no constraint in that case
         vector<unsigned> taxsets_to_remove;
         
