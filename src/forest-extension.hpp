@@ -24,7 +24,7 @@ namespace proj {
             pair<unsigned, unsigned> chooseTaxaToJoin(double s);
                     
             PartialStore::partial_t getExtensionPartial();
-            double getLineageHeight(Node* nd);
+            double getLineageHeight(const Node* nd) ;
             pair<bool, vector<bool>>    checkForValidTaxonSet(vector<TaxSet> taxset, vector<TaxSet> unused_taxsets);
 
         private:
@@ -248,8 +248,8 @@ namespace proj {
             unsigned size1 = (unsigned) taxset.size();
             if (node_choice_index < size1) { // only existing taxon sets will have associated fossils; there is no branch length constraint if the node chosen is not in a taxon set
                 vector<string> species_included = taxset[node_choice_index]._species_included;
-                if (species_included.size() == 2) {
-                    // fossil constraint only applies when the taxon set is down to last 2 lineages
+                if (species_included.size() == 3) {
+                    // fossil constraint only applies when the taxon set is down to last 2 lineages + fossil (= 3 entries in species_included)
                     // TODO: double check this
                     for (auto &s:species_included) {
                         if (s.find(match_string) != std::string::npos) {
@@ -539,7 +539,8 @@ namespace proj {
                 assert (fossil_age != -1);
                 // figure out if associated branch length has violated the fossil constraint
                 // node must be at least as deep as the fossil, which sets the minimum age for the group
-                if ((getLineageHeight(_docked_gene_forest->_lineages.back()->_left_child) + _proposed_delta )< fossil_age) {
+                if ((getLineageHeight(_proposed_lchild) + _proposed_delta) < fossil_age) {
+//                if ((getLineageHeight(_docked_gene_forest->_lineages.back()->_left_child) + _proposed_delta )< fossil_age) {
                     // fossil age is violated
                     _log_weight = -1 * G::_infinity;
                 }
@@ -566,7 +567,7 @@ namespace proj {
         return _proposed_anc._partials;
     }
 
-    inline double ForestExtension::getLineageHeight(Node* nd) {
+    inline double ForestExtension::getLineageHeight(const Node* nd) {
         if (nd != nullptr) {
             double sum_height = 0.0;
             

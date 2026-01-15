@@ -28,7 +28,7 @@ namespace proj {
             std::string         getName()                   {return _name;}
             Split               getSplit()                  {return _split;}
 
-            double              getEdgeLength()             {return _edge_length;}
+            double              getEdgeLength() const             {return _edge_length;}
             void                setEdgeLength(double v);
             double              getHeight() const           {return _height;}
             void                setHeight(double v);
