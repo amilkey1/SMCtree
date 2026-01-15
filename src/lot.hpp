@@ -111,11 +111,11 @@ namespace proj {
     }
 
     inline int Lot::randint(int low, int high) {
-//        if (low != _low || high != _high) {
+        if (low != _low || high != _high) {
             _low  = low;
             _high = high;
             _uniform_int_generator.reset(new uniform_int_generator_t(_generator, boost::random::uniform_int_distribution<>(_low,_high)));
-//        }
+        }
         return (*_uniform_int_generator)();
     }
     

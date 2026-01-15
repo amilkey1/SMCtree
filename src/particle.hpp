@@ -353,11 +353,12 @@ class Particle {
     inline void Particle::drawFossilAges() {
         // draw an age for each fossil, using the upper and lower bounds as specified
          for (auto &f:_particle_fossils) {
-             if (f._lower == f._upper) {
-                 f._lower -= 0.001;
-                 f._upper += 0.001; // make upper and lower slightly different if they are equal
+             if ((f._lower - f._upper) < 0.001) { // if upper and lower are equal, set fossil age
+                 f._age = f._lower;
              }
-            f._age = _lot->uniformConstrained(f._lower, f._upper); // TODO: unsure if this lot function is working correctly
+             else {
+                f._age = _lot->uniformConstrained(f._lower, f._upper); // TODO: unsure if this lot function is working correctly
+             }
         }
         
         sort(_particle_fossils.begin(), _particle_fossils.end(), [](Fossil & left, Fossil & right) {

@@ -778,6 +778,15 @@ namespace proj {
                 removeUnecessaryTaxsets(); // remove any taxsets with just one lineage and one fossil because they will not provide any constraints
             }
             
+            if (G::_taxsets.size() > 0) {
+                // check fossil ages
+                for (auto &f:G::_fossils) {
+                    if (f._lower > f._upper) {
+                        throw XProj ("lower fossil age must be lower than upper fossil age");
+                    }
+                }
+            }
+            
             unsigned nsteps = (G::_ntaxa-1);
             
             for (unsigned g=0; g<nsteps; g++){
