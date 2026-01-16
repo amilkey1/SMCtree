@@ -100,7 +100,6 @@ class Forest {
         double                      _estimated_birth_difference;
         double                      _turnover;
         double                      _partial_count;
-        map<string, double>         _taxset_ages;
         double                      _clock_rate;
         double                      _weight_correction; // correct for taxon set constraints
         double                      _first_split_prior;
@@ -1139,7 +1138,6 @@ class Forest {
         _estimated_birth_difference = other._estimated_birth_difference;
         _turnover = other._turnover;
         _partial_count = other._partial_count;
-        _taxset_ages = other._taxset_ages;
         _clock_rate = other._clock_rate;
         _weight_correction = other._weight_correction;
         _first_split_prior = other._first_split_prior;

@@ -605,6 +605,12 @@ namespace proj {
         ofstream splitf(height_first_splitf);
         double first_split_height = _particle_vec[0].getHeightFirstSplit();
         splitf << first_split_height << endl;
+        
+        ofstream fossilf("nodes_with_fossil_calibration_ages.txt");
+        vector<double> node_heights = _particle_vec[0].getHeightNodesWithFossilCalibrations();
+        for (auto &n:node_heights) {
+            fossilf << n << endl;
+        }
 
         // Output a PAUP* command file for estimating the species tree using
         // svd quartets and qage
@@ -1290,7 +1296,6 @@ namespace proj {
         // check for duplicate taxsets
         for (unsigned count = 0; count < G::_taxsets.size(); count++) {
             for (unsigned comparison = count + 1; comparison < G::_taxsets.size(); comparison++) {
-                // TODO: if two taxsets are equal except for the fossil, combine them and use the older fossil
                 vector<string> common_elements;
                 // Find the intersection of the two vectors
 
@@ -1442,12 +1447,6 @@ namespace proj {
             else {
                 root_age = G::_root_age;
             }
-            
-//            to be consistent with beast output, birth rate is "effective birth rate": lambda - mu
-//            death rate is relative to birth rate (mu / lambda)
-//            https://groups.google.com/g/beast-users/c/HtpPKHGYNYg/m/pC1rIS5iCgAJ
-//            https://beast2-dev.github.io/hmc/hmc//Priors/DeathRatePrior/
-//            https://beast2-dev.github.io/hmc/hmc//Priors/BirthRatePrior/
             
             double diversification_rate = lambda - mu;
             double turnover = mu / lambda;

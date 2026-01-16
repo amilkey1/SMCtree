@@ -376,7 +376,7 @@ namespace proj {
                      update_unused = true;
                      string name = taxset_no_fossils[i]._name;
                      double tree_height = getLineageHeight(_docked_gene_forest->_lineages.back());
-                     taxset_ages[name] = tree_height;
+                     taxset_ages[name] = tree_height + _proposed_delta;
                      taxset_no_fossils.erase(taxset_no_fossils.begin() + i);
                  }
              }
@@ -479,7 +479,7 @@ namespace proj {
                      update_unused = true;
                      string name = taxset[i]._name;
                      double tree_height = getLineageHeight(_docked_gene_forest->_lineages.back());
-                     taxset_ages[name] = tree_height;
+                     taxset_ages[name] = tree_height + _proposed_delta;
                      taxset.erase(taxset.begin() + i);
                  }
              }
