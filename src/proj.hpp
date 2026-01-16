@@ -1396,7 +1396,7 @@ namespace proj {
             }
         }
         
-        fossilf << "fossil calibration " << "\t" << "95%_hpd_min" << "\t" << "95%_hpd_max" << "\t" << "observed_mean" << endl;
+        fossilf << "fossil " << "\t" << "min" << "\t" << "max" << "\t" << "observed_mean" << endl;
         
         // get 95% hpd intervals for heights
         for (unsigned f=0; f < G::_fossils.size(); f++) {
@@ -1425,7 +1425,7 @@ namespace proj {
             double observed_mean = mean_heights[f] /= _particle_vec.size();
             
             // write min and max to file
-            fossilf << "fossil calibration " << f << "\t" << min << "\t" << max << "\t" << observed_mean << endl;
+            fossilf << f << "\t" << min << "\t" << max << "\t" << observed_mean << endl;
         }
     }
 
