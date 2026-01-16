@@ -52,6 +52,7 @@ namespace proj {
             double computeEffectiveSampleSize(const vector<double> & probs) const;
             void writeTreeFile ();
             void writeLogFile();
+            void writeCalibratedNodeFile();
             void writeLogMarginalLikelihoodFile() const;
             void handleBaseFrequencies();
             void handleRelativeRates();
@@ -836,6 +837,7 @@ namespace proj {
             writeTreeFile();
             writePartialCount();
             writeLogFile();
+            writeCalibratedNodeFile();
             writePartialCount();
             writeLogMarginalLikelihoodFile();
             
@@ -922,7 +924,7 @@ namespace proj {
                 vector<double> hpd_values_in_range;
 
                 for (unsigned h=0; h<ninety_five_index; h++) {
-                    hpd_values_in_range.push_back(_hpd_values[h].first);
+                    hpd_values_in_range.push_back(_hpd_values[h].second);
                 }
 
                 auto max = *std::max_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
@@ -1366,6 +1368,67 @@ namespace proj {
         treef.close();
     }
 
+    inline void Proj::writeCalibratedNodeFile() {
+        ofstream fossilf("nodes_with_fossil_calibration_ages.txt");
+        vector<vector<pair<double, double>>> node_heights;
+        vector<double> mean_heights;
+        node_heights.resize(G::_fossils.size());
+        mean_heights.resize(G::_fossils.size(), 0);
+        
+        for (unsigned f=0; f<G::_fossils.size(); f++) {
+            for (unsigned n=0; n<_indices_to_keep.size(); n++) {
+                unsigned index = _indices_to_keep[n];
+                Particle p = _particle_vec[index];
+                double node_age = p.getHeightNodesWithFossilCalibrations()[f];
+                
+                vector<double> tree_log_likelihoods = p.calcGeneTreeLogLikelihoods();
+                double log_likelihood = 0.0;
+                for (auto &t:tree_log_likelihoods) {
+                    log_likelihood += t;
+                }
+                
+                double total_log_prior = p.getAllPriors();
+                
+                double log_posterior = total_log_prior + log_likelihood;
+                
+                node_heights[f].push_back(make_pair(log_posterior, node_age));
+                mean_heights[f] += node_age;
+            }
+        }
+        
+        fossilf << "fossil calibration " << "\t" << "95%_hpd_min" << "\t" << "95%_hpd_max" << "\t" << "observed_mean" << endl;
+        
+        // get 95% hpd intervals for heights
+        for (unsigned f=0; f < G::_fossils.size(); f++) {
+            // sort values largest to smallest
+            std::sort(node_heights[f].begin(), node_heights[f].end());
+            std::reverse(node_heights[f].begin(), node_heights[f].end());
+
+            // take first 95% of values (round down to nearest integer)
+            double total = boost::size(node_heights[f]);
+            double ninety_five_index = floor(0.95*total);
+
+            if (ninety_five_index == 0) {
+                ninety_five_index = 1;
+            }
+
+            vector<double> values_in_range;
+
+            for (unsigned h=0; h<ninety_five_index; h++) {
+                values_in_range.push_back(node_heights[f][h].second);
+            }
+
+            auto max = *std::max_element(values_in_range.begin(), values_in_range.end());
+            auto min = *std::min_element(values_in_range.begin(), values_in_range.end());
+            assert (min < max || min == max);
+            
+            double observed_mean = mean_heights[f] /= _particle_vec.size();
+            
+            // write min and max to file
+            fossilf << "fossil calibration " << f << "\t" << min << "\t" << max << "\t" << observed_mean << endl;
+        }
+    }
+
     inline void Proj::writeLogFile() {
         // this function creates a params file that is comparable to output from beast
         ofstream logf("params.log");
@@ -1410,7 +1473,7 @@ namespace proj {
             double log_posterior = total_log_prior + log_likelihood;
             
             if (G::_coverage) {
-                _hpd_values.push_back(make_pair(p.getHeightFirstSplit(), log_posterior));
+                _hpd_values.push_back(make_pair(log_posterior, p.getHeightFirstSplit()));
             }
 
             double clock_rate = p.getClockRate();

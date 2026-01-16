@@ -238,7 +238,6 @@ class Particle {
         double increment = _forest_ptr->drawBirthDeathIncrement(_lot, -1);
         _forest_extension.addIncrement(increment);
 
-        // for simulating
         // save heights of each clade with a fossil calibration
         unsigned size_before = (unsigned) _particle_taxsets.size();
         
