@@ -809,29 +809,18 @@ namespace proj {
                 
                 proposeParticles(g);
                 
-                unsigned particle_num = 0;
-                if (G::_nthreads == 1) {
-                    for (unsigned a=0; a<G::_ngroups; a++) {
-//                        for (auto &p:_particle_vec) {
-//                            cout << particle_num << "\t" << "\t";
-//                            p.showTaxaJoined();
-//                            p.showParticle();
-//                            particle_num++;
-//                        }
-                        double ess = filterParticles(g, a);
-                        output(format("     ESS = %d\n") % ess, 2);
+                    if (G::_nthreads == 1) {
+                        for (unsigned a=0; a<G::_ngroups; a++) {
+                            double ess = filterParticles(g, a);
+                            output(format("     ESS = %d\n") % ess, 2);
+                        }
+                        
                     }
-                    
-                }
-                else {
-                    filterParticlesThreading(g);
+                    else {
+                        filterParticlesThreading(g);
+                    }
                 }
                 
-//                for (auto &p:_particle_vec) {
-//                    p.showParticle();
-//                    p.calcGeneTreeLogLikelihoods();
-//                }
-            }
             output(format("     log marginal likelihood = %d\n") % _log_marginal_likelihood, 2);
             
             writeTreeFile();

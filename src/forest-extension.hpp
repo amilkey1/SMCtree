@@ -20,7 +20,7 @@ namespace proj {
             const Node *    getProposedRChild() const;
                         
             void            addIncrement(double increment);
-            void            joinPriorPrior(vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset, vector<TaxSet> &taxset_no_fossils, vector<TaxSet> &unused_taxset_no_fossils, vector<Fossil> &particle_fossils, vector<bool> &valid_taxsets, map<string, double> &taxset_ages);
+            void            joinPriorPrior(vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset, vector<TaxSet> &taxset_no_fossils, vector<TaxSet> &unused_taxset_no_fossils, vector<Fossil> &particle_fossils, vector<bool> &valid_taxsets, map<string, double> &taxset_ages, double clock_rate);
             pair<unsigned, unsigned> chooseTaxaToJoin(double s);
                     
             PartialStore::partial_t getExtensionPartial();
@@ -305,7 +305,7 @@ namespace proj {
         return make_pair(t1, t2);
     }
 
-    inline void ForestExtension::joinPriorPrior(vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset, vector<TaxSet> &taxset_no_fossils, vector<TaxSet> &unused_taxset_no_fossils, vector<Fossil> &particle_fossils, vector<bool> &valid_taxsets, map<string, double> &taxset_ages) {
+    inline void ForestExtension::joinPriorPrior(vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset, vector<TaxSet> &taxset_no_fossils, vector<TaxSet> &unused_taxset_no_fossils, vector<Fossil> &particle_fossils, vector<bool> &valid_taxsets, map<string, double> &taxset_ages, double clock_rate) {
         vector<unsigned> set_counts;
         
         string match_string = "FOSSIL";
@@ -545,7 +545,7 @@ namespace proj {
                     _log_weight = -1 * G::_infinity;
                 }
                 else if (G::_start_mode != "sim") {
-                    _log_weight = _docked_gene_forest->calcPartialArrayLazy(&_proposed_anc, _proposed_lchild, _proposed_rchild);
+                    _log_weight = _docked_gene_forest->calcPartialArrayLazy(&_proposed_anc, _proposed_lchild, _proposed_rchild, clock_rate);
                     _log_weight += weight_correction;
                 }
                 else {
@@ -554,7 +554,7 @@ namespace proj {
             }
             else if (G::_start_mode != "sim") {
                 // Compute partial likelihood array of ancestral node
-                _log_weight = _docked_gene_forest->calcPartialArrayLazy(&_proposed_anc, _proposed_lchild, _proposed_rchild);
+                _log_weight = _docked_gene_forest->calcPartialArrayLazy(&_proposed_anc, _proposed_lchild, _proposed_rchild, clock_rate);
                 _log_weight += weight_correction;
             }
             else {

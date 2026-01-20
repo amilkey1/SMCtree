@@ -22,7 +22,7 @@ class Forest {
         
         //POL added below
         void    createTrivialForest();
-        void    simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites);
+        void    simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites, double clock_rate);
         double  getLogLikelihood();
         double  getHeightFirstSplit();
         double  getHeightSecondIncr();
@@ -42,15 +42,15 @@ class Forest {
         void addIncrement(Lot::SharedPtr lot);
         double joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset, vector<TaxSet> &taxset_no_fossils, vector<TaxSet> &unused_taxset_no_fossils, vector<Fossil> &particle_fossils);
         void calcPartialArray(Node* new_nd);
-        double calcPartialArrayLazy(Node * new_nd, const Node * lchild, const Node * rchild) const;
-        double calcTransitionProbability(Node* child, double s, double s_child, unsigned locus);
-        double calcTransitionProbabilityLazy(double s, double s_child, double edge_length, unsigned locus) const;
+        double calcPartialArrayLazy(Node * new_nd, const Node * lchild, const Node * rchild, double clock_rate) const;
+        double calcTransitionProbability(Node* child, double s, double s_child, unsigned locus, double clock_rate);
+        double calcTransitionProbabilityLazy(double s, double s_child, double edge_length, unsigned locus, double clock_rate) const;
         
         //POL added below
         Node * pullNode();
         unsigned getNumLineages() const;
         unsigned getNumNodes() const;
-        double calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length);
+        double calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length, double clock_rate);
         //POL added above
 
         pair<unsigned, unsigned> chooseTaxaToJoin(double s, Lot::SharedPtr lot);
@@ -100,7 +100,6 @@ class Forest {
         double                      _estimated_birth_difference;
         double                      _turnover;
         double                      _partial_count;
-        double                      _clock_rate;
         double                      _weight_correction; // correct for taxon set constraints
         double                      _first_split_prior;
         double                      _tree_height;
@@ -157,7 +156,6 @@ class Forest {
         _turnover = 0.0;
         _partial_count = 0;
         _weight_correction = 0.0;
-        _clock_rate = 1.0;
         _tree_height = 0.0;
     }
 
@@ -565,7 +563,7 @@ class Forest {
         return make_pair(t1, t2);
     }
 
-    inline double Forest::calcPartialArrayLazy(Node * new_nd, const Node * lchild, const Node * rchild) const {
+    inline double Forest::calcPartialArrayLazy(Node * new_nd, const Node * lchild, const Node * rchild, double clock_rate) const {
         double curr_loglike = 0.0;
         double prev_loglike = 0.0;
         
@@ -599,8 +597,8 @@ class Forest {
             assert(child->_partials);
             auto & child_partial_array = child->_partials->_v;
 
-            double pr_same = calcTransitionProbabilityLazy(0, 0, child->_edge_length + edgelen_extension, i);
-            double pr_diff = calcTransitionProbabilityLazy(0, 1, child->_edge_length + edgelen_extension, i);
+            double pr_same = calcTransitionProbabilityLazy(0, 0, child->_edge_length + edgelen_extension, i, clock_rate);
+            double pr_diff = calcTransitionProbabilityLazy(0, 1, child->_edge_length + edgelen_extension, i, clock_rate);
 //            for (unsigned p = 0; p < npatterns; p++) {
             for (unsigned p = first_pattern; p < last_pattern; p++) {
                 unsigned pxnstates = p*G::_nstates;
@@ -799,14 +797,14 @@ class Forest {
         return curr_loglike - prev_loglike;
     }
 
-    inline double Forest::calcTransitionProbability(Node* child, double s, double s_child, unsigned locus) {
+    inline double Forest::calcTransitionProbability(Node* child, double s, double s_child, unsigned locus, double clock_rate) {
         double relative_rate = G::_double_relative_rates[locus];
         assert (relative_rate > 0.0);
         
         double child_transition_prob = 0.0;
 
         if (G::_model_type == G::ModelType::MODEL_TYPE_JC) {
-            double expterm = exp(-4.0*(child->_edge_length * _clock_rate * relative_rate)/3.0);
+            double expterm = exp(-4.0*(child->_edge_length * clock_rate * relative_rate)/3.0);
             double prsame = 0.25+0.75*expterm;
             double prdif = 0.25 - 0.25*expterm;
 
@@ -825,7 +823,7 @@ class Forest {
             double PI_J = 0.0;
 
             double phi = (pi_A+pi_G)*(pi_C+pi_T)+G::_kappa*(pi_A*pi_G+pi_C*pi_T);
-            double beta_t = 0.5*(child->_edge_length * _clock_rate * relative_rate)/phi;
+            double beta_t = 0.5*(child->_edge_length * clock_rate * relative_rate)/phi;
 
             // transition prob depends only on ending state
             if (s_child == 0) {
@@ -877,16 +875,16 @@ class Forest {
         return child_transition_prob;
     }
 
-    inline double Forest::calcTransitionProbabilityLazy(double s, double s_child, double edge_length, unsigned locus) const {
+    inline double Forest::calcTransitionProbabilityLazy(double s, double s_child, double edge_length, unsigned locus, double clock_rate) const {
         double child_transition_prob = 0.0;
         double relative_rate = G::_double_relative_rates[locus];
 
             if (s == s_child) {
-                child_transition_prob = 0.25 + 0.75*exp(-4.0 * _clock_rate * edge_length * relative_rate / 3.0);
+                child_transition_prob = 0.25 + 0.75*exp(-4.0 * clock_rate * edge_length * relative_rate / 3.0);
             }
             
             else {
-                child_transition_prob = 0.25 - 0.25*exp(-4.0 * edge_length * _clock_rate * relative_rate / 3.0);
+                child_transition_prob = 0.25 - 0.25*exp(-4.0 * edge_length * clock_rate * relative_rate / 3.0);
             }
             return child_transition_prob;
     }
@@ -1138,7 +1136,6 @@ class Forest {
         _estimated_birth_difference = other._estimated_birth_difference;
         _turnover = other._turnover;
         _partial_count = other._partial_count;
-        _clock_rate = other._clock_rate;
         _weight_correction = other._weight_correction;
         _first_split_prior = other._first_split_prior;
         _tree_height = other._tree_height;
@@ -1214,7 +1211,7 @@ class Forest {
         }
     }
 
-    inline double Forest::calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length) {
+    inline double Forest::calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length, double clock_rate) {
         assert(pi.size() == 4);
         assert(fabs(accumulate(pi.begin(), pi.end(), 0.0) - 1.0) < G::_small_enough);
         //assert(_relrate > 0.0);
@@ -1233,7 +1230,7 @@ class Forest {
         //    = 2*betat*((A + G)*(C + T) + kappa(AG + CT))
         //  betat = v/[2*( (A + G)(C + T) + kappa*(AG + CT) )]
         double kappa = 1.0;
-        double betat = 0.5*_relrate*edge_length*_clock_rate/((pi[0] + pi[2])*(pi[1] + pi[3]) + kappa*(pi[0]*pi[2] + pi[1]*pi[3]));
+        double betat = 0.5*_relrate*edge_length*clock_rate/((pi[0] + pi[2])*(pi[1] + pi[3]) + kappa*(pi[0]*pi[2] + pi[1]*pi[3]));
         
         if (is_transition) {
             double pi_j = pi[to];
@@ -1252,7 +1249,7 @@ class Forest {
         return transition_prob;
     }
         
-    inline void Forest::simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites) {
+    inline void Forest::simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites, double clock_rate) {
         
         // Create vector of states for each node in the tree
         unsigned nnodes = (unsigned)_nodes.size();
@@ -1316,7 +1313,7 @@ class Forest {
                 double cum_prob = 0.0;
                 double u = lot->uniform();
                 for (unsigned to_state = 0; to_state < 4; to_state++) {
-                    cum_prob += calcSimTransitionProbability(from_state, to_state, basefreq, site_relrate*nd->_edge_length);
+                    cum_prob += calcSimTransitionProbability(from_state, to_state, basefreq, site_relrate*nd->_edge_length, clock_rate);
                     if (u < cum_prob) {
                         sequences[ndnum][i] = to_state;
                         break;

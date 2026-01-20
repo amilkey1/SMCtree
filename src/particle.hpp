@@ -30,10 +30,10 @@ class Particle {
         void                                    setStartingLogLikelihoods(vector<double> starting_log_likelihoods);
         void                                    clearPartials();
         void                                    drawClockRate();
+        double                                  getClockRate() {return _clock_rate;}
         void                                    setSimClockRate();
         void                                    createTrivialForest();
-        double                                  getClockRate() {return _forest_ptr->_clock_rate;}
-        void                                    setClockRate(double rate) {_forest_ptr->_clock_rate = rate;}
+        void                                    setClockRate(double rate) {_clock_rate = rate;}
         void                                    simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites);
         string                                  makeNewick(unsigned precision, bool use_names);
         string                                  saveForestNewick() {
@@ -87,6 +87,7 @@ class Particle {
         vector<TaxSet>                          _unused_particle_taxsets_no_fossils; // if there are overlapping taxa in taxsets, put the largest groups here until they can be used
         vector<bool>                            _valid_taxsets;
         map<string, double>                     _taxset_ages;
+        double                                  _clock_rate;
     
         double                                  _prev_log_likelihood;
         unsigned                                _total_particle_partials = 0;
@@ -120,6 +121,7 @@ class Particle {
         _log_weight = 0.0;
         _fossil_number = 0;
         _prev_log_likelihood = 0.0;
+        _clock_rate = 0.0;
         _forest_ptr = nullptr;
         _total_particle_partials = 0.0;
         _node_heights_with_fossil_calibrations.clear();
@@ -241,7 +243,7 @@ class Particle {
         // save heights of each clade with a fossil calibration
         unsigned size_before = (unsigned) _particle_taxsets.size();
         
-        _forest_extension.joinPriorPrior(_particle_taxsets, _unused_particle_taxsets, _particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils, _particle_fossils, _valid_taxsets, _taxset_ages);
+        _forest_extension.joinPriorPrior(_particle_taxsets, _unused_particle_taxsets, _particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils, _particle_fossils, _valid_taxsets, _taxset_ages, _clock_rate);
         _total_particle_partials++;
         
         unsigned size_after = (unsigned) _particle_taxsets.size();
@@ -430,15 +432,15 @@ class Particle {
     }
 
     inline void Particle::drawClockRate() {
-        _forest_ptr->_clock_rate = _lot->gamma(1, G::_clock_rate);
+        _clock_rate = _lot->gamma(1, G::_clock_rate);
     }
 
     inline void Particle::setSimClockRate() {
-        _forest_ptr->_clock_rate = G::_sim_clock_rate;
+        _clock_rate = G::_sim_clock_rate;
     }
 
     inline void Particle::simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites) {
-        _forest_ptr->simulateData(lot, data, starting_site, nsites);
+        _forest_ptr->simulateData(lot, data, starting_site, nsites, _clock_rate);
     }
 
     inline string Particle::makeNewick(unsigned precision, bool use_names) {
@@ -572,6 +574,7 @@ class Particle {
 
     inline void Particle::operator=(const Particle & other) {
         _log_weight = other._log_weight;
+        _clock_rate = other._clock_rate;
         _fossil_number = other._fossil_number;
         _particle_fossils = other._particle_fossils;
         _particle_taxsets = other._particle_taxsets;
