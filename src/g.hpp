@@ -67,6 +67,8 @@ namespace proj {
         static double                   _lambda;
         static double                   _mu;
         static double                   _root_age;
+        static double                   _root_age_max;
+        static double                   _root_age_min;
         static vector<double>           _base_frequencies;
         static vector<double>           _double_relative_rates;
         static unsigned                 _save_every;

@@ -93,6 +93,8 @@ double   G::_lambda            = 1.0;
 double   G::_mu                = 1.0;
 double   G::_kappa             = 1.0;
 double   G::_root_age          = 1.0;
+double   G::_root_age_max       = 1.0;
+double  G::_root_age_min        = 1.0;
 double G::_clock_rate = 1.0;
 string   G::_string_base_frequencies = "";
 vector<double> G::_base_frequencies;

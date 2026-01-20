@@ -101,6 +101,8 @@ namespace proj {
         ("version,v", "show program version")
         ("lambda",  value(&G::_lambda)->default_value(10.0), "per lineage speciation rate assumed for the Yule model")
         ("root_age",  value(&G::_root_age)->default_value(1.0), "root age for birth death model")
+        ("root_age_min",  value(&G::_root_age_min)->default_value(1.0), "min root age for birth death model")
+        ("root_age_max",  value(&G::_root_age_max)->default_value(1.0), "max root age for birth death model")
         ("mu",  value(&G::_mu)->default_value(1.0), "per lineage extinction rate assumed for the birth death model")
         ("rnseed",  value(&G::_rnseed)->default_value(1), "pseudorandom number seed")
         ("nthreads",  value(&G::_nthreads)->default_value(1), "number of threads")
@@ -201,8 +203,13 @@ namespace proj {
         }
         
         // If user specified root age <= 0, throw an exception
-        if (G::_root_age <= 0.0) {
+        if (G::_root_age <= 0.0 || G::_root_age_min <= 0.0 || G::_root_age_max <= 0.0) {
             throw XProj(format("must specify a value of root age >= 0 but %d was specified")%G::_root_age);
+        }
+        
+        // if root age min > max, throw an exception
+        if (G::_root_age_min > G::_root_age_max) {
+            throw XProj("root age min must be smaller than root age max");
         }
         
         // If user specified mu = 0 and estimate_mu, print a warning that Yule model will be chosen and mu will not be estimated
