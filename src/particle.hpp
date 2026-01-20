@@ -19,9 +19,9 @@ class Particle {
         void                                    showParticle();
         double                                  getTreeHeight();
         double                                  getTreeLength();
-        double                                  getEstLambda() {return _forest_ptr->_estimated_lambda;}
-        double                                  getEstMu() {return _forest_ptr->_estimated_mu;}
-        double                                  getEstRootAge() {return _forest_ptr->_estimated_root_age;}
+        double                                  getEstLambda() {return _estimated_lambda;}
+        double                                  getEstMu() {return _estimated_mu;}
+        double                                  getEstRootAge() {return _estimated_root_age;}
         double                                  getLogLikelihood();
         double                                  getYuleModel();
         double                                  getAllPriors();
@@ -42,11 +42,6 @@ class Particle {
         void                                    showTaxaJoined();
 
         string debugSaveParticleInfo(unsigned i) const;
-        void drawBirthDiff();
-        void drawTurnover();
-        void drawRootAge();
-        void calculateLambdaAndMu();
-        void drawLambda();
         double getHeightFirstSplit(){return _forest_ptr->getHeightFirstSplit();}
         double getHeightSecondIncr() {return _forest_ptr->getHeightSecondIncr();}
         double getHeightThirdIncr() {return _forest_ptr->getHeightThirdIncr();}
@@ -64,10 +59,18 @@ class Particle {
         double  getPartialCount() {return _total_particle_partials;}
         void    resetSubgroupPointers(Forest::SharedPtr gene_forest_copy);
     
+        void    drawBirthDiff();
+        void    drawTurnover();
+        void    calculateLambdaAndMu();
+        void    drawLambda();
+        void    drawRootAge();
+
+    
         // validation stuff
         double  getRootAge();
     
         vector<double>  getHeightNodesWithFossilCalibrations(){return _node_heights_with_fossil_calibrations;}
+    
     
     private:
         mutable                                 Lot::SharedPtr _lot;
@@ -88,6 +91,11 @@ class Particle {
         vector<bool>                            _valid_taxsets;
         map<string, double>                     _taxset_ages;
         double                                  _clock_rate;
+        double                                  _estimated_lambda;
+        double                                  _estimated_mu;
+        double                                  _estimated_root_age;
+        double                                  _estimated_birth_difference;
+        double                                  _turnover;
     
         double                                  _prev_log_likelihood;
         unsigned                                _total_particle_partials = 0;
@@ -125,6 +133,11 @@ class Particle {
         _forest_ptr = nullptr;
         _total_particle_partials = 0.0;
         _node_heights_with_fossil_calibrations.clear();
+        _estimated_lambda = G::_lambda;
+        _estimated_mu = G::_mu;
+        _estimated_root_age = G::_root_age;
+        _estimated_birth_difference = 0.0;
+        _turnover = 0.0;
       }
 
     inline void Particle::setParticleData(Data::SharedPtr d, bool partials) {
@@ -237,7 +250,7 @@ class Particle {
             _forest_extension.dockSim(_forest_ptr, _lot);
         }
         
-        double increment = _forest_ptr->drawBirthDeathIncrement(_lot, -1);
+        double increment = _forest_ptr->drawBirthDeathIncrement(_lot, -1, _estimated_lambda, _estimated_mu, _estimated_root_age);
         _forest_extension.addIncrement(increment);
 
         // save heights of each clade with a fossil calibration
@@ -303,15 +316,15 @@ class Particle {
         // these params are all drawn from exponential distributions
         // this also assumes the mean of the exponential distribution is the user-specified param
         if (G::_est_mu && G::_mu > 0.0) {
-            param_prior += log(G::_mu) - (_forest_ptr->_estimated_mu * G::_mu);
+            param_prior += log(G::_mu) - (_estimated_mu * G::_mu);
         }
         
         if (G::_est_lambda) {
-            param_prior += log(G::_lambda) - (_forest_ptr->_estimated_lambda * G::_lambda);
+            param_prior += log(G::_lambda) - (_estimated_lambda * G::_lambda);
         }
         
         if (G::_est_root_age) {
-            param_prior += log(G::_root_age) - (_forest_ptr->_estimated_root_age * G::_root_age);
+            param_prior += log(G::_root_age) - (_estimated_root_age * G::_root_age);
         }
                 
         double total_prior = tree_prior + param_prior;
@@ -340,30 +353,21 @@ class Particle {
     inline void Particle::drawBirthDiff() {
         assert (G::_est_lambda);
         assert (G::_est_mu);
-        _forest_ptr->drawBirthDiff(_lot);
-    }
-
-    inline void Particle::drawTurnover() {
-        assert (G::_est_mu);
-        assert (G::_est_lambda);
-        _forest_ptr->drawTurnover(_lot);
-    }
-
-    inline void Particle::drawRootAge() {
-        assert (G::_est_root_age > 0.0);
-        double max_fossil_age = -1;
-        if (_particle_fossils.size() > 0) {
-            max_fossil_age = _particle_fossils.back()._age;
-        }
-        _forest_ptr->drawRootAge(_lot, max_fossil_age);
-    }
-    
-    inline void Particle::calculateLambdaAndMu() {
-        _forest_ptr->calculateLambdaAndMu();
+            
+        // birth diff = lambda - mu
+        // Gamma(1, n) = Exp(1/n)
+        // mean = n
+        // for now, n = (G::_lambda - G::_mu) set by user
+        double mean = G::_lambda - G::_mu;
+        _estimated_birth_difference = _lot->gamma(1, mean);
     }
 
     inline void Particle::drawLambda() {
-        _forest_ptr->drawLambda(_lot);
+        // Yule model; don't estimate mu since it is fixed at 0.0
+        // Gamma(1, n) = Exp(1/n)
+        // mean = n
+        // for now, n = G::_lambda set by user
+        _estimated_lambda = _lot->gamma(1, G::_lambda);
     }
 
     inline void Particle::drawFossilAges() {
@@ -448,7 +452,7 @@ class Particle {
     }
 
     inline double Particle::getRootAge() {
-        return _forest_ptr->_estimated_root_age;
+        return _estimated_root_age;
     }
 
     inline void Particle::finalizeThisParticle() {
@@ -572,6 +576,44 @@ class Particle {
         cout << _forest_extension.getProposedLChild()->_name << "\t" << "\t" << _forest_extension.getProposedRChild()->_name << endl;
     }
 
+    inline void Particle::drawTurnover() {
+        assert (G::_est_mu);
+        assert (G::_est_lambda);
+        // turnover = mu / lambda
+        // Uniform distribution - must be (0, 1)
+        
+        _turnover = _lot->uniform();
+    }
+
+    inline void Particle::calculateLambdaAndMu() {
+        _estimated_lambda = _estimated_birth_difference / (1 - _turnover);
+        _estimated_mu = (_turnover * _estimated_birth_difference) / (1 - _turnover);
+    }
+    inline void Particle::drawRootAge() {
+        assert (G::_est_root_age > 0.0);
+        double max_fossil_age = -1;
+        if (_particle_fossils.size() > 0) {
+            max_fossil_age = _particle_fossils.back()._age;
+        }
+            
+        bool done = false;
+        while (!done) {
+            // Gamma(1, n) = Exp(1/n)
+            // mean = n
+            // for now, n = G::_root_age set by user
+            _estimated_root_age = _lot->gamma(1, G::_root_age);
+            if (max_fossil_age != -1) {
+                if (_estimated_root_age > max_fossil_age) {
+                    done = true;
+                }
+            }
+            else {
+                done = true;
+            }
+        }
+    }
+
+
     inline void Particle::operator=(const Particle & other) {
         _log_weight = other._log_weight;
         _clock_rate = other._clock_rate;
@@ -586,6 +628,11 @@ class Particle {
         _prev_log_likelihood = other._prev_log_likelihood;
         _total_particle_partials = other._total_particle_partials;
         _node_heights_with_fossil_calibrations = other._node_heights_with_fossil_calibrations;
+        _estimated_lambda = other._estimated_lambda;
+        _estimated_mu = other._estimated_mu;
+        _estimated_root_age = other._estimated_root_age;
+        _estimated_birth_difference = other._estimated_birth_difference;
+        _turnover = other._turnover;
         
         // undock forest extension
         _forest_extension.undock();

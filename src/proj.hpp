@@ -808,6 +808,9 @@ namespace proj {
                 output(format("Step %d of %d.\n") % step_plus_one % nsteps, 1);
                 
                 proposeParticles(g);
+                for (auto &p:_particle_vec) {
+                    cout << p.getEstLambda() << endl;
+                }
                 
                     if (G::_nthreads == 1) {
                         for (unsigned a=0; a<G::_ngroups; a++) {

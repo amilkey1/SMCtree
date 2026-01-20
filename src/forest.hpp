@@ -57,11 +57,6 @@ class Forest {
         string makePartialNewick(unsigned precision, bool use_names);
         void showForest();
         void updateNodeVector(vector<Node *> & node_vector, Node * delnode1, Node * delnode2, Node * addnode);
-        void drawBirthDiff(Lot::SharedPtr lot);
-        void drawTurnover(Lot::SharedPtr lot);
-        void drawRootAge(Lot::SharedPtr lot, double max_fossil_age);
-        void calculateLambdaAndMu();
-        void drawLambda(Lot::SharedPtr lot);
 
         double getTreeHeight();
         double getTreeLength();
@@ -70,7 +65,7 @@ class Forest {
         void   clearPartials();
         double getLineageHeight(Node* nd);
     
-        double    drawBirthDeathIncrement(Lot::SharedPtr lot, double age);
+        double    drawBirthDeathIncrement(Lot::SharedPtr lot, double age, double estimated_lambda, double estimated_mu, double estimated_root_age);
         pair<bool, vector<bool>>    checkForValidTaxonSet(vector<TaxSet> taxset, vector<TaxSet> unused_taxsets);
     
         double  getForestHeight() {return _tree_height;}
@@ -94,11 +89,6 @@ class Forest {
         double                      _log_joining_prob;
         vector<double>              _increments;
         vector<pair<Node*, Node*>>  _node_choices;
-        double                      _estimated_lambda;
-        double                      _estimated_mu;
-        double                      _estimated_root_age;
-        double                      _estimated_birth_difference;
-        double                      _turnover;
         double                      _partial_count;
         double                      _weight_correction; // correct for taxon set constraints
         double                      _first_split_prior;
@@ -149,11 +139,6 @@ class Forest {
         _increments.clear();
         _nleaves = 0;
         _node_choices.clear();
-        _estimated_lambda = G::_lambda;
-        _estimated_mu = G::_mu;
-        _estimated_root_age = G::_root_age;
-        _estimated_birth_difference = 0.0;
-        _turnover = 0.0;
         _partial_count = 0;
         _weight_correction = 0.0;
         _tree_height = 0.0;
@@ -307,7 +292,7 @@ class Forest {
         return _gene_tree_log_likelihoods[i];
     }
 
-    double Forest::drawBirthDeathIncrement(Lot::SharedPtr lot, double age) {
+    double Forest::drawBirthDeathIncrement(Lot::SharedPtr lot, double age, double estimated_lambda, double estimated_mu, double estimated_root_age) {
         // this function draws an increment but does not add it
         // fossils are age constraints and not part of the tree
         
@@ -317,9 +302,9 @@ class Forest {
         double cum_height = _tree_height;
         unsigned n = G::_ntaxa;
         
-        double birth_rate = _estimated_lambda;
+        double birth_rate = estimated_lambda;
         
-        double death_rate = _estimated_mu;
+        double death_rate = estimated_mu;
         
         assert (birth_rate >= death_rate);
         
@@ -327,7 +312,7 @@ class Forest {
         
         assert (n > 1);
         
-        double troot = _estimated_root_age;
+        double troot = estimated_root_age;
                 
         double u = lot->uniform();
             
@@ -420,7 +405,7 @@ class Forest {
 
         assert (new_height > 0);
         assert (new_height <= troot + 0.01);
-        assert (new_height <= _estimated_root_age + 0.01);
+        assert (new_height <= estimated_root_age + 0.01);
         
         t = new_height - cum_height;
         
@@ -1130,11 +1115,6 @@ class Forest {
         _log_joining_prob          = other._log_joining_prob;
         _increments                = other._increments;
         _node_choices              = other._node_choices;
-        _estimated_lambda          = other._estimated_lambda;
-        _estimated_mu              = other._estimated_mu;
-        _estimated_root_age        = other._estimated_root_age;
-        _estimated_birth_difference = other._estimated_birth_difference;
-        _turnover = other._turnover;
         _partial_count = other._partial_count;
         _weight_correction = other._weight_correction;
         _first_split_prior = other._first_split_prior;
@@ -1391,53 +1371,6 @@ class Forest {
         }
         else {
             return 0.0;
-        }
-    }
-
-    inline void Forest::drawBirthDiff(Lot::SharedPtr lot) {
-        // birth diff = lambda - mu
-        // Gamma(1, n) = Exp(1/n)
-        // mean = n
-        // for now, n = (G::_lambda - G::_mu) set by user
-        double mean = G::_lambda - G::_mu;
-        _estimated_birth_difference = lot->gamma(1, mean);
-    }
-
-    inline void Forest::drawTurnover(Lot::SharedPtr lot) {
-        // turnover = mu / lambda
-        // Uniform distribution - must be (0, 1)
-        
-        _turnover = lot->uniform();
-    }
-
-    inline void Forest::calculateLambdaAndMu() {
-        _estimated_lambda = _estimated_birth_difference / (1 - _turnover);
-        _estimated_mu = (_turnover * _estimated_birth_difference) / (1 - _turnover);
-    }
-
-    inline void Forest::drawLambda(Lot::SharedPtr lot) {
-        // Yule model; don't estimate mu since it is fixed at 0.0
-        // Gamma(1, n) = Exp(1/n)
-        // mean = n
-        // for now, n = G::_lambda set by user
-        _estimated_lambda = lot->gamma(1, G::_lambda);
-    }
-
-    inline void Forest::drawRootAge(Lot::SharedPtr lot, double max_fossil_age) {
-        bool done = false;
-        while (!done) {
-            // Gamma(1, n) = Exp(1/n)
-            // mean = n
-            // for now, n = G::_root_age set by user
-            _estimated_root_age = lot->gamma(1, G::_root_age);
-            if (max_fossil_age != -1) {
-                if (_estimated_root_age > max_fossil_age) {
-                    done = true;
-                }
-            }
-            else {
-                done = true;
-            }
         }
     }
 
