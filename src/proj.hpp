@@ -834,7 +834,6 @@ namespace proj {
             writePartialCount();
             writeLogFile();
             writeCalibratedNodeFile();
-            writePartialCount();
             writeLogMarginalLikelihoodFile();
             
             if (G::_ruv) {

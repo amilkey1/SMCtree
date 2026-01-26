@@ -545,7 +545,12 @@ namespace proj {
                     _log_weight = -1 * G::_infinity;
                 }
                 else if (G::_start_mode != "sim") {
-                    _log_weight = _docked_gene_forest->calcPartialArrayLazy(&_proposed_anc, _proposed_lchild, _proposed_rchild, clock_rate);
+                    if (G::_model_type == G::ModelType::MODEL_TYPE_JC) {
+                        _log_weight = _docked_gene_forest->calcPartialArrayLazyJC(&_proposed_anc, _proposed_lchild, _proposed_rchild, clock_rate);
+                    }
+                    else {
+                        _log_weight = _docked_gene_forest->calcPartialArrayLazyHKY(&_proposed_anc, _proposed_lchild, _proposed_rchild, clock_rate);
+                    }
                     _log_weight += weight_correction;
                 }
                 else {
@@ -554,7 +559,12 @@ namespace proj {
             }
             else if (G::_start_mode != "sim") {
                 // Compute partial likelihood array of ancestral node
-                _log_weight = _docked_gene_forest->calcPartialArrayLazy(&_proposed_anc, _proposed_lchild, _proposed_rchild, clock_rate);
+                if (G::_model_type == G::ModelType::MODEL_TYPE_JC) {
+                    _log_weight = _docked_gene_forest->calcPartialArrayLazyJC(&_proposed_anc, _proposed_lchild, _proposed_rchild, clock_rate);
+                }
+                else {
+                    _log_weight = _docked_gene_forest->calcPartialArrayLazyHKY(&_proposed_anc, _proposed_lchild, _proposed_rchild, clock_rate);
+                }
                 _log_weight += weight_correction;
             }
             else {
