@@ -1376,7 +1376,8 @@ class Forest {
         //    = 2*betat*(AC + AT + CG + GT + kappa(AG + CT))
         //    = 2*betat*((A + G)*(C + T) + kappa(AG + CT))
         //  betat = v/[2*( (A + G)(C + T) + kappa*(AG + CT) )]
-        double kappa = 1.0;
+//        double kappa = 1.0;
+        double kappa = G::_kappa;
         double betat = 0.5*_relrate*edge_length*clock_rate/((pi[0] + pi[2])*(pi[1] + pi[3]) + kappa*(pi[0]*pi[2] + pi[1]*pi[3]));
         
         if (is_transition) {
@@ -1418,19 +1419,20 @@ class Forest {
         
         // Draw equilibrium base frequencies from Dirichlet
         // having parameter G::_comphet
-        vector<double> basefreq = {0.25, 0.25, 0.25, 0.25};
-        if (G::_comphet != G::_infinity) {
-            // Draw 4 Gamma(G::_comphet, 1) variates
-            double A = lot->gamma(G::_comphet, 1.0);
-            double C = lot->gamma(G::_comphet, 1.0);
-            double G = lot->gamma(G::_comphet, 1.0);
-            double T = lot->gamma(G::_comphet, 1.0);
-            double total = A + C + G + T;
-            basefreq[0] = A/total;
-            basefreq[1] = C/total;
-            basefreq[2] = G/total;
-            basefreq[3] = T/total;
-        }
+        vector<double> basefreq = G::_base_frequencies;
+//        vector<double> basefreq = {0.25, 0.25, 0.25, 0.25};
+//        if (G::_comphet != G::_infinity) {
+//            // Draw 4 Gamma(G::_comphet, 1) variates
+//            double A = lot->gamma(G::_comphet, 1.0);
+//            double C = lot->gamma(G::_comphet, 1.0);
+//            double G = lot->gamma(G::_comphet, 1.0);
+//            double T = lot->gamma(G::_comphet, 1.0);
+//            double total = A + C + G + T;
+//            basefreq[0] = A/total;
+//            basefreq[1] = C/total;
+//            basefreq[2] = G/total;
+//            basefreq[3] = T/total;
+//        }
         
         // Simulate starting sequence at the root node
         Node * nd = *(_lineages.begin());
