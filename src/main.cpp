@@ -38,6 +38,7 @@
 #include <boost/random/variate_generator.hpp>
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/math/special_functions/gamma.hpp>
+#include <boost/math/distributions/gamma.hpp>
 
 #include "ncl/nxsmultiformat.h"
 
@@ -92,6 +93,9 @@ unsigned G::_nloci             = 0;
 double   G::_lambda            = 1.0;
 double   G::_mu                = 1.0;
 double   G::_kappa             = 1.0;
+bool     G::_plus_G            = false;
+double   G::_alpha             = 1000;
+vector<double>  G::_gamma_rate_cat;
 double   G::_root_age          = 1.0;
 double   G::_root_age_max       = 1.0;
 double  G::_root_age_min        = 1.0;

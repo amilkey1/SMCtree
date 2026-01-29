@@ -123,6 +123,8 @@ namespace proj {
         ("simclockrate",  value(&G::_sim_clock_rate)->default_value(1.0), "true clock rate for simulating tree under constant-rates Birth-Death model if startmode is 'sim'")
         ("kappa",  boost::program_options::value(&G::_kappa)->default_value(1.0), "value of kappa")
         ("base_frequencies", boost::program_options::value(&G::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
+        ("plus_G", boost::program_options::value(&G::_plus_G)->default_value(false), "+G rate het")
+        ("alpha", boost::program_options::value(&G::_alpha)->default_value(1000), "alpha value for +G rate het")
         ("relative_rates", boost::program_options::value(&G::_string_relative_rates)->default_value("null"), "relative rates by locus")
         ("proposal", boost::program_options::value(&G::_proposal)->default_value("prior-prior"), "prior-prior or prior-post")
         ("estimate_lambda", boost::program_options::value(&G::_est_lambda)->default_value(false), "estimate birth rate")
@@ -710,7 +712,11 @@ namespace proj {
             ps.setNLoci(G::_nloci);
             
             // set length of partials
-            ps.setNElements(G::_nstates * _data->getNumPatterns());
+            double nratecat = 1.0;
+            if (G::_plus_G) {
+                nratecat = 4.0;
+            }
+            ps.setNElements(G::_nstates * _data->getNumPatterns() * nratecat);
             
             // set group rng
             _group_rng.resize(G::_ngroups);
@@ -1271,7 +1277,7 @@ namespace proj {
         }
     }
 
-    inline void Proj::initializeParticle(Particle &particle) { // TODO: make one template particle and copy it
+    inline void Proj::initializeParticle(Particle &particle) {
         // set partials for first particle under save_memory setting for initial marginal likelihood calculation
          assert (G::_nthreads > 0);
         
@@ -1279,6 +1285,46 @@ namespace proj {
         
         if (G::_save_memory) {
             partials = false; // no partials needed for running on empty
+        }
+        
+        if (G::_plus_G) {
+            double alpha = 1 / G::_alpha;
+            double beta = 2.0;
+            double num_categ = 4;
+            double mean_rate_variable_sites = 1.0;
+            double equal_prob = 1 / num_categ;
+            
+            boost::math::gamma_distribution<> my_gamma(alpha, beta);
+            boost::math::gamma_distribution<> my_gamma_plus(alpha + 1.0, beta);
+
+              double cum_upper        = 0.0;
+              double cum_upper_plus   = 0.0;
+              double upper            = 0.0;
+              double cum_prob         = 0.0;
+              for (unsigned i = 1; i <= num_categ; ++i) {
+                  double cum_lower_plus       = cum_upper_plus;
+                  double cum_lower            = cum_upper;
+                  cum_prob                    += equal_prob;
+
+                  if (i < num_categ) {
+                      upper                   = boost::math::quantile(my_gamma, cum_prob);
+                      cum_upper_plus          = boost::math::cdf(my_gamma_plus, upper);
+                      cum_upper               = boost::math::cdf(my_gamma, upper);
+                  }
+                  else {
+                      cum_upper_plus          = 1.0;
+                      cum_upper               = 1.0;
+                  }
+
+                  double numer                = cum_upper_plus - cum_lower_plus;
+                  double denom                = cum_upper - cum_lower;
+                  double r_mean               = (denom > 0.0 ? (alpha*beta*numer/denom) : 0.0);
+                  G::_gamma_rate_cat.push_back(r_mean * mean_rate_variable_sites);
+//                  G::_gamma_rate_cat.push_back(1.0);
+              }
+        }
+        else {
+            G::_gamma_rate_cat.push_back(1.0);
         }
         
         if (G::_start_mode != "sim") {
@@ -1458,7 +1504,7 @@ namespace proj {
             logf << iter;
             iter++;
             
-            vector<double> tree_log_likelihoods = p.calcGeneTreeLogLikelihoods();
+            vector<double> tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
             double log_likelihood = 0.0;
             for (auto &t:tree_log_likelihoods) {
                 log_likelihood += t;

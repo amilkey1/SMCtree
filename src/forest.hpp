@@ -45,8 +45,8 @@ class Forest {
         double calcPartialArrayLazyJC(Node * new_nd, const Node * lchild, const Node * rchild, double clock_rate) const;
         double calcPartialArrayLazyHKY(Node * new_nd, const Node * lchild, const Node * rchild, double clock_rate) const;
         double calcTransitionProbability(Node* child, double s, double s_child, unsigned locus, double clock_rate);
-        double calcTransitionProbabilityLazyJC(double s, double s_child, double edge_length, unsigned locus, double clock_rate) const;
-        double calcTransitionProbabilityLazyHKY(double s, double s_child, double edge_length, unsigned locus, double clock_rate) const;
+        double calcTransitionProbabilityLazyJC(double s, double s_child, double edge_length, unsigned locus, double clock_rate, unsigned rate_categ) const;
+        double calcTransitionProbabilityLazyHKY(double s, double s_child, double edge_length, unsigned locus, double clock_rate, unsigned rate_categ) const;
         
         //POL added below
         Node * pullNode();
@@ -84,7 +84,7 @@ class Forest {
         vector<Node*>               _preorder;
         unsigned                    _first_pattern;
         unsigned                    _npatterns;
-        vector<double>              _gene_tree_log_likelihoods;
+        vector<double> mutable      _gene_tree_log_likelihoods;
         double                      _log_likelihood;
         unsigned                    _ninternals;
         unsigned                    _nleaves;
@@ -228,33 +228,26 @@ class Forest {
             if (!nd->_left_child) {
 
                 if (!G::_save_memory || (G::_save_memory && partials)) { // if save memory setting, don't set tip partials yet
+                    for (unsigned step = 0; step < G::_gamma_rate_cat.size(); step++) {
                         for (unsigned p=_first_pattern; p<_npatterns + _first_pattern; p++) {
                             unsigned pp = p;
+                            unsigned start = step * G::_gamma_rate_cat.size() * (_npatterns);
+                            unsigned pxnstates = p*G::_nstates + start;
+                            
                             for (unsigned s=0; s<G::_nstates; s++) {
                                 Data::state_t state = (Data::state_t)1 << s;
                                 Data::state_t d = data_matrix[nd->_number][pp];
                                 double result = state & d;
-                                (nd->_partials->_v)[p*G::_nstates + s] = (result == 0.0 ? 0.0:1.0);
+                                (nd->_partials->_v)[pxnstates + s] = (result == 0.0 ? 0.0:1.0);
                             }
                         }
+                    }
                 }
             }
         }
     }
 
     inline double Forest::calcSubsetLogLikelihood(unsigned i) {
-//        if (_lineages.size() == 1) {
-//            // if forest is complete, only include the root node in the likelihood calculation
-//            unsigned nnodes = (unsigned) _nodes.size();
-//            for (auto &nd:_nodes) {
-//                if (nd._number != nnodes - 1) {
-//                    nd._use_in_likelihood = false;
-//                }
-//                else {
-//                    nd._use_in_likelihood = true;
-//                }
-//            }
-//        }
         
         for (auto &nd:_nodes) {
             nd._use_in_likelihood = false;
@@ -570,6 +563,14 @@ class Forest {
         if (edgelen_extension < 0.0) {
             edgelen_extension = 0.0;
         }
+        
+        unsigned n_likelihood_calculations = 1;
+        if (G::_plus_G) {
+            n_likelihood_calculations = (unsigned) G::_gamma_rate_cat.size();
+        }
+        double weight = 0.0;
+        vector<double> log_likelihoods;
+        vector<double> prev_loglikelihoods;
 
         for (unsigned i=0; i<G::_nloci; i++) {
             Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(i);
@@ -577,87 +578,112 @@ class Forest {
             unsigned first_pattern = gene_begin_end.first;
             unsigned last_pattern = gene_begin_end.second;
 
-            for (const Node * child : {lchild, rchild})  {
-                assert(child->_partials);
-                auto & child_partial_array = child->_partials->_v;
-                for (unsigned p = first_pattern; p < last_pattern; p++) {
-                    unsigned pxnstates = p*G::_nstates;
-                    //unsigned pp = first_pattern + p;
-                    for (unsigned s = 0; s < G::_nstates; s++) {
-                        double sum_over_child_states = 0.0;
-                        for (unsigned s_child = 0; s_child < G::_nstates; s_child++) {
-                            double child_transition_prob = calcTransitionProbabilityLazyHKY(s, s_child, child->_edge_length + edgelen_extension, i, clock_rate);
-                            double child_partial = child_partial_array[pxnstates + s_child];
-                                                    
-                            sum_over_child_states += child_transition_prob * child_partial;
-                        }   // child state loop
-                        
-                        parent_partial_array[pxnstates + s] *= sum_over_child_states;
-                    }   // parent state loop
-                }   // pattern loop
-            }
+            for (unsigned step = 0; step < n_likelihood_calculations; step++) {
+                for (const Node * child : {lchild, rchild})  {
+                    assert(child->_partials);
+                    auto & child_partial_array = child->_partials->_v;
+                    for (unsigned p = first_pattern; p < last_pattern; p++) {
+                        unsigned start = step * G::_gamma_rate_cat.size() * _npatterns;
+                        unsigned pxnstates = p*G::_nstates + start;
+//                        unsigned pxnstates = p*G::_nstates;
+                        //unsigned pp = first_pattern + p;
+                        for (unsigned s = 0; s < G::_nstates; s++) {
+                            double sum_over_child_states = 0.0;
+                            for (unsigned s_child = 0; s_child < G::_nstates; s_child++) {
+                                double child_transition_prob = calcTransitionProbabilityLazyHKY(s, s_child, child->_edge_length + edgelen_extension, i, clock_rate, step);
+//                                cout << "child_transition_prob = " << child_transition_prob << endl;
+                                double child_partial = child_partial_array[pxnstates + s_child];
+//                                cout << "\t" << "child_partial = " << child_partial << endl;
+                                                        
+                                sum_over_child_states += child_transition_prob * child_partial;
+                            }   // child state loop
+                            
+                            parent_partial_array[pxnstates + s] *= sum_over_child_states;
+                        }   // parent state loop
+                    }   // pattern loop
+                }
+//                cout << "xxx" << endl;
         
-        // Compute the ratio of after to before likelihoods
-        //TODO: make more efficient
-        auto & newnd_partial_array = new_nd->_partials->_v;
-        auto & lchild_partial_array = lchild->_partials->_v;
-        auto & rchild_partial_array = rchild->_partials->_v;
+                // Compute the ratio of after to before likelihoods
+                //TODO: make more efficient
+                double prev_loglike = 0.0;
+                double curr_loglike = 0.0;
+                
+                auto & newnd_partial_array = new_nd->_partials->_v;
+                auto & lchild_partial_array = lchild->_partials->_v;
+                auto & rchild_partial_array = rchild->_partials->_v;
             
-        for (unsigned p = 0; p < (last_pattern - first_pattern); p++) {
-            
-            unsigned pxnstates = (first_pattern + p) * G::_nstates;
+            for (unsigned p = 0; p < (last_pattern - first_pattern); p++) {
+                unsigned start = step * G::_gamma_rate_cat.size() * _npatterns;
+                unsigned pxnstates = p*G::_nstates + start;
+//                unsigned pxnstates = (first_pattern + p) * G::_nstates;
 
-            unsigned pp = first_pattern + p;
-            
-            //unsigned count = counts[pp];
-            double left_sitelike = 0.0;
-            double right_sitelike = 0.0;
-            double newnd_sitelike = 0.0;
-    #if defined (UNROLL_LOOPS)
-            // loop 0
-            unsigned s = 0;
-            left_sitelike += G::_base_frequencies[s]*lchild_partial_array[pxnstates + s];
-            right_sitelike += G::_base_frequencies[s]*rchild_partial_array[pxnstates + s];
-            newnd_sitelike += G::_base_frequencies[s]*newnd_partial_array[pxnstates + s];
+                unsigned pp = first_pattern + p;
+                
+                //unsigned count = counts[pp];
+                double left_sitelike = 0.0;
+                double right_sitelike = 0.0;
+                double newnd_sitelike = 0.0;
+        #if defined (UNROLL_LOOPS)
+                // loop 0
+                unsigned s = 0;
+                left_sitelike += G::_base_frequencies[s]*lchild_partial_array[pxnstates + s];
+                right_sitelike += G::_base_frequencies[s]*rchild_partial_array[pxnstates + s];
+                newnd_sitelike += G::_base_frequencies[s]*newnd_partial_array[pxnstates + s];
 
-            // loop 1
-            s = 1;
-            left_sitelike += G::_base_frequencies[s]*lchild_partial_array[pxnstates + s];
-            right_sitelike += G::_base_frequencies[s]*rchild_partial_array[pxnstates + s];
-            newnd_sitelike += G::_base_frequencies[s]*newnd_partial_array[pxnstates + s];
+                // loop 1
+                s = 1;
+                left_sitelike += G::_base_frequencies[s]*lchild_partial_array[pxnstates + s];
+                right_sitelike += G::_base_frequencies[s]*rchild_partial_array[pxnstates + s];
+                newnd_sitelike += G::_base_frequencies[s]*newnd_partial_array[pxnstates + s];
 
-            // loop 2
-            s = 2;
-            left_sitelike += G::_base_frequencies[s]*lchild_partial_array[pxnstates + s];
-            right_sitelike += G::_base_frequencies[s]*rchild_partial_array[pxnstates + s];
-            newnd_sitelike += G::_base_frequencies[s]*newnd_partial_array[pxnstates + s];
+                // loop 2
+                s = 2;
+                left_sitelike += G::_base_frequencies[s]*lchild_partial_array[pxnstates + s];
+                right_sitelike += G::_base_frequencies[s]*rchild_partial_array[pxnstates + s];
+                newnd_sitelike += G::_base_frequencies[s]*newnd_partial_array[pxnstates + s];
 
-            // loop 3
-            s = 3;
-            left_sitelike += G::_base_frequencies[s]*lchild_partial_array[pxnstates + s];
-            right_sitelike += G::_base_frequencies[s]*rchild_partial_array[pxnstates + s];
-            newnd_sitelike += G::_base_frequencies[s]*newnd_partial_array[pxnstates + s];
+                // loop 3
+                s = 3;
+                left_sitelike += G::_base_frequencies[s]*lchild_partial_array[pxnstates + s];
+                right_sitelike += G::_base_frequencies[s]*rchild_partial_array[pxnstates + s];
+                newnd_sitelike += G::_base_frequencies[s]*newnd_partial_array[pxnstates + s];
 
-    #else
-            for (unsigned s = 0; s < G::_nstates; s++) {
-                left_sitelike += G::_base_frequencies[s]*(*lchild_partial_array)[pxnstates + s];
-                right_sitelike += G::_base_frequencies[s]*(*rchild_partial_array)[pxnstates + s];
-                newnd_sitelike += G::_base_frequencies[s]*(*newnd_partial_array)[pxnstates + s];
+        #else
+                for (unsigned s = 0; s < G::_nstates; s++) {
+                    left_sitelike += G::_base_frequencies[s]*(lchild_partial_array)[pxnstates + s];
+                    right_sitelike += G::_base_frequencies[s]*(rchild_partial_array)[pxnstates + s];
+                    newnd_sitelike += G::_base_frequencies[s]*(newnd_partial_array)[pxnstates + s];
+                }
+        #endif
+                prev_loglike += log(left_sitelike)*counts[pp];
+                prev_loglike += log(right_sitelike)*counts[pp];
+                curr_loglike += log(newnd_sitelike)*counts[pp];
             }
-    #endif
-            prev_loglike += log(left_sitelike)*counts[pp];
-            prev_loglike += log(right_sitelike)*counts[pp];
-            curr_loglike += log(newnd_sitelike)*counts[pp];
+                if (!G::_plus_G) {
+                   weight = curr_loglike - prev_loglike;
+               }
+               else {
+                    log_likelihoods.push_back(curr_loglike);
+//                   cout << curr_loglike << endl;
+                    prev_loglikelihoods.push_back(prev_loglike);
+                   _gene_tree_log_likelihoods[i] = curr_loglike;
+                    }
+            }
         }
-            
-        }
-        return curr_loglike - prev_loglike;
+            if (G::_plus_G) {
+                  assert (log_likelihoods.size() == G::_gamma_rate_cat.size() * G::_nloci);
+                  assert (prev_loglikelihoods.size() == G::_gamma_rate_cat.size() * G::_nloci);
+                  double curr_sum = G::calcLogSum(log_likelihoods);
+                  double prev_sum = G::calcLogSum(prev_loglikelihoods);
+                  weight = curr_sum - prev_sum;
+                _gene_tree_log_likelihoods[0] = curr_sum; // TODO: doesn't work for multiple loci
+            }
+            return weight;
+//        return curr_loglike - prev_loglike;
     }
 
     inline double Forest::calcPartialArrayLazyJC(Node * new_nd, const Node * lchild, const Node * rchild, double clock_rate) const {
-        double curr_loglike = 0.0;
-        double prev_loglike = 0.0;
-        
         // Get pattern counts
         auto counts = _data->getPatternCounts();
         
@@ -676,164 +702,177 @@ class Forest {
             edgelen_extension = 0.0;
         }
 
+        unsigned n_likelihood_calculations = 1;
+            if (G::_plus_G) {
+                n_likelihood_calculations = (unsigned) G::_gamma_rate_cat.size();
+            }
+            double weight = 0.0;
+            vector<double> log_likelihoods;
+            vector<double> prev_loglikelihoods;
+
+        
         for (unsigned i=0; i<G::_nloci; i++) {
             Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(i);
             auto & parent_partial_array = new_nd->_partials->_v;
             unsigned first_pattern = gene_begin_end.first;
             unsigned last_pattern = gene_begin_end.second;
 
-        for (const Node * child : {lchild, rchild})  {
-            assert(child->_partials);
-            auto & child_partial_array = child->_partials->_v;
+        for (unsigned step = 0; step < n_likelihood_calculations; step++) {
+            for (const Node * child : {lchild, rchild})  {
+                assert(child->_partials);
+                auto & child_partial_array = child->_partials->_v;
 
-            double pr_same = calcTransitionProbabilityLazyJC(0, 0, child->_edge_length + edgelen_extension, i, clock_rate);
-            double pr_diff = calcTransitionProbabilityLazyJC(0, 1, child->_edge_length + edgelen_extension, i, clock_rate);
-            for (unsigned p = first_pattern; p < last_pattern; p++) {
-                unsigned pxnstates = p*G::_nstates;
-                //unsigned pp = first_pattern + p;
+                double pr_same = calcTransitionProbabilityLazyJC(0, 0, child->_edge_length + edgelen_extension, i, clock_rate, step);
+                double pr_diff = calcTransitionProbabilityLazyJC(0, 1, child->_edge_length + edgelen_extension, i, clock_rate, step);
+                for (unsigned p = first_pattern; p < last_pattern; p++) {
+                    unsigned start = step * G::_gamma_rate_cat.size() * _npatterns;
+                    unsigned pxnstates = p*G::_nstates + start;
 
-#if defined (UNROLL_LOOPS)
-                // unroll parent loop
-                assert (G::_nstates == 4);
-                unsigned s = 0;
-                double sum_over_child_states = 0.0;
-
-                    // child state subloop 0
-                unsigned s_child = 0;
-                double child_partial = child_partial_array[pxnstates + s_child];
-
-                sum_over_child_states += pr_same * child_partial;
-
-                    // child state subloop 1
-                s_child = 1;
-                child_partial = child_partial_array[pxnstates + s_child];
-
-                sum_over_child_states += pr_diff * child_partial;
-
-
-                    // child state subloop 2
-                s_child = 2;
-                child_partial = child_partial_array[pxnstates + s_child];
-
-                sum_over_child_states += pr_diff * child_partial;
-
-                    // child state subloop 3
-                s_child = 3;
-                child_partial = child_partial_array[pxnstates + s_child];
-
-                sum_over_child_states += pr_diff * child_partial;
-
-                parent_partial_array[pxnstates + s] *= sum_over_child_states;
-
-                s = 1;
-                sum_over_child_states = 0.0;
-                // child state subloop 0
-                s_child = 0;
-                child_partial = child_partial_array[pxnstates + s_child];
-
-                sum_over_child_states += pr_diff * child_partial;
-
-                    // child state subloop 1
-                s_child = 1;
-                child_partial = child_partial_array[pxnstates + s_child];
-
-                sum_over_child_states += pr_same * child_partial;
-
-                    // child state subloop 2
-                s_child = 2;
-                child_partial = child_partial_array[pxnstates + s_child];
-
-                sum_over_child_states += pr_diff * child_partial;
-
-                    // child state subloop 3
-                s_child = 3;
-                child_partial = child_partial_array[pxnstates + s_child];
-
-                sum_over_child_states += pr_diff * child_partial;
-
-                parent_partial_array[pxnstates + s] *= sum_over_child_states;
-
-                s = 2;
-                sum_over_child_states = 0.0;
-                // child state subloop 0
-                s_child = 0;
-                child_partial = child_partial_array[pxnstates + s_child];
-
-                sum_over_child_states += pr_diff * child_partial;
-
-                    // child state subloop 1
-                s_child = 1;
-                child_partial = child_partial_array[pxnstates + s_child];
-
-                sum_over_child_states += pr_diff * child_partial;
-
-                    // child state subloop 2
-                s_child = 2;
-                child_partial = child_partial_array[pxnstates + s_child];
-
-                sum_over_child_states += pr_same * child_partial;
-
-                    // child state subloop 3
-                s_child = 3;
-                child_partial = child_partial_array[pxnstates + s_child];
-
-                sum_over_child_states += pr_diff * child_partial;
-
-                parent_partial_array[pxnstates + s] *= sum_over_child_states;
-
-                s = 3;
-                sum_over_child_states = 0.0;
-                // child state subloop 0
-                s_child = 0;
-                child_partial = child_partial_array[pxnstates + s_child];
-
-                sum_over_child_states += pr_diff * child_partial;
-
-                    // child state subloop 1
-                s_child = 1;
-                child_partial = child_partial_array[pxnstates + s_child];
-
-                sum_over_child_states += pr_diff * child_partial;
-
-                    // child state subloop 2
-                s_child = 2;
-                child_partial = child_partial_array[pxnstates + s_child];
-
-                sum_over_child_states += pr_diff * child_partial;
-
-                    // child state subloop 3
-                s_child = 3;
-                child_partial = child_partial_array[pxnstates + s_child];
-
-                sum_over_child_states += pr_same * child_partial;
-
-                parent_partial_array[pxnstates + s] *= sum_over_child_states;
-#else
-                for (unsigned s = 0; s < G::_nstates; s++) {
+    #if defined (UNROLL_LOOPS)
+                    // unroll parent loop
+                    assert (G::_nstates == 4);
+                    unsigned s = 0;
                     double sum_over_child_states = 0.0;
-                    for (unsigned s_child = 0; s_child < G::_nstates; s_child++) {
-                        double child_transition_prob = (s == s_child ? pr_same : pr_diff);
-                        double child_partial = (*child_partial_array)[pxnstates + s_child];
 
-                        sum_over_child_states += child_transition_prob * child_partial;
-                    }   // child state loop
+                        // child state subloop 0
+                    unsigned s_child = 0;
+                    double child_partial = child_partial_array[pxnstates + s_child];
 
-                    (*parent_partial_array)[pxnstates + s] *= sum_over_child_states;
-                }   // parent state loop
-#endif
-            }   // pattern loop
-        }
+                    sum_over_child_states += pr_same * child_partial;
+
+                        // child state subloop 1
+                    s_child = 1;
+                    child_partial = child_partial_array[pxnstates + s_child];
+
+                    sum_over_child_states += pr_diff * child_partial;
+
+
+                        // child state subloop 2
+                    s_child = 2;
+                    child_partial = child_partial_array[pxnstates + s_child];
+
+                    sum_over_child_states += pr_diff * child_partial;
+
+                        // child state subloop 3
+                    s_child = 3;
+                    child_partial = child_partial_array[pxnstates + s_child];
+
+                    sum_over_child_states += pr_diff * child_partial;
+
+                    parent_partial_array[pxnstates + s] *= sum_over_child_states;
+
+                    s = 1;
+                    sum_over_child_states = 0.0;
+                    // child state subloop 0
+                    s_child = 0;
+                    child_partial = child_partial_array[pxnstates + s_child];
+
+                    sum_over_child_states += pr_diff * child_partial;
+
+                        // child state subloop 1
+                    s_child = 1;
+                    child_partial = child_partial_array[pxnstates + s_child];
+
+                    sum_over_child_states += pr_same * child_partial;
+
+                        // child state subloop 2
+                    s_child = 2;
+                    child_partial = child_partial_array[pxnstates + s_child];
+
+                    sum_over_child_states += pr_diff * child_partial;
+
+                        // child state subloop 3
+                    s_child = 3;
+                    child_partial = child_partial_array[pxnstates + s_child];
+
+                    sum_over_child_states += pr_diff * child_partial;
+
+                    parent_partial_array[pxnstates + s] *= sum_over_child_states;
+
+                    s = 2;
+                    sum_over_child_states = 0.0;
+                    // child state subloop 0
+                    s_child = 0;
+                    child_partial = child_partial_array[pxnstates + s_child];
+
+                    sum_over_child_states += pr_diff * child_partial;
+
+                        // child state subloop 1
+                    s_child = 1;
+                    child_partial = child_partial_array[pxnstates + s_child];
+
+                    sum_over_child_states += pr_diff * child_partial;
+
+                        // child state subloop 2
+                    s_child = 2;
+                    child_partial = child_partial_array[pxnstates + s_child];
+
+                    sum_over_child_states += pr_same * child_partial;
+
+                        // child state subloop 3
+                    s_child = 3;
+                    child_partial = child_partial_array[pxnstates + s_child];
+
+                    sum_over_child_states += pr_diff * child_partial;
+
+                    parent_partial_array[pxnstates + s] *= sum_over_child_states;
+
+                    s = 3;
+                    sum_over_child_states = 0.0;
+                    // child state subloop 0
+                    s_child = 0;
+                    child_partial = child_partial_array[pxnstates + s_child];
+
+                    sum_over_child_states += pr_diff * child_partial;
+
+                        // child state subloop 1
+                    s_child = 1;
+                    child_partial = child_partial_array[pxnstates + s_child];
+
+                    sum_over_child_states += pr_diff * child_partial;
+
+                        // child state subloop 2
+                    s_child = 2;
+                    child_partial = child_partial_array[pxnstates + s_child];
+
+                    sum_over_child_states += pr_diff * child_partial;
+
+                        // child state subloop 3
+                    s_child = 3;
+                    child_partial = child_partial_array[pxnstates + s_child];
+
+                    sum_over_child_states += pr_same * child_partial;
+
+                    parent_partial_array[pxnstates + s] *= sum_over_child_states;
+    #else
+                    for (unsigned s = 0; s < G::_nstates; s++) {
+                        double sum_over_child_states = 0.0;
+                        for (unsigned s_child = 0; s_child < G::_nstates; s_child++) {
+                            double child_transition_prob = (s == s_child ? pr_same : pr_diff);
+                            double child_partial = (child_partial_array)[pxnstates + s_child];
+
+                            sum_over_child_states += child_transition_prob * child_partial;
+                        }   // child state loop
+
+                        (parent_partial_array)[pxnstates + s] *= sum_over_child_states;
+                    }   // parent state loop
+    #endif
+                }   // pattern loop
+            }
         
         // Compute the ratio of after to before likelihoods
         //TODO: make more efficient
+            double prev_loglike = 0.0;
+            double curr_loglike = 0.0;
+
+            
         auto & newnd_partial_array = new_nd->_partials->_v;
         auto & lchild_partial_array = lchild->_partials->_v;
         auto & rchild_partial_array = rchild->_partials->_v;
             
         for (unsigned p = 0; p < (last_pattern - first_pattern); p++) {
-//            unsigned pxnstates = p*G::_nstates;
-            
-            unsigned pxnstates = (first_pattern + p) * G::_nstates;
+            unsigned start = step * G::_gamma_rate_cat.size() * _npatterns;
+            unsigned pxnstates = p*G::_nstates + start;
 
             unsigned pp = first_pattern + p;
             
@@ -868,18 +907,38 @@ class Forest {
 
 #else
             for (unsigned s = 0; s < G::_nstates; s++) {
-                left_sitelike += 0.25*(*lchild_partial_array)[pxnstates + s];
-                right_sitelike += 0.25*(*rchild_partial_array)[pxnstates + s];
-                newnd_sitelike += 0.25*(*newnd_partial_array)[pxnstates + s];
+                left_sitelike += 0.25*(lchild_partial_array)[pxnstates + s];
+                right_sitelike += 0.25*(rchild_partial_array)[pxnstates + s];
+                newnd_sitelike += 0.25*(newnd_partial_array)[pxnstates + s];
             }
 #endif
             prev_loglike += log(left_sitelike)*counts[pp];
             prev_loglike += log(right_sitelike)*counts[pp];
             curr_loglike += log(newnd_sitelike)*counts[pp];
         }
-            
+            if (!G::_plus_G) {
+               weight = curr_loglike - prev_loglike;
+                _gene_tree_log_likelihoods[i] = curr_loglike;
+                cout << curr_loglike << endl;
+           }
+           else {
+                log_likelihoods.push_back(curr_loglike);
+                   cout << curr_loglike << endl;
+                prev_loglikelihoods.push_back(prev_loglike);
+           }
+            }
         }
-        return curr_loglike - prev_loglike;
+            if (G::_plus_G) {
+                  assert (log_likelihoods.size() == G::_gamma_rate_cat.size() * G::_nloci);
+                  assert (prev_loglikelihoods.size() == G::_gamma_rate_cat.size() * G::_nloci);
+                  double curr_sum = G::calcLogSum(log_likelihoods);
+                  double prev_sum = G::calcLogSum(prev_loglikelihoods);
+                  weight = curr_sum - prev_sum;
+                cout << curr_sum << endl;
+                _gene_tree_log_likelihoods[0] = curr_sum; // TODO: doesn't work for +g
+            }
+//        }
+        return weight;
     }
 
     inline double Forest::calcTransitionProbability(Node* child, double s, double s_child, unsigned locus, double clock_rate) {
@@ -960,23 +1019,28 @@ class Forest {
         return child_transition_prob;
     }
 
-    inline double Forest::calcTransitionProbabilityLazyJC(double s, double s_child, double edge_length, unsigned locus, double clock_rate) const {
+    inline double Forest::calcTransitionProbabilityLazyJC(double s, double s_child, double edge_length, unsigned locus, double clock_rate, unsigned rate_categ) const {
         double child_transition_prob = 0.0;
         double relative_rate = G::_double_relative_rates[locus];
+        assert (relative_rate > 0.0);
+        assert (rate_categ < G::_gamma_rate_cat.size());
+        double gamma_rate = G::_gamma_rate_cat[rate_categ];
 
             if (s == s_child) {
-                child_transition_prob = 0.25 + 0.75*exp(-4.0 * clock_rate * edge_length * relative_rate / 3.0);
+                child_transition_prob = 0.25 + 0.75*exp(-4.0 * clock_rate * edge_length * gamma_rate * relative_rate / 3.0);
             }
             
             else {
-                child_transition_prob = 0.25 - 0.25*exp(-4.0 * edge_length * clock_rate * relative_rate / 3.0);
+                child_transition_prob = 0.25 - 0.25*exp(-4.0 * edge_length * clock_rate * gamma_rate * relative_rate / 3.0);
             }
             return child_transition_prob;
     }
 
-    inline double Forest::calcTransitionProbabilityLazyHKY(double s, double s_child, double edge_length, unsigned locus, double clock_rate) const {
+    inline double Forest::calcTransitionProbabilityLazyHKY(double s, double s_child, double edge_length, unsigned locus, double clock_rate, unsigned rate_categ) const {
         double relative_rate = G::_double_relative_rates[locus];
         assert (relative_rate > 0.0);
+        assert (rate_categ < G::_gamma_rate_cat.size());
+        double gamma_rate = G::_gamma_rate_cat[rate_categ];
 
         double child_transition_prob = 0.0;
 
@@ -989,7 +1053,7 @@ class Forest {
         double PI_J = 0.0;
 
         double phi = (pi_A+pi_G)*(pi_C+pi_T)+G::_kappa*(pi_A*pi_G+pi_C*pi_T);
-        double beta_t = 0.5*(edge_length * relative_rate * clock_rate )/phi;
+        double beta_t = 0.5*(edge_length * relative_rate * gamma_rate * clock_rate )/phi;
 
         // transition prob depends only on ending state
         if (s_child == 0) {

@@ -32,6 +32,9 @@ namespace proj {
         static unsigned                 _nparticles;
         static string                   _model;
         static double                   _kappa;
+        static bool                     _plus_G;
+        static double                   _alpha;
+        static vector<double>           _gamma_rate_cat;
         static string                   _string_base_frequencies;
         static string                   _string_relative_rates;
         static string                   _proposal;

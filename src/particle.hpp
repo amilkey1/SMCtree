@@ -13,6 +13,7 @@ class Particle {
         void                                    setParticleData(Data::SharedPtr d, bool partials);
         void                                    operator=(const Particle & other);
         vector<double>                          calcGeneTreeLogLikelihoods();
+        vector<double>                          getGeneTreeLogLikelihoods();
         double                                  getLogWeight() const {return _log_weight;}
         void                                    proposal(unsigned step_number);
         void                                    simProposal(unsigned step_number);
@@ -56,7 +57,7 @@ class Particle {
         void    finalizeThisParticle();
         Forest::SharedPtr getForestPtr() {return _forest_ptr;}
     
-        double  getPartialCount() {return _total_particle_partials;}
+        double  getPartialCount();
         void    resetSubgroupPointers(Forest::SharedPtr gene_forest_copy);
     
         void    drawBirthDiff();
@@ -297,6 +298,15 @@ class Particle {
         return log_likelihood;
     }
 
+    inline vector<double> Particle::getGeneTreeLogLikelihoods() {
+        vector<double> log_likelihoods;
+        for (auto &l:_forest_ptr->_gene_tree_log_likelihoods) {
+            log_likelihoods.push_back(l);
+        }
+        
+        return log_likelihoods;
+    }
+
     inline double Particle::getTreeHeight() {
         return _forest_ptr->getTreeHeight();
     }
@@ -529,7 +539,7 @@ class Particle {
         }
         
         // Copy log likelihood
-        gfp->setLogLikelihood(_prev_log_likelihood + gfx.getLogWeight());
+//        gfp->setLogLikelihood(_prev_log_likelihood + gfx.getLogWeight());
                         
         // Get splits for children of _proposed_anc
         const Node * anc = gfx.getProposedAnc();
@@ -615,6 +625,13 @@ class Particle {
                 done = true;
             }
         }
+    }
+
+    inline double Particle::getPartialCount() {
+        if (G::_plus_G) {
+            _total_particle_partials *= G::_gamma_rate_cat.size();
+        }
+        return _total_particle_partials;
     }
 
 
