@@ -38,7 +38,7 @@ class Forest {
         void setForestData(Data::SharedPtr d, bool partials);
         Node * findNextPreorder(Node * nd);
         void refreshPreorder();
-        double calcSubsetLogLikelihood(unsigned i);
+//        double calcSubsetLogLikelihood(unsigned i);
         void addIncrement(Lot::SharedPtr lot);
         double joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset, vector<TaxSet> &taxset_no_fossils, vector<TaxSet> &unused_taxset_no_fossils, vector<Fossil> &particle_fossils);
         void calcPartialArray(Node* new_nd);
@@ -259,47 +259,47 @@ class Forest {
         }
     }
 
-    inline double Forest::calcSubsetLogLikelihood(unsigned i) {
-        
-        for (auto &nd:_nodes) {
-            nd._use_in_likelihood = false;
-        }
-        
-        for (auto &nd:_lineages) {
-            nd->_use_in_likelihood = true;
-        }
-        
-        _gene_tree_log_likelihoods[i] = 0.0;
-
-        auto &counts = _data->getPatternCounts();
-        _npatterns = _data->getNumPatternsInSubset(i);
-        Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(i);
-        _first_pattern = gene_begin_end.first;
-
-        for (auto &nd:_lineages) {
-            if (nd->_use_in_likelihood) {
-                assert (nd->_partials != nullptr); // ignore fossils and fake nodes in likelihood calculations
-                double log_like = 0.0;
-                unsigned skip = G::_gamma_rate_cat.size();
-//                for (unsigned p=_first_pattern; p<_npatterns + _first_pattern; p++) { // TODO: need to skip nratecat replicates of each pattern
-                for (unsigned p = 0; p < _npatterns * G::_gamma_rate_cat.size(); p++) {
-                    double site_like = 0.0;
-                    for (unsigned s=0; s<G::_nstates; s++) {
-                        double partial = (nd->_partials->_v)[p*G::_nstates+s];
-                        site_like += G::_base_frequencies[s]*partial;
-                    }
-                    if (site_like == 0) {
-                        showForest();
-                    }
-                    assert(site_like>0);
-                    log_like += log(site_like)*counts[p];
-                    p += skip * G::_nstates;
-                }
-                _gene_tree_log_likelihoods[i] += log_like;
-                }
-        }
-        return _gene_tree_log_likelihoods[i];
-    }
+//    inline double Forest::calcSubsetLogLikelihood(unsigned i) {
+//
+//        for (auto &nd:_nodes) {
+//            nd._use_in_likelihood = false;
+//        }
+//
+//        for (auto &nd:_lineages) {
+//            nd->_use_in_likelihood = true;
+//        }
+//
+//        _gene_tree_log_likelihoods[i] = 0.0;
+//
+//        auto &counts = _data->getPatternCounts();
+//        _npatterns = _data->getNumPatternsInSubset(i);
+//        Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(i);
+//        _first_pattern = gene_begin_end.first;
+//
+//        for (auto &nd:_lineages) {
+//            if (nd->_use_in_likelihood) {
+//                assert (nd->_partials != nullptr); // ignore fossils and fake nodes in likelihood calculations
+//                double log_like = 0.0;
+//                unsigned skip = G::_gamma_rate_cat.size();
+////                for (unsigned p=_first_pattern; p<_npatterns + _first_pattern; p++) { // TODO: need to skip nratecat replicates of each pattern
+//                for (unsigned p = 0; p < _npatterns * G::_gamma_rate_cat.size(); p++) {
+//                    double site_like = 0.0;
+//                    for (unsigned s=0; s<G::_nstates; s++) {
+//                        double partial = (nd->_partials->_v)[p*G::_nstates+s];
+//                        site_like += G::_base_frequencies[s]*partial;
+//                    }
+//                    if (site_like == 0) {
+//                        showForest();
+//                    }
+//                    assert(site_like>0);
+//                    log_like += log(site_like)*counts[p];
+//                    p += skip * G::_nstates;
+//                }
+//                _gene_tree_log_likelihoods[i] += log_like;
+//                }
+//        }
+//        return _gene_tree_log_likelihoods[i];
+//    }
 
     double Forest::drawBirthDeathIncrement(Lot::SharedPtr lot, double age, double estimated_lambda, double estimated_mu, double estimated_root_age) {
         // this function draws an increment but does not add it
@@ -926,13 +926,13 @@ class Forest {
             for (unsigned p = 0; p < npatterns_in_subset; p++) {
                 vector<double> prev_log_likelihoods_for_step(G::_gamma_rate_cat.size());
                 vector<double> log_likelihoods_for_step(G::_gamma_rate_cat.size());
+                unsigned pp = first_pattern + p; // TODO: or just first_pattern?
+
                 for (unsigned step = 0; step < G::_gamma_rate_cat.size(); step++) {
                 unsigned start = npartials_used;
 //            unsigned start = step * G::_gamma_rate_cat.size() * npatterns_in_subset + npartials_used;
 //            unsigned pxnstates = p*G::_nstates + start;
                     unsigned pxnstates = npartials_used;
-
-            unsigned pp = first_pattern + p; // TODO: or just first_pattern?
             
             //unsigned count = counts[pp];
             double left_sitelike = 0.0;
@@ -970,23 +970,25 @@ class Forest {
                 newnd_sitelike += 0.25*(newnd_partial_array)[pxnstates + s];
             }
 #endif
-//            prev_loglike += log(left_sitelike)*counts[pp];
-//            prev_loglike += log(right_sitelike)*counts[pp];
-//            curr_loglike += log(newnd_sitelike)*counts[pp];
-                prev_log_likelihoods_for_step[step] += log(left_sitelike) * counts[pp];
-                prev_log_likelihoods_for_step[step] += log(right_sitelike) * counts[pp];
-                log_likelihoods_for_step[step] += log(newnd_sitelike) *  counts[pp];
+
+//                prev_log_likelihoods_for_step[step] += log(left_sitelike) * counts[pp];
+//                prev_log_likelihoods_for_step[step] += log(right_sitelike) * counts[pp];
+//                log_likelihoods_for_step[step] += log(newnd_sitelike) *  counts[pp];
+                    
+                    prev_log_likelihoods_for_step[step] += log(left_sitelike);
+                    prev_log_likelihoods_for_step[step] += log(right_sitelike);
+                    log_likelihoods_for_step[step] += log(newnd_sitelike);
                     
                     npartials_used += G::_nstates;
         }
                 // calculate log sum over all rate categories for the site
-                cout << "x";
                 if (G::_plus_G) {
                           assert (log_likelihoods_for_step.size() == G::_gamma_rate_cat.size());
                           assert (prev_log_likelihoods_for_step.size() == G::_gamma_rate_cat.size());
-                          double curr_sum = G::calcLogSum(log_likelihoods_for_step) - log_n_rate_categ;
-                          double prev_sum = G::calcLogSum(prev_log_likelihoods_for_step) - log_n_rate_categ;
+                          double curr_sum = (G::calcLogSum(log_likelihoods_for_step) - log_n_rate_categ) * counts[pp];
+                          double prev_sum = (G::calcLogSum(prev_log_likelihoods_for_step) - log_n_rate_categ) * counts[pp];
                         _gene_tree_log_likelihoods[i] += curr_sum;
+                    weight += curr_sum - prev_sum;
                     }
                 else {
                         assert (log_likelihoods_for_step.size() == 1);
@@ -994,6 +996,7 @@ class Forest {
                         double curr_sum = log_likelihoods_for_step[0];
                         double prev_sum = prev_log_likelihoods_for_step[0];
                       _gene_tree_log_likelihoods[i] += curr_sum;
+                    weight += curr_sum - prev_sum;
                 }
             }
 //            log_likelihoods[i].push_back(curr_loglike);

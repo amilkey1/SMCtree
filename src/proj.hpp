@@ -755,12 +755,13 @@ namespace proj {
 
             // reset marginal likelihood
             _log_marginal_likelihood = 0.0;
-            vector<double> starting_log_likelihoods = p.calcGeneTreeLogLikelihoods();
+//            vector<double> starting_log_likelihoods = p.calcGeneTreeLogLikelihoods();
             
             _log_marginal_likelihood = 0.0;
-            for (auto &l:starting_log_likelihoods) {
-                _log_marginal_likelihood += l;
-            }
+            // TODO: add back in marginal likelihood calculation
+//            for (auto &l:starting_log_likelihoods) {
+//                _log_marginal_likelihood += l;
+//            }
             
             _log_marginal_likelihood *= G::_ngroups;
             
@@ -788,9 +789,9 @@ namespace proj {
                 }
             }
             
-            for (unsigned p=1; p<_particle_vec.size(); p++) {
-                _particle_vec[p].setStartingLogLikelihoods(starting_log_likelihoods);
-            }
+//            for (unsigned p=1; p<_particle_vec.size(); p++) {
+//                _particle_vec[p].setStartingLogLikelihoods(starting_log_likelihoods);
+//            }
             
             if (G::_taxsets.size() > 0) {
                 removeUnecessaryTaxsets(); // remove any taxsets with just one lineage and one fossil because they will not provide any constraints
@@ -1426,7 +1427,8 @@ namespace proj {
                 Particle p = _particle_vec[index];
                 double node_age = p.getHeightNodesWithFossilCalibrations()[f];
                 
-                vector<double> tree_log_likelihoods = p.calcGeneTreeLogLikelihoods();
+//                vector<double> tree_log_likelihoods = p.calcGeneTreeLogLikelihoods();
+                vector<double> tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
                 double log_likelihood = 0.0;
                 for (auto &t:tree_log_likelihoods) {
                     log_likelihood += t;

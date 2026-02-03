@@ -12,7 +12,7 @@ class Particle {
     
         void                                    setParticleData(Data::SharedPtr d, bool partials);
         void                                    operator=(const Particle & other);
-        vector<double>                          calcGeneTreeLogLikelihoods();
+//        vector<double>                          calcGeneTreeLogLikelihoods();
         vector<double>                          getGeneTreeLogLikelihoods();
         double                                  getLogWeight() const {return _log_weight;}
         void                                    proposal(unsigned step_number);
@@ -183,20 +183,20 @@ class Particle {
         }
     }
 
-    inline vector<double> Particle::calcGeneTreeLogLikelihoods() {
-        vector<double> gene_forest_likelihoods;
-        gene_forest_likelihoods.resize(G::_nloci);
-        
-        //calculate likelihood for each gene tree
-        for (unsigned i=0; i<G::_nloci; i++) {
-            double gene_tree_log_likelihood  = 0.0;
-            gene_tree_log_likelihood = _forest_ptr->calcSubsetLogLikelihood(i);
-            assert(!isnan (gene_tree_log_likelihood));
-            gene_forest_likelihoods[i] = gene_tree_log_likelihood;
-        }
-
-        return gene_forest_likelihoods;
-    }
+//    inline vector<double> Particle::calcGeneTreeLogLikelihoods() {
+//        vector<double> gene_forest_likelihoods;
+//        gene_forest_likelihoods.resize(G::_nloci);
+//
+//        //calculate likelihood for each gene tree
+//        for (unsigned i=0; i<G::_nloci; i++) {
+//            double gene_tree_log_likelihood  = 0.0;
+//            gene_tree_log_likelihood = _forest_ptr->calcSubsetLogLikelihood(i);
+//            assert(!isnan (gene_tree_log_likelihood));
+//            gene_forest_likelihoods[i] = gene_tree_log_likelihood;
+//        }
+//
+//        return gene_forest_likelihoods;
+//    }
 
     inline void Particle::simProposal(unsigned step_number) {
         proposal(step_number);
