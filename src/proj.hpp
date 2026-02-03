@@ -755,13 +755,12 @@ namespace proj {
 
             // reset marginal likelihood
             _log_marginal_likelihood = 0.0;
-//            vector<double> starting_log_likelihoods = p.calcGeneTreeLogLikelihoods();
+            vector<double> starting_log_likelihoods = p.calcGeneTreeLogLikelihoods();
             
             _log_marginal_likelihood = 0.0;
-            // TODO: add back in marginal likelihood calculation
-//            for (auto &l:starting_log_likelihoods) {
-//                _log_marginal_likelihood += l;
-//            }
+            for (auto &l:starting_log_likelihoods) {
+                _log_marginal_likelihood += l;
+            }
             
             _log_marginal_likelihood *= G::_ngroups;
             
