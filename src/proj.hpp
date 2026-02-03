@@ -714,7 +714,7 @@ namespace proj {
             // set length of partials
             double nratecat = 1.0;
             if (G::_plus_G) {
-                nratecat = 2.0; // TODO: fix this
+                nratecat = 4.0; // TODO: fix this
             }
             ps.setNElements(G::_nstates * _data->getNumPatterns() * nratecat);
             
@@ -1207,16 +1207,8 @@ namespace proj {
         unsigned count = 0;
         if (G::_nthreads == 1) {
             for (auto & p : _particle_vec) {
-//                if (count == 46 || count == 48) {
-//                    cout << "stop";
-//                }
+
                 p.proposal(step_number);
-                
-//                if (count == 46 && step_number == 2) {
-//                    p.finalizeThisParticle();
-//                    p.showParticle();
-//                    p.calcGeneTreeLogLikelihoods();
-//                }
                 count++;
             }
         }
@@ -1293,7 +1285,7 @@ namespace proj {
             double rate_variance = G::_gamma_rate_var;
             double alpha = 1 / G::_gamma_rate_var;
             double beta = rate_variance;
-            double num_categ = 2; // TODO: fix this
+            double num_categ = 4.0; // TODO: fix this
             double mean_rate_variable_sites = 1.0;
             double equal_prob = 1 / num_categ;
             

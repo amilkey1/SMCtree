@@ -238,9 +238,6 @@ class Forest {
                         for (unsigned p=0; p<npatterns_in_subset; p++) {
                             for (unsigned step = 0; step < G::_gamma_rate_cat.size(); step++) {
                                 unsigned pp = first_pattern + p;
-//                                unsigned start = npartials_used;
-//                                unsigned start = step * G::_gamma_rate_cat.size() * npatterns_in_subset + npartials_used;
-//                                unsigned pxnstates = p*G::_nstates + start;
                                 unsigned pxnstates = npartials_used;
                                 
                                 for (unsigned s=0; s<G::_nstates; s++) {
@@ -251,7 +248,6 @@ class Forest {
                                 }
                                 npartials_used += G::_nstates;
                             }
-//                            npartials_used += npatterns_in_subset * G::_nstates;
                         }
                     }
                 }
@@ -701,8 +697,8 @@ class Forest {
                  else {
                          assert (log_likelihoods_for_step.size() == 1);
                          assert (prev_log_likelihoods_for_step.size() == 1);
-                         double curr_sum = log_likelihoods_for_step[0];
-                         double prev_sum = prev_log_likelihoods_for_step[0];
+                         double curr_sum = log_likelihoods_for_step[0] * counts[pp];
+                         double prev_sum = prev_log_likelihoods_for_step[0] * counts[pp];
                        _gene_tree_log_likelihoods[i] += curr_sum;
                      weight += curr_sum - prev_sum;
                  }
@@ -981,8 +977,8 @@ class Forest {
                 else {
                         assert (log_likelihoods_for_step.size() == 1);
                         assert (prev_log_likelihoods_for_step.size() == 1);
-                        double curr_sum = log_likelihoods_for_step[0];
-                        double prev_sum = prev_log_likelihoods_for_step[0];
+                        double curr_sum = log_likelihoods_for_step[0] * counts[pp];
+                        double prev_sum = prev_log_likelihoods_for_step[0] * counts[pp];
                       _gene_tree_log_likelihoods[i] += curr_sum;
                     weight += curr_sum - prev_sum;
                 }
