@@ -33,7 +33,7 @@ namespace proj {
         static string                   _model;
         static double                   _kappa;
         static bool                     _plus_G;
-        static double                   _alpha;
+        static double                   _gamma_rate_var;
         static vector<double>           _gamma_rate_cat;
         static string                   _string_base_frequencies;
         static string                   _string_relative_rates;

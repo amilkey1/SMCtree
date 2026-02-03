@@ -124,7 +124,7 @@ namespace proj {
         ("kappa",  boost::program_options::value(&G::_kappa)->default_value(1.0), "value of kappa")
         ("base_frequencies", boost::program_options::value(&G::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
         ("plus_G", boost::program_options::value(&G::_plus_G)->default_value(false), "+G rate het")
-        ("alpha", boost::program_options::value(&G::_alpha)->default_value(1.0), "alpha value for +G rate het")
+        ("gamma_rate_var", boost::program_options::value(&G::_gamma_rate_var)->default_value(1.0), "alpha value for +G rate het")
         ("relative_rates", boost::program_options::value(&G::_string_relative_rates)->default_value("null"), "relative rates by locus")
         ("proposal", boost::program_options::value(&G::_proposal)->default_value("prior-prior"), "prior-prior or prior-post")
         ("estimate_lambda", boost::program_options::value(&G::_est_lambda)->default_value(false), "estimate birth rate")
@@ -714,7 +714,7 @@ namespace proj {
             // set length of partials
             double nratecat = 1.0;
             if (G::_plus_G) {
-                nratecat = 4.0;
+                nratecat = 2.0; // TODO: fix this
             }
             ps.setNElements(G::_nstates * _data->getNumPatterns() * nratecat);
             
@@ -1288,9 +1288,12 @@ namespace proj {
         }
         
         if (G::_plus_G) {
-            double alpha = 1 / G::_alpha;
-            double beta = 2.0;
-            double num_categ = 4;
+            // alpha and beta are shape and scale, respectively
+            // mean = alpha * beta = 1.0
+            double rate_variance = G::_gamma_rate_var;
+            double alpha = 1 / G::_gamma_rate_var;
+            double beta = rate_variance;
+            double num_categ = 2; // TODO: fix this
             double mean_rate_variable_sites = 1.0;
             double equal_prob = 1 / num_categ;
             
