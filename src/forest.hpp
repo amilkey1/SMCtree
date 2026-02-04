@@ -41,7 +41,6 @@ class Forest {
         double calcSubsetLogLikelihood(unsigned i);
         void addIncrement(Lot::SharedPtr lot);
         double joinPriorPrior(double prev_log_likelihood, Lot::SharedPtr lot, vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset, vector<TaxSet> &taxset_no_fossils, vector<TaxSet> &unused_taxset_no_fossils, vector<Fossil> &particle_fossils);
-        void calcPartialArray(Node* new_nd);
         double calcPartialArrayLazyJC(Node * new_nd, const Node * lchild, const Node * rchild, double clock_rate) const;
         double calcPartialArrayLazyHKY(Node * new_nd, const Node * lchild, const Node * rchild, double clock_rate) const;
         double calcTransitionProbabilityLazyJC(double s, double s_child, double edge_length, unsigned locus, double clock_rate, unsigned rate_categ) const;
@@ -1473,6 +1472,12 @@ class Forest {
         for (unsigned i = 0; i < nsites; i++) {
             sequences[ndnum][i] = G::multinomialDraw(lot, basefreq);
         }
+        
+        vector<double> site_rates(nsites);
+        for (unsigned i=0; i<nsites; i++) {
+            double u_cat = lot->randint(0, G::_gamma_rate_cat.size() - 1);
+            site_rates[i] = G::_gamma_rate_cat[u_cat];
+        }
 
         nd = findNextPreorder(nd);
         while (nd) {
@@ -1487,9 +1492,7 @@ class Forest {
             // Evolve nd's sequence given parent's sequence and edge length
             for (unsigned i = 0; i < nsites; i++) {
                 // Choose relative rate for this site
-                double site_relrate = 1.0;
-                if (G::_asrv_shape != G::_infinity)
-                    site_relrate = lot->gamma(G::_asrv_shape, 1.0/G::_asrv_shape);
+                double site_relrate = site_rates[i];
                 unsigned from_state = sequences[parnum][i];
                 double cum_prob = 0.0;
                 double u = lot->uniform();
