@@ -1418,7 +1418,6 @@ namespace proj {
                 Particle p = _particle_vec[index];
                 double node_age = p.getHeightNodesWithFossilCalibrations()[f];
                 
-//                vector<double> tree_log_likelihoods = p.calcGeneTreeLogLikelihoods();
                 vector<double> tree_log_likelihoods = p.getGeneTreeLogLikelihoods();
                 double log_likelihood = 0.0;
                 for (auto &t:tree_log_likelihoods) {
