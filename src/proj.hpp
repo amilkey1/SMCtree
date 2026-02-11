@@ -125,6 +125,8 @@ namespace proj {
         ("base_frequencies", boost::program_options::value(&G::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
         ("plus_G", boost::program_options::value(&G::_plus_G)->default_value(false), "+G rate het")
         ("gamma_rate_var", boost::program_options::value(&G::_gamma_rate_var)->default_value(1.0), "alpha value for +G rate het")
+        ("plus_I", boost::program_options::value(&G::_plus_I)->default_value(false), "+I rate het")
+        ("pinvar", boost::program_options::value(&G::_pinvar)->default_value(0.0), "proportion of invariant sites")
         ("relative_rates", boost::program_options::value(&G::_string_relative_rates)->default_value("null"), "relative rates by locus")
         ("proposal", boost::program_options::value(&G::_proposal)->default_value("prior-prior"), "prior-prior or prior-post")
         ("estimate_lambda", boost::program_options::value(&G::_est_lambda)->default_value(false), "estimate birth rate")
@@ -1280,6 +1282,11 @@ namespace proj {
         }
         
         if (G::_plus_G) {
+            double pinvar = 0.0;
+            if (G::_plus_I) {
+                pinvar = G::_pinvar;
+            }
+            
             // alpha and beta are shape and scale, respectively
             // mean = alpha * beta = 1.0
             double rate_variance = G::_gamma_rate_var;
@@ -1287,6 +1294,9 @@ namespace proj {
             double beta = rate_variance;
             double num_categ = 4.0; // TODO: fix this
             double mean_rate_variable_sites = 1.0;
+            if (G::_plus_I) {
+                mean_rate_variable_sites /= (1.0 - G::_pinvar);
+            }
             double equal_prob = 1 / num_categ;
             
             boost::math::gamma_distribution<> my_gamma(alpha, beta);
@@ -1319,7 +1329,11 @@ namespace proj {
               }
         }
         else {
-            G::_gamma_rate_cat.push_back(1.0);
+            double mean_rate_variable_sites = 1.0;
+            if (G::_plus_I) {
+                mean_rate_variable_sites /= (1.0 - G::_pinvar);
+            }
+            G::_gamma_rate_cat.push_back(mean_rate_variable_sites);
         }
         
         if (G::_start_mode != "sim") {

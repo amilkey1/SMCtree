@@ -560,6 +560,9 @@ class Forest {
         // Get pattern counts
         auto counts = _data->getPatternCounts();
         
+        // get monomorphic sites
+        auto monomorphic = _data->getMonomorphic();
+        
         // Determine if there is an edge length extension (this would be the
         // case if new_nd comes from a gene forest extension)
         double lchild_stem_height = lchild->_height + lchild->_edge_length;
@@ -594,6 +597,18 @@ class Forest {
             unsigned first_pattern = gene_begin_end.first;
             unsigned last_pattern = gene_begin_end.second;
             unsigned npatterns_in_subset = last_pattern - first_pattern;
+            
+            vector<double> L_invar;
+            if (G::_plus_I) {
+                for (unsigned p=first_pattern; p<npatterns_in_subset; p++) {
+                    if (monomorphic[p] > 0) {
+                        L_invar.push_back(0.25);
+                    }
+                    else {
+                        L_invar.push_back(0);
+                    }
+                }
+            }
 
             for (unsigned p = 0; p < npatterns_in_subset; p++) {
 
@@ -687,22 +702,60 @@ class Forest {
 
             }
                 // calculate log sum over all rate categories for the site
-                 if (G::_plus_G) {
-                           assert (log_likelihoods_for_step.size() == G::_gamma_rate_cat.size());
-                           assert (prev_log_likelihoods_for_step.size() == G::_gamma_rate_cat.size());
-                           double curr_sum = (G::calcLogSum(log_likelihoods_for_step) - log_n_rate_categ) * counts[pp];
-                           double prev_sum = (G::calcLogSum(prev_log_likelihoods_for_step) - log_n_rate_categ) * counts[pp];
-                         _gene_tree_log_likelihoods[i] += curr_sum;
-                     weight += curr_sum - prev_sum;
-                     }
-                 else {
-                         assert (log_likelihoods_for_step.size() == 1);
-                         assert (prev_log_likelihoods_for_step.size() == 1);
-                         double curr_sum = log_likelihoods_for_step[0] * counts[pp];
-                         double prev_sum = prev_log_likelihoods_for_step[0] * counts[pp];
-                       _gene_tree_log_likelihoods[i] += curr_sum;
-                     weight += curr_sum - prev_sum;
-                 }
+                if (G::_plus_G) {
+                    assert (log_likelihoods_for_step.size() == G::_gamma_rate_cat.size());
+                    assert (prev_log_likelihoods_for_step.size() == G::_gamma_rate_cat.size());
+                    double curr_sum = G::calcLogSum(log_likelihoods_for_step) - log_n_rate_categ;
+                    double prev_sum = G::calcLogSum(prev_log_likelihoods_for_step) - log_n_rate_categ;
+                    
+                    if (G::_plus_I) {
+                        if (L_invar[p] == 0) {
+                            curr_sum += log(1 - G::_pinvar);
+                            prev_sum += log(1 - G::_pinvar);
+                        }
+                        else {
+                            double a = log(1.0 - G::_pinvar) + curr_sum;
+                            double b = log(G::_pinvar) + log(0.25);
+                            double c = log(1.0 - G::_pinvar) + prev_sum;
+                            
+                            double max_val_a = (a > b) ? a : b;
+                            double max_val_c = (c > b) ? c : b;
+                            curr_sum = max_val_a + log(exp(a - max_val_a) + exp(b - max_val_a));
+                            prev_sum = max_val_c + log(exp(c - max_val_c) + exp(b - max_val_c));
+                        }
+                    }
+                    curr_sum *= counts[pp];
+                    prev_sum *= counts[pp];
+                    
+                    _gene_tree_log_likelihoods[i] += curr_sum;
+                    weight += curr_sum - prev_sum;
+                }
+                else {
+                    assert (log_likelihoods_for_step.size() == 1);
+                    assert (prev_log_likelihoods_for_step.size() == 1);
+                    double curr_sum = log_likelihoods_for_step[0];
+                    double prev_sum = prev_log_likelihoods_for_step[0];
+                    if (G::_plus_I) {
+                        if (L_invar[p] == 0) {
+                            curr_sum = log_likelihoods_for_step[0] + log(1 - G::_pinvar);
+                            prev_sum = prev_log_likelihoods_for_step[0] + log(1 - G::_pinvar);
+                        }
+                        else {
+                            double a = log(1.0 - G::_pinvar) + log_likelihoods_for_step[0];
+                            double b = log(G::_pinvar) + log(0.25);
+                            double c = log(1.0 - G::_pinvar) + prev_log_likelihoods_for_step[0];
+                            
+                            double max_val_a = (a > b) ? a : b;
+                            double max_val_c = (c > b) ? c : b;
+                            curr_sum = max_val_a + log(exp(a - max_val_a) + exp(b - max_val_a));
+                            prev_sum = max_val_c + log(exp(c - max_val_c) + exp(b - max_val_c));
+                        }
+                    }
+                    curr_sum *= counts[pp];
+                    prev_sum *= counts[pp];
+                    _gene_tree_log_likelihoods[i] += curr_sum;
+                    weight += curr_sum - prev_sum;
+                }
              }
              }
          return weight;
@@ -711,6 +764,9 @@ class Forest {
     inline double Forest::calcPartialArrayLazyJC(Node * new_nd, const Node * lchild, const Node * rchild, double clock_rate) const {
         // Get pattern counts
         auto counts = _data->getPatternCounts();
+        
+        // get monomorphic sites
+        auto monomorphic = _data->getMonomorphic();
         
         // Determine if there is an edge length extension (this would be the
         // case if new_nd comes from a gene forest extension)
@@ -742,11 +798,26 @@ class Forest {
         
         for (unsigned i=0; i<G::_nloci; i++) {
             _gene_tree_log_likelihoods[i] = 0.0;
+            
             Data::begin_end_pair_t gene_begin_end = _data->getSubsetBeginEnd(i);
             auto & parent_partial_array = new_nd->_partials->_v;
             unsigned first_pattern = gene_begin_end.first;
             unsigned last_pattern = gene_begin_end.second;
             unsigned npatterns_in_subset = last_pattern - first_pattern;
+            
+            vector<double> L_invar;
+            if (G::_plus_I) {
+                for (unsigned p=first_pattern; p<npatterns_in_subset; p++) {
+                    if (monomorphic[p] > 0) {
+                        // >0 means site is constant
+                        L_invar.push_back(0.25);
+                    }
+                    else {
+                        // 0 means site is variable - invariant likelihood is 0 because it varies
+                        L_invar.push_back(0);
+                    }
+                }
+            }
 
             for (unsigned p = 0; p < npatterns_in_subset; p++) {
 
@@ -968,19 +1039,57 @@ class Forest {
         }
                 // calculate log sum over all rate categories for the site
                 if (G::_plus_G) {
-                          assert (log_likelihoods_for_step.size() == G::_gamma_rate_cat.size());
-                          assert (prev_log_likelihoods_for_step.size() == G::_gamma_rate_cat.size());
-                          double curr_sum = (G::calcLogSum(log_likelihoods_for_step) - log_n_rate_categ) * counts[pp];
-                          double prev_sum = (G::calcLogSum(prev_log_likelihoods_for_step) - log_n_rate_categ) * counts[pp];
-                        _gene_tree_log_likelihoods[i] += curr_sum;
-                    weight += curr_sum - prev_sum;
+                    assert (log_likelihoods_for_step.size() == G::_gamma_rate_cat.size());
+                    assert (prev_log_likelihoods_for_step.size() == G::_gamma_rate_cat.size());
+                    double curr_sum = G::calcLogSum(log_likelihoods_for_step) - log_n_rate_categ;
+                    double prev_sum = G::calcLogSum(prev_log_likelihoods_for_step) - log_n_rate_categ;
+                    
+                    if (G::_plus_I) {
+                        if (L_invar[p] == 0) {
+                            curr_sum += log(1 - G::_pinvar);
+                            prev_sum += log(1 - G::_pinvar);
+                        }
+                        else {
+                            double a = log(1.0 - G::_pinvar) + curr_sum;
+                            double b = log(G::_pinvar) + log(0.25);
+                            double c = log(1.0 - G::_pinvar) + prev_sum;
+                            
+                            double max_val_a = (a > b) ? a : b;
+                            double max_val_c = (c > b) ? c : b;
+                            curr_sum = max_val_a + log(exp(a - max_val_a) + exp(b - max_val_a));
+                            prev_sum = max_val_c + log(exp(c - max_val_c) + exp(b - max_val_c));
+                        }
                     }
+                    curr_sum *= counts[pp];
+                    prev_sum *= counts[pp];
+                    
+                    _gene_tree_log_likelihoods[i] += curr_sum;
+                    weight += curr_sum - prev_sum;
+                }
                 else {
-                        assert (log_likelihoods_for_step.size() == 1);
-                        assert (prev_log_likelihoods_for_step.size() == 1);
-                        double curr_sum = log_likelihoods_for_step[0] * counts[pp];
-                        double prev_sum = prev_log_likelihoods_for_step[0] * counts[pp];
-                      _gene_tree_log_likelihoods[i] += curr_sum;
+                    assert (log_likelihoods_for_step.size() == 1);
+                    assert (prev_log_likelihoods_for_step.size() == 1);
+                    double curr_sum = log_likelihoods_for_step[0];
+                    double prev_sum = prev_log_likelihoods_for_step[0];
+                    if (G::_plus_I) {
+                        if (L_invar[p] == 0) {
+                            curr_sum = log_likelihoods_for_step[0] + log(1 - G::_pinvar);
+                            prev_sum = prev_log_likelihoods_for_step[0] + log(1 - G::_pinvar);
+                        }
+                        else {
+                            double a = log(1.0 - G::_pinvar) + log_likelihoods_for_step[0];
+                            double b = log(G::_pinvar) + log(0.25);
+                            double c = log(1.0 - G::_pinvar) + prev_log_likelihoods_for_step[0];
+                            
+                            double max_val_a = (a > b) ? a : b;
+                            double max_val_c = (c > b) ? c : b;
+                            curr_sum = max_val_a + log(exp(a - max_val_a) + exp(b - max_val_a));
+                            prev_sum = max_val_c + log(exp(c - max_val_c) + exp(b - max_val_c));
+                        }
+                    }
+                    curr_sum *= counts[pp];
+                    prev_sum *= counts[pp];
+                    _gene_tree_log_likelihoods[i] += curr_sum;
                     weight += curr_sum - prev_sum;
                 }
             }
@@ -1477,8 +1586,15 @@ class Forest {
         
         vector<double> site_rates(nsites);
         for (unsigned i=0; i<nsites; i++) {
-            double u_cat = lot->randint(0, G::_gamma_rate_cat.size() - 1);
-            site_rates[i] = G::_gamma_rate_cat[u_cat];
+            // select if site is variable or not
+            if (lot->uniform() < G::_pinvar) {
+                // Invariant site: set rate to 0.0
+                site_rates[i] = 0.0;
+            } else {
+                // Variable site: draw from Gamma categorie
+                unsigned u_cat = lot->randint(0, G::_gamma_rate_cat.size() - 1);
+                site_rates[i] = G::_gamma_rate_cat[u_cat];
+            }
         }
 
         nd = findNextPreorder(nd);

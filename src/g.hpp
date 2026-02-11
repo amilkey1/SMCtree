@@ -35,6 +35,8 @@ namespace proj {
         static bool                     _plus_G;
         static double                   _gamma_rate_var;
         static vector<double>           _gamma_rate_cat;
+        static bool                     _plus_I;
+        static double                   _pinvar;
         static string                   _string_base_frequencies;
         static string                   _string_relative_rates;
         static string                   _proposal;
