@@ -215,7 +215,7 @@ class Particle {
             }
             
             if (G::_est_lambda) {
-                if (G::_mu > 0) {
+//                if (G::_mu > 0) {
                     assert (G::_est_mu);
 //                    drawLambda();
 //                    drawMu();
@@ -223,11 +223,11 @@ class Particle {
 //                    drawBirthDiff();
 //                    drawTurnover();
 //                    calculateLambdaAndMu();
-                }
-                else {
-                    // Yule model
-                    drawLambda();
-                }
+//                }
+//                else {
+//                    // Yule model
+//                    drawLambda();
+//                }
             }
             
             setParticleTaxSets();
