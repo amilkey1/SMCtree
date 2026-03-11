@@ -392,13 +392,14 @@ class Particle {
     }
 
     inline void Particle::drawLambdaAndMu() {
+        assert (G::_est_mu);
+        assert (G::_est_lambda);
         // Gamma(1, n) = Exp(1/n)
         _estimated_lambda = 0.0;
         _estimated_mu = 0.0;
         
         while (_estimated_lambda <= _estimated_mu) {
             _estimated_lambda = _lot->gamma(1, G::_lambda);
-            assert (G::_est_mu);
             _estimated_mu = _lot->gamma(1, G::_mu);
         }
     }
