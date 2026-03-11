@@ -64,6 +64,8 @@ class Particle {
         void    drawTurnover();
         void    calculateLambdaAndMu();
         void    drawLambda();
+        void    drawMu();
+        void    drawLambdaAndMu();
         void    drawRootAge();
 
     
@@ -215,9 +217,12 @@ class Particle {
             if (G::_est_lambda) {
                 if (G::_mu > 0) {
                     assert (G::_est_mu);
-                    drawBirthDiff();
-                    drawTurnover();
-                    calculateLambdaAndMu();
+//                    drawLambda();
+//                    drawMu();
+                    drawLambdaAndMu();
+//                    drawBirthDiff();
+//                    drawTurnover();
+//                    calculateLambdaAndMu();
                 }
                 else {
                     // Yule model
@@ -378,6 +383,24 @@ class Particle {
         // mean = n
         // for now, n = G::_lambda set by user
         _estimated_lambda = _lot->gamma(1, G::_lambda);
+    }
+
+    inline void Particle::drawMu() {
+        // Gamma(1, n) = Exp(1/n)
+        assert (G::_est_mu);
+        _estimated_mu = _lot->gamma(1, G::_mu);
+    }
+
+    inline void Particle::drawLambdaAndMu() {
+        // Gamma(1, n) = Exp(1/n)
+        _estimated_lambda = 0.0;
+        _estimated_mu = 0.0;
+        
+        while (_estimated_lambda <= _estimated_mu) {
+            _estimated_lambda = _lot->gamma(1, G::_lambda);
+            assert (G::_est_mu);
+            _estimated_mu = _lot->gamma(1, G::_mu);
+        }
     }
 
     inline void Particle::drawFossilAges() {
