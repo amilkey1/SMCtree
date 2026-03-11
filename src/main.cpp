@@ -123,6 +123,15 @@ bool G::_coverage = false;
 bool G::_ruv_root_age = false;
 bool G::_coverage_root_age = false;
 
+bool G::_ruv_lambda = false;
+bool G::_coverage_lambda = false;
+
+bool G::_ruv_mu = false;
+bool G::_coverage_mu = false;
+
+bool G::_ruv_branch_rates = false;
+bool G::_coverage_branch_rates = false;
+
 vector<Fossil> G::_fossils;
 vector<TaxSet> G::_taxsets;
 

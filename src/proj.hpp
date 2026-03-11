@@ -72,7 +72,10 @@ namespace proj {
             vector<Lot::SharedPtr>      _group_rng;
             vector<unsigned>            _indices_to_keep; // indices of particles to write to output files
             vector<pair<double, double>> _hpd_values;
-        vector<pair<double, double>> _hpd_values_root_ages;
+            vector<pair<double, double>> _hpd_values_root_ages;
+            vector<pair<double, double>> _hpd_values_lambdas;
+            vector<pair<double, double>> _hpd_values_mus;
+            vector<pair<double, double>> _hpd_values_branch_rates;
     };
 
     inline Proj::Proj() {
@@ -146,6 +149,13 @@ namespace proj {
         ("coverage", boost::program_options::value(&G::_coverage)->default_value(false), "run coverage analysis")
         ("ruv_root_age", boost::program_options::value(&G::_ruv_root_age)->default_value(false), "run ruv analysis for root age")
         ("coverage_root_age", boost::program_options::value(&G::_coverage_root_age)->default_value(false), "run coverage analysis for root age")
+        ("ruv_lambda", boost::program_options::value(&G::_ruv_lambda)->default_value(false), "run ruv analysis for lambda")
+        ("coverage_lambda", boost::program_options::value(&G::_coverage_lambda)->default_value(false), "run coverage analysis for lambda")
+        ("ruv_mu", boost::program_options::value(&G::_ruv_mu)->default_value(false), "run ruv analysis for mu")
+        ("coverage_mu", boost::program_options::value(&G::_coverage_mu)->default_value(false), "run coverage analysis for mu")
+        ("ruv_branch_rates", boost::program_options::value(&G::_ruv_branch_rates)->default_value(false), "run ruv analysis for branch rates")
+        ("coverage_branch_rates", boost::program_options::value(&G::_coverage_branch_rates)->default_value(false), "run coverage analysis for branch rates")
+
         ;
         
         store(parse_command_line(argc, argv, desc), vm);
@@ -480,9 +490,9 @@ namespace proj {
         // create vector of particles
         G::_nparticles = 1000;
         G::_ngroups = 1;
-        G::_est_lambda = false;
+//        G::_est_lambda = false;
 //        G::_est_root_age = false;
-        G::_est_mu = false;
+//        G::_est_mu = false;
         unsigned nleaves = G::_sim_ntaxa;
         G::_ntaxa = nleaves;
         G::_root_age = G::_sim_root_age;
@@ -625,6 +635,21 @@ namespace proj {
         ofstream rootagef(root_age_f);
         double root_age = _particle_vec[0].getRootAge();
         rootagef << root_age << endl;
+        
+        string lambda_f = "true_lambda.txt";
+        ofstream lambdaf(lambda_f);
+        double lambda = _particle_vec[0].getEstLambda();
+        lambdaf << lambda << endl;
+        
+        string mu_f = "true_mu.txt";
+        ofstream muf(mu_f);
+        double mu = _particle_vec[0].getEstMu();
+        muf << mu << endl;
+        
+        string branchrate_f = "true_branch_rate.txt";
+        ofstream branchratef(branchrate_f);
+        double branch_rate = _particle_vec[0].getClockRate();
+        branchratef << branch_rate << endl;
         
         ofstream fossilf("nodes_with_fossil_calibration_ages.txt");
         vector<double> node_heights = _particle_vec[0].getHeightNodesWithFossilCalibrations();
@@ -928,6 +953,120 @@ namespace proj {
                 rankf << "rank: " << index_value << endl;
             }
             
+            if (G::_ruv_lambda) {
+                // get true root height from sim directory (read in as command line option)
+                string lambdafname;
+                if (G::_sim_dir != ".") {
+                    lambdafname = G::_sim_dir + "true_lambda.txt";
+                }
+                else {
+                    lambdafname = "true_lambda.txt";
+                }
+                ifstream inputf(lambdafname);
+                double true_lambda = 0.0;
+                string line;
+                while (getline(inputf, line)) {
+                    true_lambda = stod(line);
+                    break;
+                }
+                
+                vector<pair<double, bool>> sampled_lambdas;
+                for (auto &p:_particle_vec) {
+                    double sampled_lambda = p.getEstLambda();
+                    sampled_lambdas.push_back(make_pair(sampled_lambda, false));
+                }
+                
+                sampled_lambdas.push_back(make_pair(true_lambda, true)); // true first split height
+                
+                // sort split heights
+                sort(sampled_lambdas.begin(), sampled_lambdas.end());
+
+                // find rank of truth
+                auto it = std::find_if(sampled_lambdas.begin(), sampled_lambdas.end(), [&](const pair<double, bool>& p) { return p.second == true;});
+                unsigned index_value = (unsigned) std::distance(sampled_lambdas.begin(), it);
+                
+                // write rank value to file
+                
+                ofstream rankf("rank_lambda.txt");
+                rankf << "rank: " << index_value << endl;
+            }
+            
+            if (G::_ruv_mu) {
+                // get true root height from sim directory (read in as command line option)
+                string mufname;
+                if (G::_sim_dir != ".") {
+                    mufname = G::_sim_dir + "true_mu.txt";
+                }
+                else {
+                    mufname = "true_mu.txt";
+                }
+                ifstream inputf(mufname);
+                double true_mu = 0.0;
+                string line;
+                while (getline(inputf, line)) {
+                    true_mu = stod(line);
+                    break;
+                }
+                
+                vector<pair<double, bool>> sampled_mus;
+                for (auto &p:_particle_vec) {
+                    double sampled_mu = p.getEstMu();
+                    sampled_mus.push_back(make_pair(sampled_mu, false));
+                }
+                
+                sampled_mus.push_back(make_pair(true_mu, true)); // true first split height
+                
+                // sort split heights
+                sort(sampled_mus.begin(), sampled_mus.end());
+
+                // find rank of truth
+                auto it = std::find_if(sampled_mus.begin(), sampled_mus.end(), [&](const pair<double, bool>& p) { return p.second == true;});
+                unsigned index_value = (unsigned) std::distance(sampled_mus.begin(), it);
+                
+                // write rank value to file
+                
+                ofstream rankf("rank_mu.txt");
+                rankf << "rank: " << index_value << endl;
+            }
+            
+            if (G::_ruv_branch_rates) {
+                // get true root height from sim directory (read in as command line option)
+                string branchratefname;
+                if (G::_sim_dir != ".") {
+                    branchratefname = G::_sim_dir + "true_branch_rate.txt";
+                }
+                else {
+                    branchratefname = "true_branch_rate.txt";
+                }
+                ifstream inputf(branchratefname);
+                double true_branch_rate = 0.0;
+                string line;
+                while (getline(inputf, line)) {
+                    true_branch_rate = stod(line);
+                    break;
+                }
+                
+                vector<pair<double, bool>> sampled_branch_rates;
+                for (auto &p:_particle_vec) {
+                    double sampled_branch_rate = p.getEstMu();
+                    sampled_branch_rates.push_back(make_pair(sampled_branch_rate, false));
+                }
+                
+                sampled_branch_rates.push_back(make_pair(true_branch_rate, true)); // true first split height
+                
+                // sort split heights
+                sort(sampled_branch_rates.begin(), sampled_branch_rates.end());
+
+                // find rank of truth
+                auto it = std::find_if(sampled_branch_rates.begin(), sampled_branch_rates.end(), [&](const pair<double, bool>& p) { return p.second == true;});
+                unsigned index_value = (unsigned) std::distance(sampled_branch_rates.begin(), it);
+                
+                // write rank value to file
+                
+                ofstream rankf("rank_branch_rate.txt");
+                rankf << "rank: " << index_value << endl;
+            }
+            
             if (G::_coverage) {
                 assert (_hpd_values.size() > 0);
                 
@@ -1038,6 +1177,175 @@ namespace proj {
 
                 // write min and max to file
                 hpdf << min << "\t" << max << "\t" << true_root_age << "\t" << observed_mean << endl;
+            }
+            
+            if (G::_coverage_lambda) {
+                assert (_hpd_values_lambdas.size() > 0);
+                
+                // get height of first split from sim directory (read in as command line option)
+                string lambdafname;
+                if (G::_sim_dir != ".") {
+                    lambdafname = G::_sim_dir + "true_lambda.txt";
+                }
+                else {
+                    lambdafname = "true_lambda.txt";
+                }
+                ifstream inputf(lambdafname);
+                double true_lambda = 0.0;
+                string line;
+                while (getline(inputf, line)) {
+                    true_lambda = stod(line);
+                    break;
+                }
+                
+                // get average first split height
+                double total_lambdas = 0.0;
+                for (auto &p:_particle_vec) {
+                    total_lambdas += p.getEstLambda();
+                }
+
+                double observed_mean = total_lambdas /= _particle_vec.size();
+                
+                ofstream hpdf("hpd_lambda.txt");
+                hpdf << "min    " << "max   " << "true    " << "observed mean   " << endl;
+
+                // sort hpd values largest to smallest
+                std::sort(_hpd_values_lambdas.begin(), _hpd_values_lambdas.end());
+                std::reverse(_hpd_values_lambdas.begin(), _hpd_values_lambdas.end());
+
+                // take first 95% of values (round down to nearest integer)
+                double total = boost::size(_hpd_values_lambdas);
+                double ninety_five_index = floor(0.95*total);
+
+                if (ninety_five_index == 0) {
+                    ninety_five_index = 1;
+                }
+
+                vector<double> hpd_values_in_range;
+
+                for (unsigned h=0; h<ninety_five_index; h++) {
+                    hpd_values_in_range.push_back(_hpd_values_lambdas[h].second);
+                }
+
+                auto max = *std::max_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
+                auto min = *std::min_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
+                assert (min < max || min == max);
+
+                // write min and max to file
+                hpdf << min << "\t" << max << "\t" << true_lambda << "\t" << observed_mean << endl;
+            }
+            
+            if (G::_coverage_mu) {
+                assert (_hpd_values_mus.size() > 0);
+                
+                // get height of first split from sim directory (read in as command line option)
+                string mufname;
+                if (G::_sim_dir != ".") {
+                    mufname = G::_sim_dir + "true_mu.txt";
+                }
+                else {
+                    mufname = "true_mu.txt";
+                }
+                ifstream inputf(mufname);
+                double true_mu = 0.0;
+                string line;
+                while (getline(inputf, line)) {
+                    true_mu = stod(line);
+                    break;
+                }
+                
+                // get average first split height
+                double total_mus = 0.0;
+                for (auto &p:_particle_vec) {
+                    total_mus += p.getEstMu();
+                }
+
+                double observed_mean = total_mus /= _particle_vec.size();
+                
+                ofstream hpdf("hpd_mu.txt");
+                hpdf << "min    " << "max   " << "true    " << "observed mean   " << endl;
+
+                // sort hpd values largest to smallest
+                std::sort(_hpd_values_mus.begin(), _hpd_values_mus.end());
+                std::reverse(_hpd_values_mus.begin(), _hpd_values_mus.end());
+
+                // take first 95% of values (round down to nearest integer)
+                double total = boost::size(_hpd_values_mus);
+                double ninety_five_index = floor(0.95*total);
+
+                if (ninety_five_index == 0) {
+                    ninety_five_index = 1;
+                }
+
+                vector<double> hpd_values_in_range;
+
+                for (unsigned h=0; h<ninety_five_index; h++) {
+                    hpd_values_in_range.push_back(_hpd_values_mus[h].second);
+                }
+
+                auto max = *std::max_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
+                auto min = *std::min_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
+                assert (min < max || min == max);
+
+                // write min and max to file
+                hpdf << min << "\t" << max << "\t" << true_mu << "\t" << observed_mean << endl;
+            }
+            
+            if (G::_coverage_branch_rates) {
+                assert (_hpd_values_branch_rates.size() > 0);
+                
+                // get height of first split from sim directory (read in as command line option)
+                string branchratefname;
+                if (G::_sim_dir != ".") {
+                    branchratefname = G::_sim_dir + "true_branch_rate.txt";
+                }
+                else {
+                    branchratefname = "true_branch_rate.txt";
+                }
+                ifstream inputf(branchratefname);
+                double true_branch_rate = 0.0;
+                string line;
+                while (getline(inputf, line)) {
+                    true_branch_rate = stod(line);
+                    break;
+                }
+                
+                // get average first split height
+                double total_branch_rates = 0.0;
+                for (auto &p:_particle_vec) {
+                    total_branch_rates += p.getClockRate();
+                }
+
+                cout << total_branch_rates << endl;
+                double observed_mean = total_branch_rates /= _particle_vec.size();
+                
+                ofstream hpdf("hpd_branch_rates.txt");
+                hpdf << "min    " << "max   " << "true    " << "observed mean   " << endl;
+
+                // sort hpd values largest to smallest
+                std::sort(_hpd_values_branch_rates.begin(), _hpd_values_branch_rates.end());
+                std::reverse(_hpd_values_branch_rates.begin(), _hpd_values_branch_rates.end());
+
+                // take first 95% of values (round down to nearest integer)
+                double total = boost::size(_hpd_values_branch_rates);
+                double ninety_five_index = floor(0.95*total);
+
+                if (ninety_five_index == 0) {
+                    ninety_five_index = 1;
+                }
+
+                vector<double> hpd_values_in_range;
+
+                for (unsigned h=0; h<ninety_five_index; h++) {
+                    hpd_values_in_range.push_back(_hpd_values_branch_rates[h].second);
+                }
+
+                auto max = *std::max_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
+                auto min = *std::min_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
+                assert (min < max || min == max);
+
+                // write min and max to file
+                hpdf << min << "\t" << max << "\t" << true_branch_rate << "\t" << observed_mean << endl;
             }
             
         }
@@ -1631,6 +1939,18 @@ namespace proj {
             
             if (G::_coverage_root_age) {
                 _hpd_values_root_ages.push_back(make_pair(log_posterior, p.getRootAge()));
+            }
+            
+            if (G::_coverage_lambda) {
+                _hpd_values_lambdas.push_back(make_pair(log_posterior, p.getEstLambda()));
+            }
+            
+            if (G::_coverage_mu) {
+                _hpd_values_mus.push_back(make_pair(log_posterior, p.getEstMu()));
+            }
+            
+            if (G::_coverage_branch_rates) {
+                _hpd_values_branch_rates.push_back(make_pair(log_posterior, p.getClockRate()));
             }
 
             double clock_rate = p.getClockRate();
