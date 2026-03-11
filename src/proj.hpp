@@ -481,7 +481,7 @@ namespace proj {
         G::_nparticles = 1000;
         G::_ngroups = 1;
         G::_est_lambda = false;
-        G::_est_root_age = false;
+//        G::_est_root_age = false;
         G::_est_mu = false;
         unsigned nleaves = G::_sim_ntaxa;
         G::_ntaxa = nleaves;
