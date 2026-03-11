@@ -148,11 +148,7 @@ unsigned  G::_minor_version = 0;
 string    G::_model = "JC";
 
 unsigned  G::_sim_ntaxa    = 4;
-double    G::_sim_lambda   = 1.0;
-double    G::_sim_mu       = 0.0;
 double    G::_sim_rho      = 1.0;
-double    G::_sim_root_age = 1.0;
-double    G::_sim_clock_rate = 1.0;
 string    G::_sim_filename_prefix = "sim";
 
 double    G::_occupancy  = 1.0;

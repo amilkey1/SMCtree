@@ -636,7 +636,6 @@ class Particle {
             // mean = n
             // for now, n = G::_root_age set by user
             _estimated_root_age = _lot->gamma(1, G::_root_age);
-            // TODO: trying uniform root age to match rev bayes
 //            _estimated_root_age = _lot->uniformConstrained(G::_root_age_min, G::_root_age_max);
 //            assert (_estimated_root_age >= G::_root_age_min);
 //            assert (_estimated_root_age <= G::_root_age_max);

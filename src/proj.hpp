@@ -120,11 +120,11 @@ namespace proj {
         ("verbosity",  value(&G::_verbosity)->default_value(1), "0 (nothing but essential output), 1, 2, ...")
         ("simfnprefix",  value(&G::_sim_filename_prefix), "prefix of files in which to save simulated trees and data if startmode is 'sim' (e.g. specifying 'sim' results in files named 'sim.tre' and 'sim.nex')")
         ("simntaxa",  value(&G::_sim_ntaxa)->default_value(4), "number of taxa to simulate if startmode is 'sim'")
-        ("simlambda",  value(&G::_sim_lambda)->default_value(1.0), "true speciation rate for simulating tree under the Yule model if startmode is 'sim'")
-        ("simmu",  value(&G::_sim_mu)->default_value(0.0), "true extinction rate for simulating tree under the constant-rates Birth-Death model if startmode is 'sim'")
+        ("simlambda",  value(&G::_lambda)->default_value(1.0), "true speciation rate for simulating tree under the Yule model if startmode is 'sim'")
+        ("simmu",  value(&G::_mu)->default_value(0.0), "true extinction rate for simulating tree under the constant-rates Birth-Death model if startmode is 'sim'")
         ("simrho",  value(&G::_sim_rho)->default_value(1.0), "true extant taxon sampling rate for simulating tree under the constant-rates Birth-Death model if startmode is 'sim'")
-        ("simrootage",  value(&G::_sim_root_age)->default_value(1.0), "true root age for simulating tree under the constant-rates Birth-Death model if startmode is 'sim'")
-        ("simclockrate",  value(&G::_sim_clock_rate)->default_value(1.0), "true clock rate for simulating tree under constant-rates Birth-Death model if startmode is 'sim'")
+        ("simrootage",  value(&G::_root_age)->default_value(1.0), "true root age for simulating tree under the constant-rates Birth-Death model if startmode is 'sim'")
+        ("simclockrate",  value(&G::_clock_rate)->default_value(1.0), "true clock rate for simulating tree under constant-rates Birth-Death model if startmode is 'sim'")
         ("kappa",  boost::program_options::value(&G::_kappa)->default_value(1.0), "value of kappa")
         ("base_frequencies", boost::program_options::value(&G::_string_base_frequencies)->default_value("0.25, 0.25, 0.25, 0.25"), "string of base frequencies A C G T")
         ("plus_G", boost::program_options::value(&G::_plus_G)->default_value(false), "+G rate het")
@@ -495,7 +495,6 @@ namespace proj {
 //        G::_est_mu = false;
         unsigned nleaves = G::_sim_ntaxa;
         G::_ntaxa = nleaves;
-        G::_root_age = G::_sim_root_age;
         
         // make up taxon names
         G::_taxon_names.resize(nleaves);
@@ -607,10 +606,10 @@ namespace proj {
         for (unsigned i = 0; i < G::_nloci; ++i) {
             output(format("    %s (%d sites)\n") % G::_locus_names[i] % G::_nsites_per_locus[i], 0);
         }
-        output(format("  True speciation rate: %g\n") % G::_sim_lambda, 0);
-        output(format("  True extinction rate: %g\n") % G::_sim_mu, 0);
+        output(format("  True speciation rate: %g\n") % G::_lambda, 0);
+        output(format("  True extinction rate: %g\n") % G::_mu, 0);
         output(format("  True sampling rate: %g\n") % G::_sim_rho, 0);
-        output(format("  True root age: %g\n") % G::_sim_root_age, 0);
+        output(format("  True root age: %g\n") % G::_root_age, 0);
 
         string tree_file_name = fnprefix + ".tre";
         ofstream treef(tree_file_name);
@@ -1316,7 +1315,6 @@ namespace proj {
                     total_branch_rates += p.getClockRate();
                 }
 
-                cout << total_branch_rates << endl;
                 double observed_mean = total_branch_rates /= _particle_vec.size();
                 
                 ofstream hpdf("hpd_branch_rates.txt");
