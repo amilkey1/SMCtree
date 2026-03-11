@@ -120,6 +120,9 @@ string G::_sim_dir = ".";
 bool G::_ruv = false;
 bool G::_coverage = false;
 
+bool G::_ruv_root_age = false;
+bool G::_coverage_root_age = false;
+
 vector<Fossil> G::_fossils;
 vector<TaxSet> G::_taxsets;
 

@@ -85,6 +85,8 @@ namespace proj {
         // validation
         static bool                     _ruv;
         static bool                     _coverage;
+        static bool                     _ruv_root_age;
+        static bool                     _coverage_root_age;
 
         // Useful constants
         static double                   _small_enough;

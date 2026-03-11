@@ -72,6 +72,7 @@ namespace proj {
             vector<Lot::SharedPtr>      _group_rng;
             vector<unsigned>            _indices_to_keep; // indices of particles to write to output files
             vector<pair<double, double>> _hpd_values;
+        vector<pair<double, double>> _hpd_values_root_ages;
     };
 
     inline Proj::Proj() {
@@ -143,6 +144,8 @@ namespace proj {
         // the following variables relate to validation analyses
         ("ruv", boost::program_options::value(&G::_ruv)->default_value(false), "run ruv analysis")
         ("coverage", boost::program_options::value(&G::_coverage)->default_value(false), "run coverage analysis")
+        ("ruv_root_age", boost::program_options::value(&G::_ruv_root_age)->default_value(false), "run ruv analysis for root age")
+        ("coverage_root_age", boost::program_options::value(&G::_coverage_root_age)->default_value(false), "run coverage analysis for root age")
         ;
         
         store(parse_command_line(argc, argv, desc), vm);
@@ -618,6 +621,11 @@ namespace proj {
         double first_split_height = _particle_vec[0].getHeightFirstSplit();
         splitf << first_split_height << endl;
         
+        string root_age_f = "true_root_age.txt";
+        ofstream rootagef(root_age_f);
+        double root_age = _particle_vec[0].getRootAge();
+        rootagef << root_age << endl;
+        
         ofstream fossilf("nodes_with_fossil_calibration_ages.txt");
         vector<double> node_heights = _particle_vec[0].getHeightNodesWithFossilCalibrations();
         for (auto &n:node_heights) {
@@ -882,6 +890,44 @@ namespace proj {
                 rankf << "rank: " << index_value << endl;
             }
             
+            if (G::_ruv_root_age) {
+                // get true root height from sim directory (read in as command line option)
+                string rootfname;
+                if (G::_sim_dir != ".") {
+                    rootfname = G::_sim_dir + "true_root_age.txt";
+                }
+                else {
+                    rootfname = "true_root_age.txt";
+                }
+                ifstream inputf(rootfname);
+                double true_root_age = 0.0;
+                string line;
+                while (getline(inputf, line)) {
+                    true_root_age = stod(line);
+                    break;
+                }
+                
+                vector<pair<double, bool>> sampled_root_ages;
+                for (auto &p:_particle_vec) {
+                    double sampled_root_age = p.getRootAge();
+                    sampled_root_ages.push_back(make_pair(sampled_root_age, false));
+                }
+                
+                sampled_root_ages.push_back(make_pair(true_root_age, true)); // true first split height
+                
+                // sort split heights
+                sort(sampled_root_ages.begin(), sampled_root_ages.end());
+
+                // find rank of truth
+                auto it = std::find_if(sampled_root_ages.begin(), sampled_root_ages.end(), [&](const pair<double, bool>& p) { return p.second == true;});
+                unsigned index_value = (unsigned) std::distance(sampled_root_ages.begin(), it);
+                
+                // write rank value to file
+                
+                ofstream rankf("rank_root_age.txt");
+                rankf << "rank: " << index_value << endl;
+            }
+            
             if (G::_coverage) {
                 assert (_hpd_values.size() > 0);
                 
@@ -936,6 +982,62 @@ namespace proj {
 
                 // write min and max to file
                 hpdf << min << "\t" << max << "\t" << true_split_height << "\t" << observed_mean << endl;
+            }
+            
+            if (G::_coverage_root_age) {
+                assert (_hpd_values_root_ages.size() > 0);
+                
+                // get height of first split from sim directory (read in as command line option)
+                string rootfname;
+                if (G::_sim_dir != ".") {
+                    rootfname = G::_sim_dir + "true_root_age.txt";
+                }
+                else {
+                    rootfname = "true_root_age.txt";
+                }
+                ifstream inputf(rootfname);
+                double true_root_age = 0.0;
+                string line;
+                while (getline(inputf, line)) {
+                    true_root_age = stod(line);
+                    break;
+                }
+                
+                // get average first split height
+                double total_root_ages = 0.0;
+                for (auto &p:_particle_vec) {
+                    total_root_ages += p.getRootAge();
+                }
+
+                double observed_mean = total_root_ages /= _particle_vec.size();
+                
+                ofstream hpdf("hpd_root_age.txt");
+                hpdf << "min    " << "max   " << "true    " << "observed mean   " << endl;
+
+                // sort hpd values largest to smallest
+                std::sort(_hpd_values_root_ages.begin(), _hpd_values_root_ages.end());
+                std::reverse(_hpd_values_root_ages.begin(), _hpd_values_root_ages.end());
+
+                // take first 95% of values (round down to nearest integer)
+                double total = boost::size(_hpd_values_root_ages);
+                double ninety_five_index = floor(0.95*total);
+
+                if (ninety_five_index == 0) {
+                    ninety_five_index = 1;
+                }
+
+                vector<double> hpd_values_in_range;
+
+                for (unsigned h=0; h<ninety_five_index; h++) {
+                    hpd_values_in_range.push_back(_hpd_values_root_ages[h].second);
+                }
+
+                auto max = *std::max_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
+                auto min = *std::min_element(hpd_values_in_range.begin(), hpd_values_in_range.end());
+                assert (min < max || min == max);
+
+                // write min and max to file
+                hpdf << min << "\t" << max << "\t" << true_root_age << "\t" << observed_mean << endl;
             }
             
         }
@@ -1525,6 +1627,10 @@ namespace proj {
             
             if (G::_coverage) {
                 _hpd_values.push_back(make_pair(log_posterior, p.getHeightFirstSplit()));
+            }
+            
+            if (G::_coverage_root_age) {
+                _hpd_values_root_ages.push_back(make_pair(log_posterior, p.getRootAge()));
             }
 
             double clock_rate = p.getClockRate();
