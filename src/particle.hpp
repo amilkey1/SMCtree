@@ -32,7 +32,6 @@ class Particle {
         void                                    clearPartials();
         void                                    drawClockRate();
         double                                  getClockRate() {return _clock_rate;}
-        void                                    setSimClockRate();
         void                                    createTrivialForest();
         void                                    setClockRate(double rate) {_clock_rate = rate;}
         void                                    simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites);
@@ -471,10 +470,6 @@ class Particle {
 
     inline void Particle::drawClockRate() {
         _clock_rate = _lot->gamma(1, G::_clock_rate);
-    }
-
-    inline void Particle::setSimClockRate() {
-        _clock_rate = G::_sim_clock_rate;
     }
 
     inline void Particle::simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites) {

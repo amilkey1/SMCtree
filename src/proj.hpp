@@ -1043,7 +1043,7 @@ namespace proj {
                 
                 vector<pair<double, bool>> sampled_branch_rates;
                 for (auto &p:_particle_vec) {
-                    double sampled_branch_rate = p.getEstMu();
+                    double sampled_branch_rate = p.getClockRate();
                     sampled_branch_rates.push_back(make_pair(sampled_branch_rate, false));
                 }
                 

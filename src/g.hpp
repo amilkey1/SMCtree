@@ -18,11 +18,8 @@ namespace proj {
         // Program settings used in processCommandLineOptions
         static string                   _sim_filename_prefix;
         static unsigned                 _sim_ntaxa;
-        static double                   _sim_lambda;
-        static double                   _sim_mu;
         static double                   _sim_rho;
         static double                   _sim_root_age;
-        static double                   _sim_clock_rate;
         static unsigned                 _rnseed;
         static unsigned                 _nthreads;
         static unsigned                 _verbosity;
