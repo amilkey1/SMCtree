@@ -340,6 +340,10 @@ class Particle {
         if (G::_est_root_age) {
             param_prior += log(G::_root_age) - (_estimated_root_age * G::_root_age);
         }
+        
+        if (G::_est_clock_rate) {
+            param_prior += log(G::_clock_rate) - (_clock_rate * G::_clock_rate);
+        }
                 
         double total_prior = tree_prior + param_prior;
         return total_prior;

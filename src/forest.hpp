@@ -1488,18 +1488,18 @@ class Forest {
             j++;
         }
         
-        if (G::_start_mode != "sim") {
-            _preorder.resize(other._preorder.size());
-            if (other._preorder.size() > 0) {
-                unsigned m = 0;
-                for (auto &othernd : other._preorder) {
-                    unsigned n = othernd->_number;
-                    Node * nd = &_nodes[n];
-                    _preorder[m] = nd;
-                    m++;
-                }
-            }
-        }
+//        if (G::_start_mode != "sim") {
+//            _preorder.resize(other._preorder.size());
+//            if (other._preorder.size() > 0) {
+//                unsigned m = 0;
+//                for (auto &othernd : other._preorder) {
+//                    unsigned n = othernd->_number;
+//                    Node * nd = &_nodes[n];
+//                    _preorder[m] = nd;
+//                    m++;
+//                }
+//            }
+//        }
     }
 
     inline double Forest::calcSimTransitionProbability(unsigned from, unsigned to, const vector<double> & pi, double edge_length, double clock_rate) {
