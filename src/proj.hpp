@@ -141,8 +141,8 @@ namespace proj {
         ("taxset",  value(&taxsets), "a string defining a taxon set, e.g. 'Ursinae: Helarctos_malayanus Melursus_ursinus Ursus_abstrusus Ursus_americanus Ursus_arctos Ursus_maritimus Ursus_spelaeus Ursus_thibetanus'")
         ("simfossil",  value(&sim_fossils), "a string defining a fossil, e.g. 'Ursus_abstrusus         1.8–5.3 4.3' (4.3 is time, 1.8-5.3 is prior range)")
         // the following variables relate to validation analyses
-        ("ruv", boost::program_options::value(&G::_ruv)->default_value(false), "run ruv analysis")
-        ("coverage", boost::program_options::value(&G::_coverage)->default_value(false), "run coverage analysis")
+        ("ruv", boost::program_options::value(&G::_ruv)->default_value(false), "run ruv analysis for calibrated node")
+        ("coverage", boost::program_options::value(&G::_coverage)->default_value(false), "run coverage analysis for calibrated node")
         ("ruv_root_age", boost::program_options::value(&G::_ruv_root_age)->default_value(false), "run ruv analysis for root age")
         ("coverage_root_age", boost::program_options::value(&G::_coverage_root_age)->default_value(false), "run coverage analysis for root age")
         ("ruv_lambda", boost::program_options::value(&G::_ruv_lambda)->default_value(false), "run ruv analysis for lambda")
@@ -876,10 +876,10 @@ namespace proj {
                 // get height of first split from sim directory (read in as command line option)
                 string splitfname;
                 if (G::_sim_dir != ".") {
-                    splitfname = G::_sim_dir + "height_of_first_split.txt";
+                    splitfname = G::_sim_dir + "nodes_with_fossil_calibration_ages.txt";
                 }
                 else {
-                    splitfname = "height_of_first_split.txt";
+                    splitfname = "nodes_with_fossil_calibration_ages.txt";
                 }
                 ifstream inputf(splitfname);
                 double true_split_height = 0.0;
@@ -889,24 +889,24 @@ namespace proj {
                     break;
                 }
                 
-                vector<pair<double, bool>> first_split_heights;
+                vector<pair<double, bool>> split_heights;
                 for (auto &p:_particle_vec) {
-                    double first_split_height = p.getHeightFirstSplit();
-                    first_split_heights.push_back(make_pair(first_split_height, false));
+                    double split_height = p.getHeightNodesWithFossilCalibrations()[0];
+                    split_heights.push_back(make_pair(split_height, false));
                 }
                 
-                first_split_heights.push_back(make_pair(true_split_height, true)); // true first split height
+                split_heights.push_back(make_pair(true_split_height, true)); // true first split height
                 
                 // sort split heights
-                sort(first_split_heights.begin(), first_split_heights.end());
+                sort(split_heights.begin(), split_heights.end());
 
                 // find rank of truth
-                auto it = std::find_if(first_split_heights.begin(), first_split_heights.end(), [&](const pair<double, bool>& p) { return p.second == true;});
-                unsigned index_value = (unsigned) std::distance(first_split_heights.begin(), it);
+                auto it = std::find_if(split_heights.begin(), split_heights.end(), [&](const pair<double, bool>& p) { return p.second == true;});
+                unsigned index_value = (unsigned) std::distance(split_heights.begin(), it);
                 
                 // write rank value to file
                 
-                ofstream rankf("rank_first_split.txt");
+                ofstream rankf("rank_calibrated_node.txt");
                 rankf << "rank: " << index_value << endl;
             }
             
@@ -1068,10 +1068,10 @@ namespace proj {
                 // get height of first split from sim directory (read in as command line option)
                 string splitfname;
                 if (G::_sim_dir != ".") {
-                    splitfname = G::_sim_dir + "height_of_first_split.txt";
+                    splitfname = G::_sim_dir + "nodes_with_fossil_calibration_ages.txt";
                 }
                 else {
-                    splitfname = "height_of_first_split.txt";
+                    splitfname = "nodes_with_fossil_calibration_ages.txt";
                 }
                 ifstream inputf(splitfname);
                 double true_split_height = 0.0;
@@ -1084,7 +1084,7 @@ namespace proj {
                 // get average first split height
                 double total_first_split_heights = 0.0;
                 for (auto &p:_particle_vec) {
-                    total_first_split_heights += p.getHeightFirstSplit();
+                    total_first_split_heights += p.getHeightNodesWithFossilCalibrations()[0];
                 }
 
                 double observed_mean = total_first_split_heights /= _particle_vec.size();
@@ -1928,7 +1928,7 @@ namespace proj {
             double log_posterior = total_log_prior + log_likelihood;
             
             if (G::_coverage) {
-                _hpd_values.push_back(make_pair(log_posterior, p.getHeightFirstSplit()));
+                _hpd_values.push_back(make_pair(log_posterior, p.getHeightNodesWithFossilCalibrations()[0]));
             }
             
             if (G::_coverage_root_age) {
