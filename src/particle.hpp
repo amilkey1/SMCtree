@@ -669,8 +669,12 @@ class Particle {
                 // a * b == G::_root_age
                 // a * b^2 = G::_root_age
                 // a = G::_root_age
-                // b = 1
-                _estimated_root_age = _lot->gamma(G::_root_age, 1.0);
+                // b = 0.5
+                _estimated_root_age = _lot->gamma(G::_root_age / 0.5, 0.5);
+                
+                // mean = G::_root_age
+                // variance = G::_root_age;
+                
                 if (max_fossil_age != -1) {
                     if (_estimated_root_age > max_fossil_age) {
                         done = true;
