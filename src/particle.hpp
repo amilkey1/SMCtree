@@ -670,7 +670,9 @@ class Particle {
                 // a * b^2 = G::_root_age
                 // a = G::_root_age
                 // b = 0.5
-                _estimated_root_age = _lot->gamma(G::_root_age / 0.5, 0.5);
+                double a = G::_root_age / 0.1;
+                double b = 0.1;
+                _estimated_root_age = _lot->gamma(a, b);
                 
                 // mean = G::_root_age
                 // variance = G::_root_age;
