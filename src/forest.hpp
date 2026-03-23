@@ -90,7 +90,7 @@ class Forest {
         vector<double>              _increments;
         vector<pair<Node*, Node*>>  _node_choices;
         double                      _partial_count;
-        double                      _weight_correction; // correct for taxon set constraints
+//        double                      _weight_correction; // correct for taxon set constraints
         double                      _first_split_prior;
         double                      _tree_height;
 };
@@ -140,7 +140,7 @@ class Forest {
         _nleaves = 0;
         _node_choices.clear();
         _partial_count = 0;
-        _weight_correction = 0.0;
+//        _weight_correction = 0.0;
         _tree_height = 0.0;
     }
 
@@ -1425,7 +1425,7 @@ class Forest {
         _increments                = other._increments;
         _node_choices              = other._node_choices;
         _partial_count = other._partial_count;
-        _weight_correction = other._weight_correction;
+//        _weight_correction = other._weight_correction;
         _first_split_prior = other._first_split_prior;
         _tree_height = other._tree_height;
         _log_likelihood = other._log_likelihood;

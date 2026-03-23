@@ -125,7 +125,7 @@ namespace proj {
     
     inline tuple<double, pair<unsigned, unsigned>, pair<bool, double>> ForestExtension::chooseNodesToJoin(vector<TaxSet> &taxset, vector<TaxSet> &unused_taxset, vector<TaxSet> &taxset_no_fossils, vector<TaxSet> &unused_taxset_no_fossils, vector<Fossil> &particle_fossils, vector<bool> &valid_taxsets) {
         
-        double weight_correction = 0.0;
+//        double weight_correction = 0.0;
 
         vector<unsigned> set_counts;
         
@@ -214,18 +214,18 @@ namespace proj {
                 total_choices += num_choices;
             }
             
-            double weight_posterior = 0;
+//            double weight_posterior = 0;
             
             for (auto &s:set_probabilities) { //s * s  because you have ex (3/4) probability of choosing a taxset * 3 taxa within that taxset
-                weight_posterior += (s * s / total_choices);
+//                weight_posterior += (s * s / total_choices);
                 s /= total_choices;
             }
             
             double nlineages = (double) _docked_gene_forest->_lineages.size();
-            double weight_prior = 1 / ((nlineages * (nlineages - 1)) / 2);
-            weight_posterior = 1 / weight_posterior;
+//            double weight_prior = 1 / ((nlineages * (nlineages - 1)) / 2);
+//            weight_posterior = 1 / weight_posterior;
             
-            weight_correction = weight_prior / weight_posterior;
+//            weight_correction = weight_prior / weight_posterior;
             
             assert (set_probabilities.size() > 0);
             
@@ -280,6 +280,7 @@ namespace proj {
         }
         
         pair<bool, double> fossil_info = make_pair(fossil_constraint, fossil_age);
+        double weight_correction = 0.0;
         return make_tuple(weight_correction, t, fossil_info);
     }
 
