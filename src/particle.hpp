@@ -473,7 +473,14 @@ class Particle {
     }
 
     inline void Particle::drawClockRate() {
-        _clock_rate = _lot->gamma(1, G::_clock_rate);
+        if (G::_prior_distribution == 0) {
+            // exponential distribution
+            _clock_rate = _lot->gamma(1, G::_clock_rate);
+        }
+        else {
+            // gamma distribution
+            _clock_rate = _lot->gamma(G::_root_age, 1.0);
+        }
     }
 
     inline void Particle::simulateData(Lot::SharedPtr lot, Data::SharedPtr data, unsigned starting_site, unsigned nsites) {
@@ -629,22 +636,49 @@ class Particle {
             max_fossil_age = _particle_fossils.back()._age;
         }
             
-        bool done = false;
-        while (!done) {
-            // Gamma(1, n) = Exp(1/n)
-            // mean = n
-            // for now, n = G::_root_age set by user
-            _estimated_root_age = _lot->gamma(1, G::_root_age);
-//            _estimated_root_age = _lot->uniformConstrained(G::_root_age_min, G::_root_age_max);
-//            assert (_estimated_root_age >= G::_root_age_min);
-//            assert (_estimated_root_age <= G::_root_age_max);
-            if (max_fossil_age != -1) {
-                if (_estimated_root_age > max_fossil_age) {
+        if (G::_prior_distribution == 0) {
+            // exponential distribution
+            bool done = false;
+            while (!done) {
+                // Gamma(1, n) = Exp(1/n)
+                // mean = n
+                // for now, n = G::_root_age set by user
+                _estimated_root_age = _lot->gamma(1, G::_root_age);
+                //            _estimated_root_age = _lot->uniformConstrained(G::_root_age_min, G::_root_age_max);
+                //            assert (_estimated_root_age >= G::_root_age_min);
+                //            assert (_estimated_root_age <= G::_root_age_max);
+                if (max_fossil_age != -1) {
+                    if (_estimated_root_age > max_fossil_age) {
+                        done = true;
+                    }
+                }
+                else {
                     done = true;
                 }
             }
-            else {
-                done = true;
+        }
+        
+        else {
+            // gamma distribution
+            bool done = false;
+            while (!done) {
+                // Gamma(a, b)
+                // mean = a * b
+                // variance = a * b^2
+                // for now, mean = G::_root_age set by user
+                // a * b == G::_root_age
+                // a * b^2 = G::_root_age
+                // a = G::_root_age
+                // b = 1
+                _estimated_root_age = _lot->gamma(G::_root_age, 1.0);
+                if (max_fossil_age != -1) {
+                    if (_estimated_root_age > max_fossil_age) {
+                        done = true;
+                    }
+                }
+                else {
+                    done = true;
+                }
             }
         }
     }
