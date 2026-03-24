@@ -504,7 +504,7 @@ class Particle {
         else {
             // gamma distribution
             double a = G::_clock_rate * G::_clock_rate / G::_gamma_variance;
-            double b = G::_clock_rate / G::_clock_rate;
+            double b = G::_gamma_variance / G::_clock_rate;
             _clock_rate = _lot->gamma(a,b);
         }
     }
