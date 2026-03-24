@@ -112,6 +112,7 @@ bool G::_est_mu = false;
 bool G::_est_clock_rate = false;
 bool G::_est_root_age = false;
 int G::_prior_distribution = 0;
+double G::_gamma_variance = 1.0;
 unsigned G::_ngroups = 1.0;
 unsigned G::_save_every = 1.0;
 bool G::_run_on_empty = false;

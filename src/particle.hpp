@@ -329,6 +329,7 @@ class Particle {
         
         // these params are all drawn from exponential distributions
         // this also assumes the mean of the exponential distribution is the user-specified param
+        // TODO: modify for inverse gamma
         if (G::_est_mu && G::_mu > 0.0) {
             param_prior += log(G::_mu) - (_estimated_mu * G::_mu);
         }
@@ -475,7 +476,9 @@ class Particle {
     inline void Particle::drawClockRate() {
         if (G::_prior_distribution == 0) {
             // exponential distribution
-            _clock_rate = _lot->gamma(1, G::_clock_rate);
+            double a = G::_clock_rate * G::_clock_rate / G::_gamma_variance;
+            double b = G::_clock_rate / G::_root_age;
+            _clock_rate = _lot->gamma(a,b);
         }
         else {
             // gamma distribution
@@ -665,13 +668,13 @@ class Particle {
                 // Gamma(a, b)
                 // mean = a * b
                 // variance = a * b^2
-                // for now, mean = G::_root_age set by user
+                // mean = G::_root_age set by user
                 // a * b == G::_root_age
-                // a * b^2 = G::_root_age
+                // a * b^2 = G::_gamma_variance
                 // a = G::_root_age
                 // b = 0.5
-                double a = G::_root_age / 0.1;
-                double b = 0.1;
+                double a = G::_root_age * G::_root_age / G::_gamma_variance;
+                double b = G::_gamma_variance / G::_root_age;
                 _estimated_root_age = _lot->gamma(a, b);
                 
                 // mean = G::_root_age
@@ -686,6 +689,7 @@ class Particle {
                     done = true;
                 }
             }
+            cout << _estimated_root_age << " , ";
         }
     }
 
