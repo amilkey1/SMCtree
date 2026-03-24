@@ -355,15 +355,15 @@ class Particle {
             if (G::_est_root_age) {
                 double a = G::_root_age * G::_root_age / G::_gamma_variance;
                 double b = G::_gamma_variance / G::_root_age;
-                double gamma_func_a = tgamma(a);
-                param_prior += (a - 1) * log(_estimated_root_age) - (_estimated_root_age / b) - log(gamma_func_a) - a * log(b);
+                double gamma_func_a = lgamma(a);
+                param_prior += (a - 1) * log(_estimated_root_age) - (_estimated_root_age / b) - gamma_func_a - a * log(b);
             }
             
             if (G::_est_clock_rate) {
                 double a = G::_clock_rate * G::_clock_rate / G::_gamma_variance;
                 double b = G::_gamma_variance / G::_clock_rate;
-                double gamma_func_a = tgamma(a);
-                param_prior += (a - 1) * log(_clock_rate) - ( _clock_rate/ b) - log(gamma_func_a) - a * log(b);
+                double gamma_func_a = lgamma(a);
+                param_prior += (a - 1) * log(_clock_rate) - ( _clock_rate/ b) - gamma_func_a - a * log(b);
                 
             }
         }
