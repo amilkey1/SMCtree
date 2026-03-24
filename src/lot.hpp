@@ -14,7 +14,7 @@ namespace proj {
             double                          uniformConstrained(double lower, double upper);
             int                             randint(int low, int high);
             pair<unsigned, unsigned>        nchoose2(unsigned n);
-            double                          normal(double mean, double sd);
+            double                          normal();
             double                          gamma(double shape, double scale);
             double                          logUniform();
             double                          logNormal(double mu, double sigma);
@@ -97,13 +97,8 @@ namespace proj {
         return log(u);
     }
     
-    inline double Lot::normal(double mean, double sd) {
-//        return (*_normal_variate_generator)();
-        // transform standard normal (mean = 0, sd = 1) to custom mean and sd
-        _normal_variate_generator.reset(new normal_variate_generator_t(_generator, boost::random::normal_distribution<>()));
-
-        double u = (*_normal_variate_generator)();
-        return mean + (sd * u);
+    inline double Lot::normal() {
+        return (*_normal_variate_generator)();
     }
 
     inline double Lot::gamma(double shape, double scale) {
