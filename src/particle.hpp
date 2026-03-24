@@ -330,20 +330,42 @@ class Particle {
         // these params are all drawn from exponential distributions
         // this also assumes the mean of the exponential distribution is the user-specified param
         // TODO: modify for inverse gamma
-        if (G::_est_mu && G::_mu > 0.0) {
-            param_prior += log(G::_mu) - (_estimated_mu * G::_mu);
+        if (G::_prior_distribution == 0) {
+            if (G::_est_mu && G::_mu > 0.0) {
+                param_prior += log(G::_mu) - (_estimated_mu * G::_mu);
+            }
+            
+            if (G::_est_lambda) {
+                param_prior += log(G::_lambda) - (_estimated_lambda * G::_lambda);
+            }
+            
+            if (G::_est_root_age) {
+                param_prior += log(G::_root_age) - (_estimated_root_age * G::_root_age);
+            }
+            
+            if (G::_est_clock_rate) {
+                param_prior += log(G::_clock_rate) - (_clock_rate * G::_clock_rate);
+            }
         }
-        
-        if (G::_est_lambda) {
-            param_prior += log(G::_lambda) - (_estimated_lambda * G::_lambda);
-        }
-        
-        if (G::_est_root_age) {
-            param_prior += log(G::_root_age) - (_estimated_root_age * G::_root_age);
-        }
-        
-        if (G::_est_clock_rate) {
-            param_prior += log(G::_clock_rate) - (_clock_rate * G::_clock_rate);
+        else {
+            if (G::_est_mu || G::_est_lambda) {
+                throw XProj("cannot estimate mu and lambda with gamma distribution");
+            }
+            
+            if (G::_est_root_age) {
+                double a = G::_root_age * G::_root_age / G::_gamma_variance;
+                double b = G::_gamma_variance / G::_root_age;
+                double gamma_func_a = tgamma(a);
+                param_prior += (a - 1) * log(_estimated_root_age) - (_estimated_root_age / b) - log(gamma_func_a) - a * log(b);
+            }
+            
+            if (G::_est_clock_rate) {
+                double a = G::_clock_rate * G::_clock_rate / G::_gamma_variance;
+                double b = G::_gamma_variance / G::_clock_rate;
+                double gamma_func_a = tgamma(a);
+                param_prior += (a - 1) * log(_clock_rate) - ( _clock_rate/ b) - log(gamma_func_a) - a * log(b);
+                
+            }
         }
                 
         double total_prior = tree_prior + param_prior;
