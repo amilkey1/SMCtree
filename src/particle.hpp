@@ -689,7 +689,7 @@ class Particle {
                     done = true;
                 }
             }
-            cout << _estimated_root_age << " , ";
+//            cout << _estimated_root_age << " , ";
         }
     }
 
