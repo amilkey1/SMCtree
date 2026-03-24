@@ -497,14 +497,15 @@ class Particle {
 
     inline void Particle::drawClockRate() {
         if (G::_prior_distribution == 0) {
-            // exponential distribution
-            double a = G::_clock_rate * G::_clock_rate / G::_gamma_variance;
-            double b = G::_clock_rate / G::_root_age;
-            _clock_rate = _lot->gamma(a,b);
+            // Gamma(1, n) = Exp(1/n)
+            // mean = n
+            _estimated_root_age = _lot->gamma(1, G::_clock_rate);
         }
         else {
             // gamma distribution
-            _clock_rate = _lot->gamma(G::_root_age, 1.0);
+            double a = G::_clock_rate * G::_clock_rate / G::_gamma_variance;
+            double b = G::_clock_rate / G::_clock_rate;
+            _clock_rate = _lot->gamma(a,b);
         }
     }
 
