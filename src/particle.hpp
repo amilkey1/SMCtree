@@ -500,7 +500,7 @@ class Particle {
         if (G::_prior_distribution == 0) {
             // Gamma(1, n) = Exp(1/n)
             // mean = n
-            _estimated_root_age = _lot->gamma(1, G::_clock_rate);
+            _clock_rate = _lot->gamma(1, G::_clock_rate);
         }
         else {
             // gamma distribution
