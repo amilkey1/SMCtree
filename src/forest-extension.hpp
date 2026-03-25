@@ -531,10 +531,10 @@ namespace proj {
          }
 
 
-        if (G::_run_on_empty) {
-            _log_weight = 0.0;
-        }
-        else {
+//        if (G::_run_on_empty) {
+//            _log_weight = 0.0;
+//        }
+//        else {
             if (fossil_constraint) {
                 // TODO: I don't think this works if > 2 taxa in clade
                 assert (fossil_age != -1);
@@ -544,6 +544,9 @@ namespace proj {
 //                if ((getLineageHeight(_docked_gene_forest->_lineages.back()->_left_child) + _proposed_delta )< fossil_age) {
                     // fossil age is violated
                     _log_weight = -1 * G::_infinity;
+                    if (G::_run_on_empty * _log_weight != -1 * G::_infinity) {
+                        _log_weight = 0.0;
+                    }
                 }
                 else if (G::_start_mode != "sim") {
                     if (G::_model_type == G::ModelType::MODEL_TYPE_JC) {
@@ -560,18 +563,20 @@ namespace proj {
             }
             else if (G::_start_mode != "sim") {
                 // Compute partial likelihood array of ancestral node
-                if (G::_model_type == G::ModelType::MODEL_TYPE_JC) {
-                    _log_weight = _docked_gene_forest->calcPartialArrayLazyJC(&_proposed_anc, _proposed_lchild, _proposed_rchild, clock_rate);
+                if (!G::_run_on_empty) {
+                    if (G::_model_type == G::ModelType::MODEL_TYPE_JC) {
+                        _log_weight = _docked_gene_forest->calcPartialArrayLazyJC(&_proposed_anc, _proposed_lchild, _proposed_rchild, clock_rate);
+                    }
+                    else {
+                        _log_weight = _docked_gene_forest->calcPartialArrayLazyHKY(&_proposed_anc, _proposed_lchild, _proposed_rchild, clock_rate);
+                    }
+                    _log_weight += weight_correction;
                 }
-                else {
-                    _log_weight = _docked_gene_forest->calcPartialArrayLazyHKY(&_proposed_anc, _proposed_lchild, _proposed_rchild, clock_rate);
-                }
-                _log_weight += weight_correction;
             }
             else {
                 _log_weight = 0.0; // weight is 0 if simulation
             }
-        }
+//        }
     }
     
     inline PartialStore::partial_t ForestExtension::getExtensionPartial() {

@@ -66,6 +66,7 @@ class Particle {
         void    drawMu();
         void    drawLambdaAndMu();
         void    drawRootAge();
+        void    setLogWeight(double weight){_log_weight = weight;}
 
     
         // validation stuff
@@ -277,12 +278,12 @@ class Particle {
             assert (_forest_ptr->_lineages.size() == 2);
         }
         
-        if (G::_run_on_empty) {
-            _log_weight = 0.0;
-        }
-        else {
+//        if (G::_run_on_empty) {
+//            _log_weight = 0.0;
+//        }
+//        else {
             _log_weight = _forest_extension.getLogWeight();
-        }
+//        }
     }
 
     inline void Particle::showParticle() {

@@ -1615,7 +1615,6 @@ namespace proj {
         unsigned count = 0;
         if (G::_nthreads == 1) {
             for (auto & p : _particle_vec) {
-
                 p.proposal(step_number);
                 count++;
             }
