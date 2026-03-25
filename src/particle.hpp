@@ -354,15 +354,15 @@ class Particle {
             }
             
             if (G::_est_root_age) {
-                double a = G::_root_age * G::_root_age / G::_gamma_variance;
-                double b = G::_gamma_variance / G::_root_age;
+                double a = G::_root_age * G::_root_age / G::_gamma_variance_root_age;
+                double b = G::_gamma_variance_root_age / G::_root_age;
                 double gamma_func_a = lgamma(a);
                 param_prior += (a - 1) * log(_estimated_root_age) - (_estimated_root_age / b) - gamma_func_a - a * log(b);
             }
             
             if (G::_est_clock_rate) {
-                double a = G::_clock_rate * G::_clock_rate / G::_gamma_variance;
-                double b = G::_gamma_variance / G::_clock_rate;
+                double a = G::_clock_rate * G::_clock_rate / G::_gamma_variance_clock_rate;
+                double b = G::_gamma_variance_clock_rate / G::_clock_rate;
                 double gamma_func_a = lgamma(a);
                 param_prior += (a - 1) * log(_clock_rate) - ( _clock_rate/ b) - gamma_func_a - a * log(b);
                 
@@ -425,9 +425,24 @@ class Particle {
         _estimated_lambda = 0.0;
         _estimated_mu = 0.0;
         
-        while (_estimated_lambda <= _estimated_mu) {
-            _estimated_lambda = _lot->gamma(1, G::_lambda);
-            _estimated_mu = _lot->gamma(1, G::_mu);
+        if (G::_prior_distribution == 0) {
+            while (_estimated_lambda <= _estimated_mu) {
+                _estimated_lambda = _lot->gamma(1, G::_lambda);
+                _estimated_mu = _lot->gamma(1, G::_mu);
+            }
+        }
+        else {
+            while (_estimated_lambda <= _estimated_mu) {
+                // gamma distribution
+                double a = G::_lambda * G::_lambda / G::_gamma_variance_lambda;
+                double b = G::_gamma_variance_lambda / G::_lambda;
+                _estimated_lambda = _lot->gamma(a,b);
+                
+                // gamma distribution
+                double c = G::_mu * G::_mu / G::_gamma_variance_mu;
+                double d = G::_gamma_variance_mu / G::_mu;
+                _estimated_mu = _lot->gamma(c,d);
+            }
         }
     }
 
@@ -504,8 +519,8 @@ class Particle {
         }
         else {
             // gamma distribution
-            double a = G::_clock_rate * G::_clock_rate / G::_gamma_variance;
-            double b = G::_gamma_variance / G::_clock_rate;
+            double a = G::_clock_rate * G::_clock_rate / G::_gamma_variance_clock_rate;
+            double b = G::_gamma_variance_clock_rate / G::_clock_rate;
             _clock_rate = _lot->gamma(a,b);
         }
     }
@@ -697,8 +712,8 @@ class Particle {
                 // a * b^2 = G::_gamma_variance
                 // a = G::_root_age
                 // b = 0.5
-                double a = G::_root_age * G::_root_age / G::_gamma_variance;
-                double b = G::_gamma_variance / G::_root_age;
+                double a = G::_root_age * G::_root_age / G::_gamma_variance_root_age;
+                double b = G::_gamma_variance_root_age / G::_root_age;
                 _estimated_root_age = _lot->gamma(a, b);
                 
                 // mean = G::_root_age

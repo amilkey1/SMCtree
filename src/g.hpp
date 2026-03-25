@@ -41,7 +41,10 @@ namespace proj {
         static bool                     _est_mu;
         static bool                     _est_root_age;
         static int                      _prior_distribution;
-        static double                   _gamma_variance;
+        static double                   _gamma_variance_clock_rate;
+        static double                   _gamma_variance_root_age;
+        static double                   _gamma_variance_lambda;
+        static double                   _gamma_variance_mu;
         static bool                     _est_clock_rate;
         static double                   _clock_rate;
         static unsigned                 _ngroups;
