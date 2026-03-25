@@ -24,7 +24,6 @@ namespace proj {
         
             typedef boost::variate_generator<boost::mt19937 &, boost::random::uniform_01<> >                uniform_variate_generator_t;
             typedef boost::variate_generator<boost::mt19937 &, boost::random::uniform_real_distribution<> >  uniform_variate_generator_constrained_t;
-            typedef boost::variate_generator<boost::mt19937 &, boost::random::normal_distribution<> >       normal_variate_generator_t;
             typedef boost::variate_generator<boost::mt19937 &, boost::random::gamma_distribution<> >        gamma_variate_generator_t;
             typedef boost::variate_generator<boost::mt19937 &, boost::random::uniform_int_distribution<> >  uniform_int_generator_t;
             typedef boost::variate_generator<boost::mt19937 &, boost::random::lognormal_distribution<> >    lognormal_variate_generator_t;
@@ -34,7 +33,6 @@ namespace proj {
             boost::mt19937                             _generator;
             shared_ptr<uniform_variate_generator_t>    _uniform_variate_generator;
             std::shared_ptr<uniform_variate_generator_constrained_t>    _uniform_variate_generator_constrained;
-            shared_ptr<normal_variate_generator_t>     _normal_variate_generator;
             shared_ptr<gamma_variate_generator_t>      _gamma_variate_generator;
             shared_ptr<uniform_int_generator_t>        _uniform_int_generator;
             shared_ptr<lognormal_variate_generator_t>  _lognormal_variate_generator;
@@ -53,7 +51,6 @@ namespace proj {
     inline Lot::Lot() : _seed(0), _gamma_shape(1.0), _low(0), _high(100) {
         _generator.seed(static_cast<unsigned int>(time(0)));
         _uniform_variate_generator = shared_ptr<uniform_variate_generator_t>(new uniform_variate_generator_t(_generator, boost::random::uniform_01<>()));
-        _normal_variate_generator = shared_ptr<normal_variate_generator_t>(new normal_variate_generator_t(_generator, boost::random::normal_distribution<>(_mean, _sd)));
         _gamma_variate_generator = shared_ptr<gamma_variate_generator_t>(new gamma_variate_generator_t(_generator, boost::random::gamma_distribution<>(_gamma_shape)));
         _uniform_int_generator = shared_ptr<uniform_int_generator_t>(new uniform_int_generator_t(_generator, boost::random::uniform_int_distribution<>(_low, _high)));
         _lognormal_variate_generator = shared_ptr<lognormal_variate_generator_t>(new lognormal_variate_generator_t(_generator, boost::random::lognormal_distribution<>()));
