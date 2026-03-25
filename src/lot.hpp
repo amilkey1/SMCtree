@@ -14,7 +14,6 @@ namespace proj {
             double                          uniformConstrained(double lower, double upper);
             int                             randint(int low, int high);
             pair<unsigned, unsigned>        nchoose2(unsigned n);
-            double                          normal();
             double                          gamma(double shape, double scale);
             double                          logUniform();
             double                          logNormal(double mu, double sigma);
@@ -95,10 +94,6 @@ namespace proj {
         while (u <= 0.0)
             u = (*_uniform_variate_generator)();
         return log(u);
-    }
-    
-    inline double Lot::normal() {
-        return (*_normal_variate_generator)();
     }
 
     inline double Lot::gamma(double shape, double scale) {
