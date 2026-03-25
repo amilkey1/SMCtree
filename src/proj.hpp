@@ -787,14 +787,16 @@ namespace proj {
 
             // reset marginal likelihood
             _log_marginal_likelihood = 0.0;
-            vector<double> starting_log_likelihoods = p.calcGeneTreeLogLikelihoods();
             
-            _log_marginal_likelihood = 0.0;
-            for (auto &l:starting_log_likelihoods) {
-                _log_marginal_likelihood += l;
+            if (!G::_run_on_empty) {
+                vector<double> starting_log_likelihoods = p.calcGeneTreeLogLikelihoods();
+                
+                for (auto &l:starting_log_likelihoods) {
+                    _log_marginal_likelihood += l;
+                }
+                
+                _log_marginal_likelihood *= G::_ngroups;
             }
-            
-            _log_marginal_likelihood *= G::_ngroups;
             
             // initialize starting log likelihoods for all other particles
             // necessary for calculating the first weight

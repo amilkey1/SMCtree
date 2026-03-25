@@ -549,13 +549,15 @@ namespace proj {
                     }
                 }
                 else if (G::_start_mode != "sim") {
-                    if (G::_model_type == G::ModelType::MODEL_TYPE_JC) {
-                        _log_weight = _docked_gene_forest->calcPartialArrayLazyJC(&_proposed_anc, _proposed_lchild, _proposed_rchild, clock_rate);
+                    if (!G::_run_on_empty) {
+                        if (G::_model_type == G::ModelType::MODEL_TYPE_JC) {
+                            _log_weight = _docked_gene_forest->calcPartialArrayLazyJC(&_proposed_anc, _proposed_lchild, _proposed_rchild, clock_rate);
+                        }
+                        else {
+                            _log_weight = _docked_gene_forest->calcPartialArrayLazyHKY(&_proposed_anc, _proposed_lchild, _proposed_rchild, clock_rate);
+                        }
+                        _log_weight += weight_correction;
                     }
-                    else {
-                        _log_weight = _docked_gene_forest->calcPartialArrayLazyHKY(&_proposed_anc, _proposed_lchild, _proposed_rchild, clock_rate);
-                    }
-                    _log_weight += weight_correction;
                 }
                 else {
                     _log_weight = 0.0; // weight is 0 if simulation
