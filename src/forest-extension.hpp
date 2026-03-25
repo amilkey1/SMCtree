@@ -413,16 +413,17 @@ namespace proj {
                  vector<string> common_elements;
                  // Find the intersection of the two vectors
 
+                 // TODO: check this separately for all taxsets in case of multiple overlap
                  for (unsigned count = 0; count < taxset_no_fossils.size(); count++) {
                      std::set_intersection(taxset_no_fossils[count]._species_included.begin(), taxset_no_fossils[count]._species_included.end(),
-                                           unused_taxset_no_fossils[min_index]._species_included.begin(), unused_taxset_no_fossils[min_index]._species_included.end(),
+                                        unused_taxset_no_fossils[updateable_unused[min_index]]._species_included.begin(), unused_taxset_no_fossils[updateable_unused[min_index]]._species_included.end(),
                                        std::back_inserter(common_elements));
                  }
                      
                  if (common_elements.size() == 0) {
                      // add unused taxset into taxsets
                      taxset_no_fossils.push_back(unused_taxset_no_fossils[updateable_unused[min_index]]);
-                     unused_taxset_no_fossils.erase(unused_taxset_no_fossils.begin() + min_index);
+                     unused_taxset_no_fossils.erase(unused_taxset_no_fossils.begin() + updateable_unused[min_index]);
                  }
              }
          }
@@ -518,14 +519,14 @@ namespace proj {
 
                  for (unsigned count = 0; count < taxset.size(); count++) {
                      std::set_intersection(taxset[count]._species_included.begin(), taxset[count]._species_included.end(),
-                                           unused_taxset[min_index]._species_included.begin(), unused_taxset[min_index]._species_included.end(),
+                                           unused_taxset[updateable_unused[min_index]]._species_included.begin(), unused_taxset[updateable_unused[min_index]]._species_included.end(),
                                        std::back_inserter(common_elements));
                  }
                      
                  if (common_elements.size() == 0) {
                      // add unused taxset into taxsets
                      taxset.push_back(unused_taxset[updateable_unused[min_index]]);
-                     unused_taxset.erase(unused_taxset.begin() + min_index);
+                     unused_taxset.erase(unused_taxset.begin() + updateable_unused[min_index]);
                  }
              }
          }
@@ -544,7 +545,7 @@ namespace proj {
 //                if ((getLineageHeight(_docked_gene_forest->_lineages.back()->_left_child) + _proposed_delta )< fossil_age) {
                     // fossil age is violated
                     _log_weight = -1 * G::_infinity;
-                    if (G::_run_on_empty * _log_weight != -1 * G::_infinity) {
+                    if (G::_run_on_empty && _log_weight != -1 * G::_infinity) {
                         _log_weight = 0.0;
                     }
                 }

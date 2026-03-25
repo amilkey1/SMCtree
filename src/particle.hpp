@@ -260,15 +260,16 @@ class Particle {
         _forest_extension.addIncrement(increment);
 
         // save heights of each clade with a fossil calibration
-        unsigned size_before = (unsigned) _particle_taxsets.size();
+//        unsigned size_before = (unsigned) _particle_taxsets.size();
+        unsigned size_before = (unsigned) _taxset_ages.size();
         
         _forest_extension.joinPriorPrior(_particle_taxsets, _unused_particle_taxsets, _particle_taxsets_no_fossils, _unused_particle_taxsets_no_fossils, _particle_fossils, _valid_taxsets, _taxset_ages, _clock_rate);
         _total_particle_partials++;
         
-        unsigned size_after = (unsigned) _particle_taxsets.size();
+        unsigned size_after = (unsigned) _taxset_ages.size();
         
         if (size_after != size_before) {
-            assert (size_after == size_before - 1);
+            assert (size_before == size_after - 1);
             double proposed_delta = _forest_extension.getProposedDelta();
             _node_heights_with_fossil_calibrations.push_back(_forest_ptr->_tree_height + proposed_delta);
         }

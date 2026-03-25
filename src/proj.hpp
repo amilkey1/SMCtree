@@ -135,8 +135,8 @@ namespace proj {
         ("prior_distribution", boost::program_options::value(&G::_prior_distribution)->default_value(0), "use gamma (1) or exponential (0) for parameter prior distributions")
         ("gamma_variance_clock_rate", boost::program_options::value(&G::_gamma_variance_clock_rate)->default_value(1.0), "if using gamma for prior distributions, set variance for clock rate")
         ("gamma_variance_root_age", boost::program_options::value(&G::_gamma_variance_root_age)->default_value(1.0), "if using gamma for prior distributions, set variance for root age")
-        ("gamma_variance_mu", boost::program_options::value(&G::_gamma_variance_lambda)->default_value(1.0), "if using gamma for prior distributions, set variance for lambda")
-        ("gamma_variance_lambda", boost::program_options::value(&G::_gamma_variance_mu)->default_value(1.0), "if using gamma for prior distributions, set variance for mu")
+        ("gamma_variance_lambda", boost::program_options::value(&G::_gamma_variance_lambda)->default_value(1.0), "if using gamma for prior distributions, set variance for lambda")
+        ("gamma_variance_mu", boost::program_options::value(&G::_gamma_variance_mu)->default_value(1.0), "if using gamma for prior distributions, set variance for mu")
         ("estimate_clock_rate", boost::program_options::value(&G::_est_clock_rate)->default_value(false), "estimate clock rate")
         ("ngroups", boost::program_options::value(&G::_ngroups)->default_value(1.0), "number of subgroups")
         ("save_every", boost::program_options::value(&G::_save_every)->default_value(1.0), "save one out of this number of trees in params and tree files")
@@ -1764,8 +1764,18 @@ namespace proj {
                 std::set_intersection(G::_taxsets[count]._species_included.begin(), G::_taxsets[count]._species_included.end(),
                                       G::_taxsets[comparison]._species_included.begin(), G::_taxsets[comparison]._species_included.end(),
                                   std::back_inserter(common_elements));
-                if (common_elements.size() == G::_taxsets[count]._species_included.size() - 1) { // the larger taxset  goes in unused taxsets
-                    throw XProj ("can't specify multiple fossils for the same taxset; choose the older fossil");
+                if (G::_fossils.size() > 0) {
+                    if (common_elements.size() == G::_taxsets[count]._species_included.size() - 1) { // the larger taxset  goes in unused taxsets
+                        throw XProj ("can't specify multiple fossils for the same taxset; choose the older fossil");
+                    }
+                }
+                else {
+                    unsigned size1 = (unsigned) G::_taxsets[count]._species_included.size();
+                    unsigned size2 = (unsigned) G::_taxsets[comparison]._species_included.size();
+                    unsigned larger = max(size1, size2);
+                    if (common_elements.size() == larger) { // the larger taxset  goes in unused taxsets
+                        throw XProj ("can't specify multiple fossils for the same taxset; choose the older fossil");
+                    }
                 }
             }
         }
