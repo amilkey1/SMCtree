@@ -122,6 +122,7 @@ unsigned G::_ngroups = 1.0;
 unsigned G::_save_every = 1.0;
 bool G::_run_on_empty = false;
 string G::_sim_dir = ".";
+double G::_min_param_value = 0.00001;
 
 // validation
 bool G::_ruv = false;

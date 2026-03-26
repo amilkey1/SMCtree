@@ -527,13 +527,17 @@ class Particle {
         if (G::_prior_distribution_clock_rate == 0) {
             // Gamma(1, n) = Exp(1/n)
             // mean = n
-            _clock_rate = _lot->gamma(1, G::_clock_rate);
+            while (_clock_rate < G::_min_param_value) {
+                _clock_rate = _lot->gamma(1, G::_clock_rate);
+            }
         }
         else {
             // gamma distribution
-            double a = G::_clock_rate * G::_clock_rate / G::_gamma_variance_clock_rate;
-            double b = G::_gamma_variance_clock_rate / G::_clock_rate;
-            _clock_rate = _lot->gamma(a,b);
+            while (_clock_rate < G::_min_param_value) {
+                double a = G::_clock_rate * G::_clock_rate / G::_gamma_variance_clock_rate;
+                double b = G::_gamma_variance_clock_rate / G::_clock_rate;
+                _clock_rate = _lot->gamma(a,b);
+            }
         }
     }
 
@@ -698,16 +702,15 @@ class Particle {
                 // mean = n
                 // for now, n = G::_root_age set by user
                 _estimated_root_age = _lot->gamma(1, G::_root_age);
-                //            _estimated_root_age = _lot->uniformConstrained(G::_root_age_min, G::_root_age_max);
-                //            assert (_estimated_root_age >= G::_root_age_min);
-                //            assert (_estimated_root_age <= G::_root_age_max);
                 if (max_fossil_age != -1) {
-                    if (_estimated_root_age > max_fossil_age) {
+                    if (_estimated_root_age > max_fossil_age && _estimated_root_age > G::_min_param_value) {
                         done = true;
                     }
                 }
                 else {
-                    done = true;
+                    if (_estimated_root_age > G::_min_param_value) {
+                        done = true;
+                    }
                 }
             }
         }
@@ -731,13 +734,15 @@ class Particle {
                 // mean = G::_root_age
                 // variance = G::_root_age;
                 
-                if (max_fossil_age != -1) {
+                if (max_fossil_age != -1 && _estimated_root_age > G::_min_param_value) {
                     if (_estimated_root_age > max_fossil_age) {
                         done = true;
                     }
                 }
                 else {
-                    done = true;
+                    if (_estimated_root_age > G::_min_param_value) {
+                        done = true;
+                    }
                 }
             }
         }

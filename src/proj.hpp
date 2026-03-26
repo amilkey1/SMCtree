@@ -1376,9 +1376,9 @@ namespace proj {
             prob_count++;
         }
         
-        for (auto &p:_particle_vec) {
-            cout << p.getClockRate() << " , ";
-        }
+//        for (auto &p:_particle_vec) {
+//            cout << p.getClockRate() << " , ";
+//        }
         // Normalize log_weights to create discrete probability distribution
         double log_sum_weights = G::calcLogSum(probs);
         

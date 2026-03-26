@@ -83,6 +83,7 @@ namespace proj {
         static vector<double>           _double_relative_rates;
         static unsigned                 _save_every;
         static unsigned                 _step;
+        static double                   _min_param_value;
         
         static vector<Fossil>           _fossils;
         static vector<TaxSet>           _taxsets;
