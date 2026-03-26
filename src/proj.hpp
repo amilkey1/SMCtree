@@ -132,7 +132,10 @@ namespace proj {
         ("estimate_lambda", boost::program_options::value(&G::_est_lambda)->default_value(false), "estimate birth rate")
         ("estimate_mu", boost::program_options::value(&G::_est_mu)->default_value(false), "estimate death rate")
         ("estimate_root_age", boost::program_options::value(&G::_est_root_age)->default_value(false), "estimate root age")
-        ("prior_distribution", boost::program_options::value(&G::_prior_distribution)->default_value(0), "use gamma (1) or exponential (0) for parameter prior distributions")
+        ("prior_distribution_lambda", boost::program_options::value(&G::_prior_distribution_lambda)->default_value(0), "use gamma (1) or exponential (0) for lambda prior distributions")
+        ("prior_distribution_mu", boost::program_options::value(&G::_prior_distribution_mu)->default_value(0), "use gamma (1) or exponential (0) for mu prior distributions")
+        ("prior_distribution_clock_rate", boost::program_options::value(&G::_prior_distribution_clock_rate)->default_value(0), "use gamma (1) or exponential (0) for clock rate prior distributions")
+         ("prior_distribution_root_age", boost::program_options::value(&G::_prior_distribution_root_age)->default_value(0), "use gamma (1) or exponential (0) for root age prior distributions")
         ("gamma_variance_clock_rate", boost::program_options::value(&G::_gamma_variance_clock_rate)->default_value(1.0), "if using gamma for prior distributions, set variance for clock rate")
         ("gamma_variance_root_age", boost::program_options::value(&G::_gamma_variance_root_age)->default_value(1.0), "if using gamma for prior distributions, set variance for root age")
         ("gamma_variance_lambda", boost::program_options::value(&G::_gamma_variance_lambda)->default_value(1.0), "if using gamma for prior distributions, set variance for lambda")
@@ -1373,6 +1376,9 @@ namespace proj {
             prob_count++;
         }
         
+        for (auto &p:_particle_vec) {
+            cout << p.getClockRate() << " , ";
+        }
         // Normalize log_weights to create discrete probability distribution
         double log_sum_weights = G::calcLogSum(probs);
         

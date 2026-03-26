@@ -59,7 +59,6 @@ namespace proj {
         
     inline Lot::~Lot() {
         _uniform_variate_generator.reset();
-        _normal_variate_generator.reset();
         _gamma_variate_generator.reset();
         _uniform_int_generator.reset();
         _lognormal_variate_generator.reset();

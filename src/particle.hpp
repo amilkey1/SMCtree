@@ -257,6 +257,7 @@ class Particle {
         }
         
         double increment = _forest_ptr->drawBirthDeathIncrement(_lot, -1, _estimated_lambda, _estimated_mu, _estimated_root_age);
+        
         _forest_extension.addIncrement(increment);
 
         // save heights of each clade with a fossil calibration
@@ -331,42 +332,48 @@ class Particle {
         
         // these params are all drawn from exponential distributions
         // this also assumes the mean of the exponential distribution is the user-specified param
-        // TODO: modify for inverse gamma
-        if (G::_prior_distribution == 0) {
-            if (G::_est_mu && G::_mu > 0.0) {
+        if (G::_est_mu) {
+            if (G::_prior_distribution_mu == 0) {
                 param_prior += log(G::_mu) - (_estimated_mu * G::_mu);
             }
-            
-            if (G::_est_lambda) {
-                param_prior += log(G::_lambda) - (_estimated_lambda * G::_lambda);
-            }
-            
-            if (G::_est_root_age) {
-                param_prior += log(G::_root_age) - (_estimated_root_age * G::_root_age);
-            }
-            
-            if (G::_est_clock_rate) {
-                param_prior += log(G::_clock_rate) - (_clock_rate * G::_clock_rate);
+            else {
+                double a = G::_mu * G::_mu / G::_gamma_variance_mu;
+                double b = G::_gamma_variance_mu / G::_mu;
+                double gamma_func_a = lgamma(a);
+                param_prior += (a - 1) * log(_estimated_mu) - (_estimated_mu / b) - gamma_func_a - a * log(b);
             }
         }
-        else {
-            if (G::_est_mu || G::_est_lambda) {
-                throw XProj("cannot estimate mu and lambda with gamma distribution");
+        if (G::_est_lambda) {
+            if (G::_prior_distribution_lambda == 0) {
+                param_prior += log(G::_lambda) - (_estimated_lambda * G::_lambda);
             }
-            
-            if (G::_est_root_age) {
+            else {
+                double a = G::_lambda * G::_lambda / G::_gamma_variance_lambda;
+                double b = G::_gamma_variance_lambda / G::_lambda;
+                double gamma_func_a = lgamma(a);
+                param_prior += (a - 1) * log(_estimated_lambda) - (_estimated_lambda / b) - gamma_func_a - a * log(b);
+            }
+        }
+        if (G::_est_root_age) {
+            if (G::_prior_distribution_root_age == 0) {
+                param_prior += log(G::_root_age) - (_estimated_root_age * G::_root_age);
+            }
+            else {
                 double a = G::_root_age * G::_root_age / G::_gamma_variance_root_age;
                 double b = G::_gamma_variance_root_age / G::_root_age;
                 double gamma_func_a = lgamma(a);
                 param_prior += (a - 1) * log(_estimated_root_age) - (_estimated_root_age / b) - gamma_func_a - a * log(b);
             }
-            
-            if (G::_est_clock_rate) {
+        }
+        if (G::_est_clock_rate) {
+            if (G::_prior_distribution_clock_rate == 0) {
+                param_prior += log(G::_clock_rate) - (_clock_rate * G::_clock_rate);
+            }
+            else {
                 double a = G::_clock_rate * G::_clock_rate / G::_gamma_variance_clock_rate;
                 double b = G::_gamma_variance_clock_rate / G::_clock_rate;
                 double gamma_func_a = lgamma(a);
-                param_prior += (a - 1) * log(_clock_rate) - ( _clock_rate/ b) - gamma_func_a - a * log(b);
-                
+                param_prior += (a - 1) * log(_clock_rate) - (_clock_rate / b) - gamma_func_a - a * log(b);
             }
         }
                 
@@ -426,7 +433,11 @@ class Particle {
         _estimated_lambda = 0.0;
         _estimated_mu = 0.0;
         
-        if (G::_prior_distribution == 0) {
+        if (G::_prior_distribution_lambda != G::_prior_distribution_mu) {
+            throw XProj("must specify same distribution for lambda and mu");
+        }
+        
+        if (G::_prior_distribution_lambda == 0) {
             while (_estimated_lambda <= _estimated_mu) {
                 _estimated_lambda = _lot->gamma(1, G::_lambda);
                 _estimated_mu = _lot->gamma(1, G::_mu);
@@ -513,7 +524,7 @@ class Particle {
     }
 
     inline void Particle::drawClockRate() {
-        if (G::_prior_distribution == 0) {
+        if (G::_prior_distribution_clock_rate == 0) {
             // Gamma(1, n) = Exp(1/n)
             // mean = n
             _clock_rate = _lot->gamma(1, G::_clock_rate);
@@ -679,7 +690,7 @@ class Particle {
             max_fossil_age = _particle_fossils.back()._age;
         }
             
-        if (G::_prior_distribution == 0) {
+        if (G::_prior_distribution_root_age == 0) {
             // exponential distribution
             bool done = false;
             while (!done) {
@@ -729,7 +740,6 @@ class Particle {
                     done = true;
                 }
             }
-//            cout << _estimated_root_age << " , ";
         }
     }
 
