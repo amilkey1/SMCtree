@@ -68,7 +68,8 @@ namespace proj {
             Forest::SharedPtr           _sim_tree;
             Partition::SharedPtr        _partition;
             Data::SharedPtr             _data;
-            double                      _log_marginal_likelihood;
+            vector<double>              _log_marginal_likelihoods;
+            double                      _averaged_log_marginal_likelihood;
             vector<Lot::SharedPtr>      _group_rng;
             vector<unsigned>            _indices_to_keep; // indices of particles to write to output files
             vector<pair<double, double>> _hpd_values;
@@ -86,7 +87,8 @@ namespace proj {
     }
     
     inline void Proj::clear() {
-        _log_marginal_likelihood = 0.0;
+        _log_marginal_likelihoods.clear();
+        _averaged_log_marginal_likelihood = 0.0;
         _data = nullptr;
         _partition.reset(new Partition());
     }
@@ -792,16 +794,16 @@ namespace proj {
             //debugSaveParticleVectorInfo("debug-initialized.txt", 0);
 
             // reset marginal likelihood
-            _log_marginal_likelihood = 0.0;
+            _log_marginal_likelihoods.resize(G::_ngroups, 0.0);
             
             if (!G::_run_on_empty) {
                 vector<double> starting_log_likelihoods = p.calcGeneTreeLogLikelihoods();
                 
                 for (auto &l:starting_log_likelihoods) {
-                    _log_marginal_likelihood += l;
+                    for (unsigned g=0; g<G::_ngroups; g++) {
+                        _log_marginal_likelihoods[g] += l;
+                    }
                 }
-                
-                _log_marginal_likelihood *= G::_ngroups;
             }
             
             // initialize starting log likelihoods for all other particles
@@ -862,19 +864,20 @@ namespace proj {
                 
                 proposeParticles(g);
                 
-                    if (G::_nthreads == 1) {
-                        for (unsigned a=0; a<G::_ngroups; a++) {
-                            double ess = filterParticles(g, a);
-                            output(format("     ESS = %d\n") % ess, 2);
-                        }
-                        
+                if (G::_nthreads == 1) {
+                    for (unsigned a=0; a<G::_ngroups; a++) {
+                        double ess = filterParticles(g, a);
+                        output(format("     ESS = %d\n") % ess, 2);
                     }
-                    else {
-                        filterParticlesThreading(g);
-                    }
+                    
                 }
-                
-            output(format("     log marginal likelihood = %d\n") % _log_marginal_likelihood, 2);
+                else {
+                    filterParticlesThreading(g);
+                }
+            }
+               
+            _averaged_log_marginal_likelihood = G::calcLogSum(_log_marginal_likelihoods) - log(G::_ngroups);
+            output(format("     log marginal likelihood = %d\n") % _averaged_log_marginal_likelihood, 2);
             
             writeTreeFile();
             writePartialCount();
@@ -1391,7 +1394,7 @@ namespace proj {
         transform(probs.begin(), probs.end(), probs.begin(), [log_sum_weights](double logw){return exp(logw - log_sum_weights);});
         
         // Compute component of the log marginal likelihood due to this step
-        _log_marginal_likelihood += log_sum_weights - log(G::_nparticles);
+        _log_marginal_likelihoods[group_number] += log_sum_weights - log(G::_nparticles);
         
         if (G::_verbosity > 1) {
             // Compute effective sample size
@@ -2033,7 +2036,7 @@ namespace proj {
     inline void Proj::writeLogMarginalLikelihoodFile() const {
         // this function writes the log marginal likelihood to a file
         ofstream logf ("marginal_likelihood.txt");
-        logf << "log marginal likelihood: " << _log_marginal_likelihood << "\n";
+        logf << "log marginal likelihood: " << _averaged_log_marginal_likelihood << "\n";
     }
 
     inline void Proj::buildNonzeroMap(vector<Particle> &particles, map<const void *, list<unsigned> > & nonzero_map, const vector<unsigned> & nonzeros, vector<unsigned> particle_indices, unsigned start, unsigned end) {
